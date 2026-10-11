@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LostInLimbo.LevelGen/LostInLimbo.LevelGen.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LostInLimbo.LevelGen.Tests/LostInLimbo.LevelGen.Tests.csproj" />
+  </Folder>
+</Solution>
