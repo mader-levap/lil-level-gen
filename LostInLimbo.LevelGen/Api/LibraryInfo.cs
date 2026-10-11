@@ -5,12 +5,13 @@ namespace LostInLimbo.LevelGen.Api;
 /// <summary>
 /// Information about the level generation library.
 /// </summary>
-public sealed record LibraryInfo(string Name, string Version)
+public static class LibraryInfo
 {
-  /// <summary>Library information read from the compiled assembly.</summary>
-  public static LibraryInfo Default { get; } = new(
-    Name: "LostInLimbo.LevelGen",
-    Version: ReadVersion());
+  /// <summary>Library name.</summary>
+  public const string Name = "LostInLimbo.LevelGen";
+
+  /// <summary>Library version read from the compiled assembly.</summary>
+  public static string Version { get; } = ReadVersion();
 
   /// <summary>Retrieves version number from .csproj file so you need to update project version in only one place.</summary>
   /// <returns>Version string.</returns>
