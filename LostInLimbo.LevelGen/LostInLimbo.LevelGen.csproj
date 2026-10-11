@@ -7,4 +7,22 @@
     <Version>0.0.1</Version>
   </PropertyGroup>
 
+  <!-- NuGet package metadata. Version stays a single source of truth (see Api/LibraryInfo). -->
+  <PropertyGroup>
+    <PackageId>LostInLimbo.LevelGen</PackageId>
+    <Authors>Mader Levap</Authors>
+    <Description>Engine-neutral procedural level and chunk generation library for Lost in Limbo.</Description>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/mader-levap/lil-level-gen</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/mader-levap/lil-level-gen.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>level-generation;procedural-generation;gamedev;lost-in-limbo</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE.txt" Pack="true" PackagePath="\" />
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
 </Project>

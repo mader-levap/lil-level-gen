@@ -42,14 +42,14 @@ You may use modern C# language syntax where the compiler supports it, but do not
 
 ```text
 lil-level-gen/
-├─ LostInLimbo.slnx                - Solution for level generator and its tests.
-├ AGENTS.md                        - This file.
-├ README.md, TODO.md               - Project notes and current tasks.
-├─ LostInLimbo.LevelGen/
-│  ├─ Api/                      - Contains public API.
-│  ├─ Data/                     - Contains public data contracts.
-│  └─ Internal/                 - Contains internal code.
-└─ LostInLimbo.LevelGen.Tests/
+ ├─ LostInLimbo.slnx                - Solution for level generator and its tests.
+ ├─ AGENTS.md                        - This file.
+ ├─ README.md, TODO.md               - Project notes and current tasks.
+ ├─ LostInLimbo.LevelGen/
+ │   ├─ Api/                      - Contains public API.
+ │   ├─ Data/                     - Contains public data contracts.
+ │   └─ Internal/                 - Contains internal code.
+ └─ LostInLimbo.LevelGen.Tests/
 ```
 
 - `LostInLimbo.LevelGen` contains all generator code.
@@ -75,6 +75,12 @@ Run only tests:
 
 ```bash
 dotnet test LostInLimbo.LevelGen.Tests/LostInLimbo.LevelGen.Tests.csproj
+```
+
+Pack library (only when explicitly asked):
+
+```bash
+dotnet pack LostInLimbo.LevelGen/LostInLimbo.LevelGen.csproj -c Release -o artifacts/packages
 ```
 
 Before considering work complete:
@@ -144,6 +150,7 @@ Other rules:
 ## Other
 
 - **Never commit or push.** The user reviews and commits manually.
+- Do not pack NuGet package unless explicitly asked.
 
 ## Generation design
 
