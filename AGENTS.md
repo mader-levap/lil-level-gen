@@ -45,6 +45,9 @@ lil-level-gen/
 ├─ LostInLimbo.slnx
 ├─ src/
 │  └─ LostInLimbo.LevelGen/
+│     ├─ Api/                      - Contains public API.
+│     ├─ Data/                     - Contains public data contracts.
+│     └─ Internal/                 - Contains internal code.
 └─ tests/
    └─ LostInLimbo.LevelGen.Tests/
 ```
@@ -119,6 +122,10 @@ Prefer focused tests. Example names:
 - `GenerateChunk_WithInvalidDimensions_ThrowsArgumentException`
 - `GenerateChunk_WhenCancelled_ThrowsOperationCanceledException`
 
+Other rules:
+- If bug is known, create test first, run it to make sure test catches bug, then fix bug.
+- Comment tests. Use Arrange/Act/Assert convention, for example `// Assert: Value is correct.`.
+
 ### Error handling
 
 - Validate public inputs and throw specific exceptions such as `ArgumentException`, `ArgumentOutOfRangeException`, or `InvalidOperationException`.
@@ -130,7 +137,7 @@ Prefer focused tests. Example names:
 ### Documentation
 
 - Code should be well-commented.
-- Add XML documentation comments to public types and public members.
+- Add XML documentation comments to all classes, types and members.
 - Explain non-obvious generation rules, constraints, and coordinate-system assumptions.
 - Document units, coordinate origins, and whether coordinates are inclusive or exclusive.
 
