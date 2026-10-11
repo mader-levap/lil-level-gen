@@ -6,7 +6,7 @@
 
 Its primary consumers are:
 
-- A standalone C# level editor.
+- A standalone C# level editor (uses Stride engine).
 - The future Godot or Unity game.
 - Potentially other engines through a native or data-export bridge.
 
@@ -14,14 +14,14 @@ The library generates **data only**. It does not create game-engine objects, mes
 
 ## Non-negotiable architecture rules
 
-- Keep this project engine-neutral.
+- Keep this project **engine-neutral**.
 - Do **not** add references to Godot, Unity, Stride, WPF, WinForms, Avalonia, or any game-engine SDK.
 - Do not use `Godot.*`, `UnityEngine.*`, `Stride.*`, `System.Windows.*`, or similar engine/UI namespaces.
 - Do not create `GameObject`, `Node3D`, `Mesh`, `Transform`, `Entity`, or other engine-specific objects.
 - Do not perform file I/O, console output, logging, HTTP requests, or UI work inside generation algorithms.
-- Generation methods must be deterministic for the same inputs and random seed.
+- Generation methods must be **deterministic** for the same inputs and random seed.
 - Accept randomness through an injectable seed or random-number-generator abstraction; do not use unseeded `Random` inside generation logic.
-- Return plain C# data types such as records, classes, enums, arrays, and collections.
+- Return **plain C# data types** such as records, classes, enums, arrays, and collections.
 - Keep public APIs small, explicit, and stable.
 - Prefer composition and pure functions over global state and hidden side effects.
 - Do not introduce NuGet dependencies unless they are essential, portable, and compatible with `netstandard2.1`. Even then, ask for user permission first.
@@ -42,23 +42,23 @@ You may use modern C# language syntax where the compiler supports it, but do not
 
 ```text
 lil-level-gen/
-├─ LostInLimbo.slnx
-├─ src/
-│  └─ LostInLimbo.LevelGen/
-│     ├─ Api/                      - Contains public API.
-│     ├─ Data/                     - Contains public data contracts.
-│     └─ Internal/                 - Contains internal code.
-└─ tests/
-   └─ LostInLimbo.LevelGen.Tests/
+├─ LostInLimbo.slnx                - Solution for level generator and its tests.
+├ AGENTS.md                        - This file.
+├ README.md, TODO.md               - Project notes and current tasks.
+├─ LostInLimbo.LevelGen/
+│  ├─ Api/                      - Contains public API.
+│  ├─ Data/                     - Contains public data contracts.
+│  └─ Internal/                 - Contains internal code.
+└─ LostInLimbo.LevelGen.Tests/
 ```
 
-- `src/LostInLimbo.LevelGen` contains all generator code.
-- `tests/LostInLimbo.LevelGen.Tests` contains unit and integration tests.
+- `LostInLimbo.LevelGen` contains all generator code.
+- `LostInLimbo.LevelGen.Tests` contains unit and integration tests.
 - Editor, Godot, Unity, and other engine-specific code must not be added to this library project.
 
-## Build and test
+## Basic commands
 
-Run these commands from the repository root:
+Build and test entire solution:
 
 ```bash
 dotnet build LostInLimbo.slnx
@@ -68,28 +68,28 @@ dotnet test LostInLimbo.slnx
 Build only the library:
 
 ```bash
-dotnet build src/LostInLimbo.LevelGen/LostInLimbo.LevelGen.csproj
+dotnet build LostInLimbo.LevelGen/LostInLimbo.LevelGen.csproj
 ```
 
 Run only tests:
 
 ```bash
-dotnet test tests/LostInLimbo.LevelGen.Tests/LostInLimbo.LevelGen.Tests.csproj
+dotnet test LostInLimbo.LevelGen.Tests/LostInLimbo.LevelGen.Tests.csproj
 ```
 
 Before considering work complete:
 
-1. Run `dotnet build LostInLimbo.slnx`.
-2. Run `dotnet test LostInLimbo.slnx`.
-3. Fix all warnings introduced by the change when practical.
-4. Add or update tests for new behavior, bug fixes, and edge cases.
+- Run `dotnet build LostInLimbo.slnx`.
+- Run `dotnet test LostInLimbo.slnx`.
+- Fix all warnings introduced by the change when practical.
+- Add or update tests for new behavior, bug fixes, and edge cases.
 
 ## Code style
 
 ### General coding rules
 
 - Use C# file-scoped namespaces.
-- Enable and respect nullable reference types.
+- Write null-aware code and do not silence nullable warnings with `null!` without a documented reason.
 - Use `sealed` for classes that are not intended for inheritance.
 - Prefer `record` for immutable data-transfer types.
 - Prefer `IReadOnlyList<T>`, `IReadOnlyCollection<T>`, or arrays in public APIs when callers should not mutate the result.
@@ -143,7 +143,7 @@ Other rules:
 
 ## Other
 
-- Never commit or push.
+- **Never commit or push.** The user reviews and commits manually.
 
 ## Generation design
 
