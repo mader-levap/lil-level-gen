@@ -13,8 +13,11 @@ public static class LibraryInfo
   /// <summary>Library version read from the compiled assembly.</summary>
   public static string Version { get; } = ReadVersion();
 
-  /// <summary>Retrieves version number from .csproj file so you need to update project version in only one place.</summary>
-  /// <returns>Version string.</returns>
+  /// <summary>
+  /// Reads the assembly's informational version, which is generated from the <c>Version</c>
+  /// property in the .csproj file, so the project version is defined in only one place.
+  /// </summary>
+  /// <returns>Version string without build metadata, or <c>0.0.0</c> when the assembly declares no version.</returns>
   private static string ReadVersion()
   {
     var informational = typeof(LibraryInfo).Assembly

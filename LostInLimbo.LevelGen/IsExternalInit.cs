@@ -1,9 +1,9 @@
 namespace System.Runtime.CompilerServices;
 
-// Compile-time marker required by init-only setters on netstandard2.1.
-// Never instantiated; defined here because netstandard2.1 predates it.
-// Without this shim compilation will fail.
-// This issue is specific to libraries targeting old frameworks while using modern syntax.
+// Compile-time marker needed to compile init-only setters when targeting netstandard2.1.
+// Never instantiated; the type shipped with C# 9 / .NET 5 and is not part of netstandard2.1.
+// Without this shim, compilation will fail.
+// The same applies to any target older than .NET 5 (e.g. .NET Framework) using modern syntax.
 internal sealed class IsExternalInit
 {
 }

@@ -1,4 +1,4 @@
-# Lost in Limbo solution
+# Lost in Limbo level generation
 
 ## Project overview
 
@@ -129,8 +129,8 @@ Prefer focused tests. Example names:
 - `GenerateChunk_WhenCancelled_ThrowsOperationCanceledException`
 
 Other rules:
-- If bug is known, create test first, run it to make sure test catches bug, then fix bug.
-- Comment tests. Use Arrange/Act/Assert convention, for example `// Assert: Value is correct.`.
+- If a bug is known, create a test first, run it to make sure the test catches the bug, then fix the bug.
+- Comment tests. Use the Arrange/Act/Assert convention, for example `// Assert: Value is correct.`
 
 ### Error handling
 
@@ -143,7 +143,7 @@ Other rules:
 ### Documentation
 
 - Code should be well-commented.
-- Add XML documentation comments to all classes, types and members.
+- Add XML documentation comments to all types and members, except for overridden methods.
 - Explain non-obvious generation rules, constraints, and coordinate-system assumptions.
 - Document units, coordinate origins, and whether coordinates are inclusive or exclusive.
 

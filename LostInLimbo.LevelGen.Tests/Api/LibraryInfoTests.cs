@@ -7,7 +7,7 @@ public sealed class LibraryInfoTests
 {
     [Fact]
     public void Name_ReturnsExpectedName() {
-      // Assert: Library returns correct name of library.
+      // Assert: Library returns the correct name of the library.
       Assert.Equal("LostInLimbo.LevelGen", LibraryInfo.Name);
     }
 
@@ -20,13 +20,13 @@ public sealed class LibraryInfoTests
 
     [Fact]
     public void Version_ReturnsAssemblyInformationalVersion() {
-      // Arrange: Get version information from .csproj file.
+      // Arrange: Read the informational version attribute from the compiled assembly.
       var expectedVersion = typeof(LibraryInfo).Assembly
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
         .InformationalVersion
         .Split('+')[0];
 
-      // Assert: Version given by library is actually from .csproj file.
+      // Assert: The version given by the library matches the assembly's informational version.
       Assert.Equal(expectedVersion, LibraryInfo.Version);
     }
 }

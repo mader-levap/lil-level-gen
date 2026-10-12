@@ -7,7 +7,7 @@
     <Version>0.0.1</Version>
   </PropertyGroup>
 
-  <!-- NuGet package metadata. Version stays a single source of truth (see Api/LibraryInfo). -->
+  <!-- NuGet package metadata. Version above is the single source of truth for the package version (see Api/LibraryInfo, which reads it). -->
   <PropertyGroup>
     <PackageId>LostInLimbo.LevelGen</PackageId>
     <Authors>Mader Levap</Authors>
