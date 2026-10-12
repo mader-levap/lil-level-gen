@@ -177,6 +177,11 @@ public ChunkData GenerateChunk(
 
 It must not depend on player position, camera, engine frame time, or scene state.
 
+### World
+
+- All dimensions (X, Y and Z) are used.
+- Important: **Z is up/down** (Blender/UE convention). Consumers that use Y as up/down need to take it in account.
+
 ### Randomness and determinism
 
 - Derive per-chunk random generators deterministically from the world seed and chunk coordinates.

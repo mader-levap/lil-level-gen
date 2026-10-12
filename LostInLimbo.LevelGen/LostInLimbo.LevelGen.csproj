@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>latest</LangVersion> 
     <Nullable>enable</Nullable>
-    <Version>0.0.1</Version>
+    <Version>0.0.2</Version>
   </PropertyGroup>
 
   <!-- NuGet package metadata. Version above is the single source of truth for the package version (see Api/LibraryInfo, which reads it). -->
@@ -19,6 +19,10 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>level-generation;procedural-generation;gamedev;lost-in-limbo</PackageTags>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="10.0.12" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="..\LICENSE.txt" Pack="true" PackagePath="\" />
