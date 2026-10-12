@@ -7,9 +7,9 @@ namespace LostInLimbo.LevelGen.Data.Config;
 /// </summary>
 /// <remarks>
 /// The level is laid out as a top-down X/Y/Z grid of chunks. All values are counts of chunks,
-/// not cells. Use <see cref="ChunkSize"/> to control how many cells a single chunk contains.
+/// not cells. Use <see cref="CnfChunkSize"/> to control how many cells a single chunk contains.
 /// </remarks>
-public sealed record LevelSize
+public sealed record CnfLevelSize
 {
   /// <summary>Default number of chunks along the X axis.</summary>
   public const int DefaultX = 3;
@@ -21,7 +21,7 @@ public sealed record LevelSize
   public const int DefaultZ = 3;
 
   /// <summary>Shared default instance (3x3x3 chunks).</summary>
-  public static LevelSize Default { get; } = new();
+  public static CnfLevelSize Default { get; } = new();
 
   /// <summary>Number of chunks along the X axis. Must be at least 1.</summary>
   public int X { get; init; } = DefaultX;

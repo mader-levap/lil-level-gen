@@ -10,10 +10,10 @@ namespace LostInLimbo.LevelGen.Data.Config;
 /// Pure data; no randomness is performed here. Every per-chunk random generator is derived
 /// deterministically from <see cref="Seed"/>, so the same seed with the same configuration
 /// always produces the same level. The shape maps one-to-one to JSON via
-/// <c>LostInLimbo.LevelGen.Api.LevelGenerationConfigSerializer</c>; future settings are added
+/// <c>LostInLimbo.LevelGen.Api.CnfLevelGenerationSerializer</c>; future settings are added
 /// as new nested section records to keep the root small as the number of knobs grows.
 /// </remarks>
-public sealed record LevelGenerationConfig
+public sealed record CnfLevelGeneration
 {
   /// <summary>Version of the configuration format currently written by the serializer.</summary>
   public const int CurrentConfigVersion = 1;
@@ -31,10 +31,10 @@ public sealed record LevelGenerationConfig
   public long Seed { get; init; }
 
   /// <summary>Size of the whole level, in chunks.</summary>
-  public LevelSize LevelSize { get; init; } = LevelSize.Default;
+  public CnfLevelSize LevelSize { get; init; } = CnfLevelSize.Default;
 
   /// <summary>Size of a single chunk, in cells.</summary>
-  public ChunkSize ChunkSize { get; init; } = ChunkSize.Default;
+  public CnfChunkSize ChunkSize { get; init; } = CnfChunkSize.Default;
 
   /// <summary>
   /// Validates every invariant of this configuration, including its sections.

@@ -8,9 +8,9 @@ namespace LostInLimbo.LevelGen.Data.Config;
 /// <remarks>
 /// Cells are the smallest unit of the generation grid: room and corridor placement happens in
 /// cells. The cell grid of a chunk is local to that chunk; world position is derived from the
-/// chunk's coordinates in the level (see <see cref="LevelSize"/>).
+/// chunk's coordinates in the level (see <see cref="CnfLevelSize"/>).
 /// </remarks>
-public sealed record ChunkSize
+public sealed record CnfChunkSize
 {
   /// <summary>Default number of cells along the X axis.</summary>
   public const int DefaultX = 16;
@@ -22,7 +22,7 @@ public sealed record ChunkSize
   public const int DefaultZ = 16;
 
   /// <summary>Shared default instance (16x16x16 cells).</summary>
-  public static ChunkSize Default { get; } = new();
+  public static CnfChunkSize Default { get; } = new();
 
   /// <summary>Number of cells along the X axis. Must be at least 1.</summary>
   public int X { get; init; } = DefaultX;

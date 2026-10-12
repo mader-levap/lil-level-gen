@@ -42,9 +42,10 @@ You may use modern C# language syntax where the compiler supports it, but do not
 
 ```text
 lil-level-gen/
- ├─ LostInLimbo.slnx                - Solution for level generator and its tests.
- ├─ AGENTS.md                        - This file.
- ├─ README.md, TODO.md               - Project notes and current tasks.
+ ├─ LostInLimbo.slnx              - Solution for level generator and its tests.
+ ├─ AGENTS.md                     - This file.
+ ├─ README.md, TODO.md            - Project notes and current tasks.
+ ├─ GENERATOR.md                  - Description of level generator.
  ├─ LostInLimbo.LevelGen/
  │   ├─ Api/                      - Contains public API.
  │   ├─ Data/                     - Contains public data contracts.

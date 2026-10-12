@@ -3,23 +3,23 @@ using LostInLimbo.LevelGen.Data.Config;
 
 namespace LostInLimbo.LevelGen.Tests.Api;
 
-public sealed class LevelGenerationConfigSerializerTests
+public sealed class CnfLevelGenerationSerializerTests
 {
   [Fact]
   public void Serialize_WithNullConfig_ThrowsArgumentNullException()
   {
     // Act/Assert: Null input is rejected.
-    Assert.Throws<ArgumentNullException>(() => LevelGenerationConfigSerializer.Serialize(null!));
+    Assert.Throws<ArgumentNullException>(() => CnfLevelGenerationSerializer.Serialize(null!));
   }
 
   [Fact]
   public void Serialize_WithDefaultConfig_ProducesIndentedCamelCaseJson()
   {
     // Arrange: A configuration with a known seed.
-    var config = new LevelGenerationConfig { Seed = 12345 };
+    var config = new CnfLevelGeneration { Seed = 12345 };
 
     // Act: Serialize it.
-    var json = LevelGenerationConfigSerializer.Serialize(config);
+    var json = CnfLevelGenerationSerializer.Serialize(config);
 
     // Assert: The canonical camelCase names and values appear in the output.
     Assert.Contains("\"configVersion\": 1", json);
@@ -33,12 +33,12 @@ public sealed class LevelGenerationConfigSerializerTests
   public void Serialize_WithSameConfig_ProducesIdenticalJson()
   {
     // Arrange: Two independently built but equal configurations.
-    var first = new LevelGenerationConfig { Seed = 7 };
-    var second = new LevelGenerationConfig { Seed = 7 };
+    var first = new CnfLevelGeneration { Seed = 7 };
+    var second = new CnfLevelGeneration { Seed = 7 };
 
     // Act: Serialize both.
-    var firstJson = LevelGenerationConfigSerializer.Serialize(first);
-    var secondJson = LevelGenerationConfigSerializer.Serialize(second);
+    var firstJson = CnfLevelGenerationSerializer.Serialize(first);
+    var secondJson = CnfLevelGenerationSerializer.Serialize(second);
 
     // Assert: Serialization is deterministic for equal input.
     Assert.Equal(firstJson, secondJson);
@@ -48,16 +48,16 @@ public sealed class LevelGenerationConfigSerializerTests
   public void RoundTrip_WithCustomValues_ProducesEqualConfig()
   {
     // Arrange: A configuration with non-default values on every field.
-    var config = new LevelGenerationConfig
+    var config = new CnfLevelGeneration
     {
       Seed = -9876543210L,
-      LevelSize = new LevelSize { X = 5, Y = 4, Z = 2 },
-      ChunkSize = new ChunkSize { X = 8, Y = 12, Z = 24 },
+      LevelSize = new CnfLevelSize { X = 5, Y = 4, Z = 2 },
+      ChunkSize = new CnfChunkSize { X = 8, Y = 12, Z = 24 },
     };
 
     // Act: Serialize and deserialize the configuration.
-    var json = LevelGenerationConfigSerializer.Serialize(config);
-    var roundTripped = LevelGenerationConfigSerializer.Deserialize(json);
+    var json = CnfLevelGenerationSerializer.Serialize(config);
+    var roundTripped = CnfLevelGenerationSerializer.Deserialize(json);
 
     // Assert: The round-tripped configuration is equal by value.
     Assert.Equal(config, roundTripped);
@@ -77,7 +77,7 @@ public sealed class LevelGenerationConfigSerializerTests
       """;
 
     // Act: Deserialize the sample.
-    var config = LevelGenerationConfigSerializer.Deserialize(json);
+    var config = CnfLevelGenerationSerializer.Deserialize(json);
 
     // Assert: Every value from the JSON is present.
     Assert.Equal(1, config.ConfigVersion);
@@ -97,13 +97,13 @@ public sealed class LevelGenerationConfigSerializerTests
     const string json = """{ "seed": 42 }""";
 
     // Act: Deserialize the minimal sample.
-    var config = LevelGenerationConfigSerializer.Deserialize(json);
+    var config = CnfLevelGenerationSerializer.Deserialize(json);
 
     // Assert: The seed is set and everything else falls back to defaults.
     Assert.Equal(42L, config.Seed);
-    Assert.Equal(LevelGenerationConfig.CurrentConfigVersion, config.ConfigVersion);
-    Assert.Equal(LevelSize.Default, config.LevelSize);
-    Assert.Equal(ChunkSize.Default, config.ChunkSize);
+    Assert.Equal(CnfLevelGeneration.CurrentConfigVersion, config.ConfigVersion);
+    Assert.Equal(CnfLevelSize.Default, config.LevelSize);
+    Assert.Equal(CnfChunkSize.Default, config.ChunkSize);
   }
 
   [Fact]
@@ -113,7 +113,7 @@ public sealed class LevelGenerationConfigSerializerTests
     const string json = """{ "Seed": 42 }""";
 
     // Act: Deserialize the sample.
-    var config = LevelGenerationConfigSerializer.Deserialize(json);
+    var config = CnfLevelGenerationSerializer.Deserialize(json);
 
     // Assert: Property matching is case-insensitive.
     Assert.Equal(42L, config.Seed);
@@ -123,7 +123,7 @@ public sealed class LevelGenerationConfigSerializerTests
   public void Deserialize_WithNullJson_ThrowsArgumentNullException()
   {
     // Act/Assert: Null input is rejected.
-    Assert.Throws<ArgumentNullException>(() => LevelGenerationConfigSerializer.Deserialize(null!));
+    Assert.Throws<ArgumentNullException>(() => CnfLevelGenerationSerializer.Deserialize(null!));
   }
 
   [Theory]
@@ -132,7 +132,7 @@ public sealed class LevelGenerationConfigSerializerTests
   public void Deserialize_WithEmptyJson_ThrowsArgumentException(string json)
   {
     // Act/Assert: Empty input is rejected.
-    Assert.Throws<ArgumentException>(() => LevelGenerationConfigSerializer.Deserialize(json));
+    Assert.Throws<ArgumentException>(() => CnfLevelGenerationSerializer.Deserialize(json));
   }
 
   [Fact]
@@ -143,7 +143,7 @@ public sealed class LevelGenerationConfigSerializerTests
 
     // Act/Assert: The parse failure is reported as an argument exception naming the parameter.
     var exception = Assert.Throws<ArgumentException>(
-      () => LevelGenerationConfigSerializer.Deserialize(json));
+      () => CnfLevelGenerationSerializer.Deserialize(json));
     Assert.Equal("json", exception.ParamName);
   }
 
@@ -155,7 +155,7 @@ public sealed class LevelGenerationConfigSerializerTests
 
     // Act/Assert: The version check rejects it.
     var exception = Assert.Throws<ArgumentException>(
-      () => LevelGenerationConfigSerializer.Deserialize(json));
+      () => CnfLevelGenerationSerializer.Deserialize(json));
     Assert.Equal("json", exception.ParamName);
   }
 
@@ -166,6 +166,6 @@ public sealed class LevelGenerationConfigSerializerTests
   {
     // Act/Assert: The invariant check rejects it.
     Assert.Throws<ArgumentOutOfRangeException>(
-      () => LevelGenerationConfigSerializer.Deserialize(json));
+      () => CnfLevelGenerationSerializer.Deserialize(json));
   }
 }

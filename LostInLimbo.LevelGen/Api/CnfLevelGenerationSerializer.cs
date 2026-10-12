@@ -5,7 +5,7 @@ using LostInLimbo.LevelGen.Data.Config;
 namespace LostInLimbo.LevelGen.Api;
 
 /// <summary>
-/// Serializes and deserializes <see cref="LevelGenerationConfig"/> to and from JSON strings.
+/// Serializes and deserializes <see cref="CnfLevelGeneration"/> to and from JSON strings.
 /// </summary>
 /// <remarks>
 /// This type defines the single canonical JSON format shared by all consumers (editor, game):
@@ -13,7 +13,7 @@ namespace LostInLimbo.LevelGen.Api;
 /// to be forgiving of hand-written files, but everything this type writes is camelCase.
 /// Only strings cross this boundary; file reading and writing stay with the callers.
 /// </remarks>
-public static class LevelGenerationConfigSerializer
+public static class CnfLevelGenerationSerializer
 {
   /// <summary>Serializer options shared by reading and writing, so the format stays consistent.</summary>
   private static readonly JsonSerializerOptions Options = new()
@@ -30,7 +30,7 @@ public static class LevelGenerationConfigSerializer
   /// <returns>JSON text representing <paramref name="config"/>.</returns>
   /// <exception cref="ArgumentNullException"><paramref name="config"/> is <see langword="null"/>.</exception>
   /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
-  public static string Serialize(LevelGenerationConfig config)
+  public static string Serialize(CnfLevelGeneration config)
   {
     if (config is null)
     {
@@ -52,7 +52,7 @@ public static class LevelGenerationConfigSerializer
   /// The JSON is empty, malformed, describes a newer <c>ConfigVersion</c> than this library
   /// supports, or violates configuration invariants.
   /// </exception>
-  public static LevelGenerationConfig Deserialize(string json)
+  public static CnfLevelGeneration Deserialize(string json)
   {
     if (json is null)
     {
@@ -64,15 +64,15 @@ public static class LevelGenerationConfigSerializer
       throw new ArgumentException("JSON must not be empty.", nameof(json));
     }
 
-    LevelGenerationConfig? config;
+    CnfLevelGeneration? config;
     try
     {
-      config = JsonSerializer.Deserialize<LevelGenerationConfig>(json, Options);
+      config = JsonSerializer.Deserialize<CnfLevelGeneration>(json, Options);
     }
     catch (JsonException exception)
     {
       throw new ArgumentException(
-        $"JSON is not a valid {nameof(LevelGenerationConfig)}: {exception.Message}",
+        $"JSON is not a valid {nameof(CnfLevelGeneration)}: {exception.Message}",
         nameof(json),
         exception);
     }
@@ -82,11 +82,11 @@ public static class LevelGenerationConfigSerializer
       throw new ArgumentException("JSON deserialized to null.", nameof(json));
     }
 
-    if (config.ConfigVersion != LevelGenerationConfig.CurrentConfigVersion)
+    if (config.ConfigVersion != CnfLevelGeneration.CurrentConfigVersion)
     {
       throw new ArgumentException(
         $"Config version {config.ConfigVersion} is different than the supported version " +
-        $"{LevelGenerationConfig.CurrentConfigVersion}. Update the library or the config file.",
+        $"{CnfLevelGeneration.CurrentConfigVersion}. Update the library or the config file.",
         nameof(json));
     }
 
