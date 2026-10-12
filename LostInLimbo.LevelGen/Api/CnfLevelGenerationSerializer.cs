@@ -32,10 +32,7 @@ public static class CnfLevelGenerationSerializer
   /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
   public static string Serialize(CnfLevelGeneration config)
   {
-    if (config is null)
-    {
-      throw new ArgumentNullException(nameof(config));
-    }
+    if (config is null) throw new ArgumentNullException(nameof(config));
 
     config.Validate();
 
@@ -54,15 +51,10 @@ public static class CnfLevelGenerationSerializer
   /// </exception>
   public static CnfLevelGeneration Deserialize(string json)
   {
-    if (json is null)
-    {
-      throw new ArgumentNullException(nameof(json));
-    }
+    if (json is null) throw new ArgumentNullException(nameof(json));
 
     if (string.IsNullOrWhiteSpace(json))
-    {
       throw new ArgumentException("JSON must not be empty.", nameof(json));
-    }
 
     CnfLevelGeneration? config;
     try
@@ -78,9 +70,7 @@ public static class CnfLevelGenerationSerializer
     }
 
     if (config is null)
-    {
       throw new ArgumentException("JSON deserialized to null.", nameof(json));
-    }
 
     if (config.ConfigVersion != CnfLevelGeneration.CurrentConfigVersion)
     {

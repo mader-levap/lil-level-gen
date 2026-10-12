@@ -3,20 +3,22 @@ using System;
 namespace LostInLimbo.LevelGen.Data.Config;
 
 /// <summary>
-/// Configuration for generating a level: the seed and the layout knobs that feed the
-/// generation passes. This is the root of the JSON configuration files.
+/// Configuration for generating a level. This is the root of the JSON configuration files.
 /// </summary>
 /// <remarks>
-/// Pure data; no randomness is performed here. Every per-chunk random generator is derived
-/// deterministically from <see cref="Seed"/>, so the same seed with the same configuration
+/// Pure data; no randomness is performed here. Same seed with the same configuration
 /// always produces the same level. The shape maps one-to-one to JSON via
-/// <c>LostInLimbo.LevelGen.Api.CnfLevelGenerationSerializer</c>; future settings are added
-/// as new nested section records to keep the root small as the number of knobs grows.
+/// <c>LostInLimbo.LevelGen.Api.CnfLevelGenerationSerializer</c>.
 /// </remarks>
 public sealed record CnfLevelGeneration
 {
   /// <summary>Version of the configuration format currently written by the serializer.</summary>
   public const int CurrentConfigVersion = 1;
+
+  //
+
+  /// <summary>Default instance.</summary>
+  public static CnfLevelGeneration Default { get; } = new();
 
   /// <summary>
   /// Schema version of this configuration. Increment when the JSON format changes in way that
@@ -24,17 +26,10 @@ public sealed record CnfLevelGeneration
   /// </summary>
   public int ConfigVersion { get; init; } = CurrentConfigVersion;
 
-  /// <summary>
-  /// World seed from which all per-chunk random generators are derived deterministically.
-  /// Two runs with the same seed and configuration produce identical output.
-  /// </summary>
-  public long Seed { get; init; }
+  /// <summary>General configuration.</summary>
+  public CnfGeneral General { get; init; } = CnfGeneral.Default;
 
-  /// <summary>Size of the whole level, in chunks.</summary>
-  public CnfLevelSize LevelSize { get; init; } = CnfLevelSize.Default;
-
-  /// <summary>Size of a single chunk, in cells.</summary>
-  public CnfChunkSize ChunkSize { get; init; } = CnfChunkSize.Default;
+  //
 
   /// <summary>
   /// Validates every invariant of this configuration, including its sections.
@@ -46,13 +41,9 @@ public sealed record CnfLevelGeneration
     if (ConfigVersion < 1)
       throw new ArgumentOutOfRangeException(nameof(ConfigVersion), ConfigVersion, "Config version must be at least 1.");
 
-    if (LevelSize is null)
-      throw new ArgumentException("Level size must not be null.", nameof(LevelSize));
+    if (General is null)
+      throw new ArgumentException("General config must not be null.", nameof(General));
 
-    if (ChunkSize is null)
-      throw new ArgumentException("Chunk size must not be null.", nameof(ChunkSize));
-
-    LevelSize.Validate();
-    ChunkSize.Validate();
+    General.Validate();
   }
 }
