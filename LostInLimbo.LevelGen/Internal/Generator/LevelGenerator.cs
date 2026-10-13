@@ -13,7 +13,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// <para>Updates status during execution, so consumer can show progress.</para>
 /// </summary>
 /// <remarks>
-/// NOTE: right now it is placeholder that pretends to do something (sleeps).
+/// NOTE: right now it is placeholder that pretends to do something: it advances a fixed number
+/// of steps, each imitating work by sleeping (see <see cref="MainLoop"/>).
 /// Mutates <see cref="World"/> in place on the worker thread; consumers must only read it
 /// after status reports <see cref="EnGenResult.Finished"/>.
 /// </remarks>
@@ -25,6 +26,9 @@ internal sealed class LevelGenerator
   private readonly CnfLevelGeneration _config;
   /// <summary>Shared, thread-safe status sink owned by the API layer.</summary>
   private readonly GenerationStatusStore _statusStore;
+
+  /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
+  private int TotalPlaceholderSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
   /// <summary>
   /// Result of generation. Placeholder: not populated yet. Will be built up in place
@@ -80,8 +84,8 @@ internal sealed class LevelGenerator
   /// </para>
   /// </remarks>
   /// <param name="cancellationToken">
-  /// Token governing this run. Checked before any pass starts and awaited during placeholder
-  /// work; future passes receive it as a parameter and check it at pass boundaries.
+  /// Token governing this run. Checked before generation starts and then only at step
+  /// boundaries - the sleep of a running placeholder step is never interrupted.
   /// </param>
   public void Execute(CancellationToken cancellationToken = default)
   {
@@ -107,31 +111,69 @@ internal sealed class LevelGenerator
   }
 
   /// <summary>
-  /// Placeholder for generation passes. Will be replaced by real layout, validation and
-  /// placement passes using <see cref="_enRunKind"/> and <see cref="_config"/>.
+  /// Placeholder for generation passes: advances the placeholder step loop, where every step
+  /// imitates real work by sleeping. Number of steps comes from <see cref="CnfDebug.PlaceholderSteps"/>.
   /// </summary>
-  /// <param name="cancellationToken">Cancellation token.</param>
-  /// <returns>Generation result. Can be only Finished or Paused.</returns>
+  /// <param name="cancellationToken">Token checked at every step boundary.</param>
+  /// <returns>Generation result. Finished when all steps are done, otherwise Paused.</returns>
   private EnGenResult RunGeneration(CancellationToken cancellationToken)
   {
     if (_config.Debug?.FailAtStart == true) throw new Exception("Deliberate failure at start.");
 
     MainLoop(cancellationToken);
 
-    // In future we will be able to finish even with run kind different than All.
-    return _enRunKind == EnRunKind.All ? EnGenResult.Finished : EnGenResult.Paused;
+    // Complete generation means the level is done; otherwise a Step/Area run stopped early
+    // and the run can be resumed to continue with the remaining steps.
+    return IsGenerationComplete() ? EnGenResult.Finished : EnGenResult.Paused;
   }
 
   /// <summary>
-  /// Main loop of generator.
+  /// <para>Placeholder for generation passes. Advances generation by a bounded number of steps.</para>
+  /// <para>
+  /// Loops while generation is not complete yet (see <see cref="IsGenerationComplete"/>) and the
+  /// run kind still allows more work: <c>EnRunKind.All</c> runs until generation completes, <c>Area</c>
+  /// and <c>Step</c> run at most one step per execution.
+  /// </para>
+  /// <para>
+  /// Each step first checks the token (the only cancellation checkpoint) and then sleeps for
+  /// <c>PlaceholderSleep / PlaceholderSteps</c> milliseconds as an imitation of the work done in
+  /// a single step. The sleep itself is a plain, uninterruptible <see cref="Thread.Sleep(int)"/>;
+  /// cancellation is therefore observed only after the current step completes. Completed steps
+  /// are counted in <see cref="Data.Result.Stats.LilStats.Steps"/> of <see cref="World"/>, which
+  /// survives pausing and resuming because the API keeps this generator instance alive.
+  /// </para>
   /// </summary>
-  /// <param name="cancellationToken">Cancellation token.</param>
+  /// <param name="cancellationToken">Token checked at every step boundary.</param>
   private void MainLoop(CancellationToken cancellationToken)
   {
-    // Placeholder: pretend to work for the configured duration (debug-overridable, default 3 seconds).
-    // Token-aware wait: wakes up as soon as cancellation is requested instead of sleeping through it.
+    var totalSteps = TotalPlaceholderSteps;
     var sleepMilliseconds = _config.Debug?.PlaceholderSleep ?? CnfDebug.DefaultPlaceholderSleep;
-    if (cancellationToken.WaitHandle.WaitOne(sleepMilliseconds))
-      cancellationToken.ThrowIfCancellationRequested();    
+    var stepSleepMilliseconds = sleepMilliseconds / totalSteps;
+
+    // Maximum number of steps this execution may add; real passes will budget work differently.
+    var maxStepsThisRun = _enRunKind == EnRunKind.All ? int.MaxValue : 1;
+
+    var stepsRun = 0;
+    while (stepsRun < maxStepsThisRun && !IsGenerationComplete())
+    {
+      // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
+      cancellationToken.ThrowIfCancellationRequested();
+
+      // Imitation of the work of a single step; deliberately not token-aware.
+      Thread.Sleep(stepSleepMilliseconds);
+
+      World.Stats.Steps++;
+      stepsRun++;
+    }
+  }
+
+  /// <summary>
+  /// Placeholder for the real completion criterion. The real generator will use a more
+  /// complex check (layout complete, all areas placed, ...) and will not know the total
+  /// number of steps in advance.
+  /// </summary>
+  private bool IsGenerationComplete()
+  {
+    return World.Stats.Steps >= TotalPlaceholderSteps;
   }
 }

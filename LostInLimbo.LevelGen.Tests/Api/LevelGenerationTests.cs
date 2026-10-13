@@ -19,16 +19,19 @@ public sealed class LevelGenerationTests : IDisposable
   /// <summary>
   /// Config with a short placeholder sleep, giving tests a safe window to observe
   /// mid-run state (Running, hidden world) before the run reaches a terminal state.
+  /// The sleep is split evenly across the placeholder steps (100 ms per step by default).
   /// </summary>
-  /// <param name="sleep">How many ms generator should sleep instead of doing generation?</param>
+  /// <param name="sleep">Total ms the generator should sleep instead of doing generation.</param>
   /// <param name="failAtStart">If true, generator fails at start.</param>
-  private static CnfLevelGeneration Config(int sleep = 100, bool failAtStart = false)
+  /// <param name="steps">How many placeholder steps the generation is split into.</param>
+  private static CnfLevelGeneration Config(int sleep = 1000, bool failAtStart = false, int steps = CnfDebug.DefaultPlaceholderSteps)
   {
     return CnfLevelGeneration.Default with
     {
       Debug = new CnfDebug
       {
         PlaceholderSleep = sleep,
+        PlaceholderSteps = steps,
         FailAtStart = failAtStart,
       },
     };
@@ -114,6 +117,32 @@ public sealed class LevelGenerationTests : IDisposable
 
     // Assert: Resuming an already finished run is refused.
     Assert.False(LevelGeneration.Resume(EnRunKind.Step));
+  }
+
+  [Fact]
+  public void Resume_WithStepKind_RepeatedlyEventuallyFinishes()
+  {
+    // Arrange: A stepwise run over a three-step placeholder level.
+    Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 0, steps: 3)));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+
+    // Act: Resume one step at a time until no step remains (guard against an endless pause).
+    var resumes = 0;
+    while (LevelGeneration.Status().Result == EnGenResult.Paused && resumes < 10)
+    {
+      Assert.True(LevelGeneration.Resume(EnRunKind.Step));
+      WaitForTerminal();
+      resumes++;
+    }
+
+    // Assert: Three steps total, so the start plus two resumes finished the level.
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+    Assert.Equal(2, resumes);
+    Assert.NotNull(LevelGeneration.World());
+
+    // Assert: The result data counted every completed step.
+    Assert.Equal(3L, LevelGeneration.World()!.Stats.Steps);
   }
 
   [Fact]

@@ -13,6 +13,9 @@ public sealed record CnfDebug
   /// <summary>Default placeholder sleep in milliseconds.</summary>
   public const int DefaultPlaceholderSleep = 0;
 
+  /// <summary>Default number of steps the placeholder generation loop executes.</summary>
+  public const int DefaultPlaceholderSteps = 10;
+
   //
 
   /// <summary>Default instance.</summary>
@@ -26,8 +29,17 @@ public sealed record CnfDebug
   /// <summary>
   /// How long the placeholder generation pretends to work, in milliseconds.
   /// 0 means it returns immediately. Debug only; real passes will not sleep.
+  /// The value is split evenly across <see cref="PlaceholderSteps"/> steps, so the
+  /// per-step sleep is this value divided by the step count (integer division).
   /// </summary>
   public int PlaceholderSleep { get; init; } = DefaultPlaceholderSleep;
+
+  /// <summary>
+  /// How many steps the placeholder generation loop runs before finishing.
+  /// Each run kind advances a different amount: All runs all remaining steps,
+  /// Area and Step run a single step and then pause. Must be at least 1.
+  /// </summary>
+  public int PlaceholderSteps { get; init; } = DefaultPlaceholderSteps;
 
   //
 
@@ -39,5 +51,8 @@ public sealed record CnfDebug
   {
     if (PlaceholderSleep < 0)
       throw new ArgumentOutOfRangeException(nameof(PlaceholderSleep), PlaceholderSleep, "Placeholder sleep must be >= 0 milliseconds.");
+
+    if (PlaceholderSteps < 1)
+      throw new ArgumentOutOfRangeException(nameof(PlaceholderSteps), PlaceholderSteps, "Placeholder steps must be >= 1.");
   }
 }

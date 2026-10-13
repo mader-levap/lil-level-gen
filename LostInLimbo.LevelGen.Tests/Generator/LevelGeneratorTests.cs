@@ -13,12 +13,15 @@ namespace LostInLimbo.LevelGen.Tests.Generator;
 /// </summary>
 public sealed class LevelGeneratorTests
 {
-  /// <summary>Config with the placeholder sleep disabled so Execute-based tests run instantly.</summary>
-  private static CnfLevelGeneration FastConfig()
+  /// <summary>
+  /// Config with the placeholder sleep disabled so Execute-based tests run instantly,
+  /// and with a configurable number of placeholder steps (default from <see cref="CnfDebug"/>).
+  /// </summary>
+  private static CnfLevelGeneration FastConfig(int placeholderSteps = CnfDebug.DefaultPlaceholderSteps)
   {
     return CnfLevelGeneration.Default with
     {
-      Debug = new CnfDebug { PlaceholderSleep = 0 },
+      Debug = new CnfDebug { PlaceholderSleep = 0, PlaceholderSteps = placeholderSteps },
     };
   }
 
@@ -77,6 +80,23 @@ public sealed class LevelGeneratorTests
     // Assert: Validation rejects it before any run could be claimed.
     Assert.Throws<ArgumentOutOfRangeException>(
       () => new LevelGenerator(EnRunKind.All, config, statusStore));
+  }
+
+  [Fact]
+  public void Constructor_WithPlaceholderStepsBelowOne_ThrowsArgumentOutOfRangeException()
+  {
+    // Arrange: Valid store and run kind, but a placeholder step count below one.
+    var statusStore = new GenerationStatusStore();
+    var config = CnfLevelGeneration.Default with
+    {
+      Debug = new CnfDebug { PlaceholderSteps = 0 },
+    };
+
+    // Act: Constructing with the invalid step count.
+    // Assert: Validation rejects it naming the PlaceholderSteps parameter.
+    var exception = Assert.Throws<ArgumentOutOfRangeException>(
+      () => new LevelGenerator(EnRunKind.All, config, statusStore));
+    Assert.Equal("PlaceholderSteps", exception.ParamName);
   }
 
   [Fact]
@@ -162,6 +182,76 @@ public sealed class LevelGeneratorTests
   }
 
   [Fact]
+  public void Execute_WithStepKind_RunsExactlyOneStep()
+  {
+    // Arrange: Claimed stepwise run without placeholder sleep.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.Step, FastConfig(), statusStore);
+
+    // Act: Run a single execution.
+    generator.Execute();
+
+    // Assert: Exactly one step was made and the run pauses with the rest still pending.
+    Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+    Assert.Equal(1L, generator.World.Stats.Steps);
+  }
+
+  [Fact]
+  public void Execute_WithAreaKind_RunsExactlyOneStep()
+  {
+    // Arrange: Claimed area run; areas do not exist yet, so Area advances like Step.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.Area, FastConfig(), statusStore);
+
+    // Act: Run a single execution.
+    generator.Execute();
+
+    // Assert: Exactly one step was made and the run pauses with the rest still pending.
+    Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+    Assert.Equal(1L, generator.World.Stats.Steps);
+  }
+
+  [Fact]
+  public void Execute_WithAllRunKind_RunsAllSteps()
+  {
+    // Arrange: Claimed full run over a three-step placeholder level.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.All, FastConfig(placeholderSteps: 3), statusStore);
+
+    // Act: Run generation to completion.
+    generator.Execute();
+
+    // Assert: Every step was made and the run finished.
+    Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+    Assert.Equal(3L, generator.World.Stats.Steps);
+  }
+
+  [Fact]
+  public void Execute_WithStepKind_RepeatedlyEventuallyFinishes()
+  {
+    // Arrange: Claimed stepwise run over a three-step placeholder level.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.Step, FastConfig(placeholderSteps: 3), statusStore);
+
+    // Act: Execute one step at a time until no step remains (guard against an endless pause).
+    var executions = 0;
+    while (statusStore.Current.Result != EnGenResult.Finished && executions < 10)
+    {
+      generator.Execute();
+      executions++;
+    }
+
+    // Assert: Three steps total, so the third execution finished the level.
+    Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+    Assert.Equal(3, executions);
+    Assert.Equal(3L, generator.World.Stats.Steps);
+  }
+
+  [Fact]
   public void Execute_WithFailAtStartDebugConfig_PublishesError()
   {
     // Arrange: Generator configured to fail immediately at start.
@@ -222,10 +312,11 @@ public sealed class LevelGeneratorTests
   }
 
   [Fact]
-  public void Execute_CancelDuringPlaceholderSleep_ReturnsBeforeSleepEnds()
+  public void Execute_CancelDuringStep_ReturnsAtNextStepBoundary()
   {
-    // Arrange: A run that would sleep for 30 seconds if the wait ignored the token.
-    const int SleepMilliseconds = 30_000;
+    // Arrange: A run whose placeholder steps take 1 second each (10 000 ms over 10 steps),
+    // so sleeping through the whole placeholder duration would far outlast the join window.
+    const int SleepMilliseconds = 10_000;
     var statusStore = new GenerationStatusStore();
     Assert.True(statusStore.TryBeginRun());
     var config = CnfLevelGeneration.Default with
@@ -235,7 +326,7 @@ public sealed class LevelGeneratorTests
     var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
     using var cancellationTokenSource = new CancellationTokenSource();
 
-    // Act: Run generation on a worker thread and cancel while it is under way.
+    // Act: Run generation on a worker thread and cancel while a step is under way.
     var stopwatch = Stopwatch.StartNew();
     var worker = new Thread(() => generator.Execute(cancellationTokenSource.Token))
     {
@@ -243,12 +334,12 @@ public sealed class LevelGeneratorTests
       Name = "LevelGeneratorTests.CancelProbe",
     };
     worker.Start();
-    Thread.Sleep(200); // Give the worker time to enter the placeholder wait.
+    Thread.Sleep(200); // Give the worker time to enter the placeholder step.
     cancellationTokenSource.Cancel();
     var joined = worker.Join(TimeSpan.FromSeconds(5));
     stopwatch.Stop();
 
-    // Assert: The placeholder wait woke up early instead of sleeping through the cancellation.
+    // Assert: The run stopped at the next step boundary instead of sleeping through the rest.
     Assert.True(joined, $"Generator did not react to cancellation within 5 s (slept {stopwatch.Elapsed}).");
     Assert.True(stopwatch.Elapsed < TimeSpan.FromMilliseconds(SleepMilliseconds),
       $"Generator ran for {stopwatch.Elapsed}, expected well below the {SleepMilliseconds} ms placeholder sleep.");
