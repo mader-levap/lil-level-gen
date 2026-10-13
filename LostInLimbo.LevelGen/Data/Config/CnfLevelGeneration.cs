@@ -28,6 +28,9 @@ public sealed record CnfLevelGeneration
   /// <summary>General configuration.</summary>
   public CnfGeneral General { get; init; } = CnfGeneral.Default;
 
+  /// <summary>Debug configuration. Ignored if null.</summary>
+  public CnfDebug? Debug { get; init; } = null;
+
   //
 
   /// <summary>

@@ -1,4 +1,4 @@
 Current and planned tasks:
-- Create placeholder internal that does pretend work (just sleeps for few seconds).
+- Finish LevelGenerator placeholder.
 - Rework config data.
 - Add tests of config data and serializer after rework.
