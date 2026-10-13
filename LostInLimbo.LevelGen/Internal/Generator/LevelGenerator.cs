@@ -19,8 +19,6 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// </remarks>
 internal sealed class LevelGenerator
 {
-  private static readonly TimeSpan PlaceholderWorkDuration = TimeSpan.FromSeconds(3);
-
   /// <summary>Kind of run. Mutated only between runs via <see cref="SetRunKind"/>.</summary>
   private EnRunKind _enRunKind;
   /// <summary>Configuration data for level generation.</summary>
@@ -99,7 +97,8 @@ internal sealed class LevelGenerator
   {
     if (_config.Debug?.FailAtStart == true) throw new Exception("Deliberate failure at start.");
 
-    Thread.Sleep(PlaceholderWorkDuration);
+    // Placeholder: pretend to work for the configured duration (debug-overridable, default 3 seconds).
+    Thread.Sleep(_config.Debug?.PlaceholderSleep ?? CnfDebug.DefaultPlaceholderSleep);
 
     // In future we will be able to finish even with run kind different than All.
     return _enRunKind == EnRunKind.All ? EnGenResult.Finished : EnGenResult.Paused;

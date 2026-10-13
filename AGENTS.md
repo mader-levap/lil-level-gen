@@ -117,11 +117,11 @@ Use xUnit.
 For every meaningful generator feature, add tests that verify:
 
 - Deterministic output for the same seed and inputs.
-- Correct chunk dimensions and cell bounds.
+- Correct area dimensions and cell bounds.
 - Required areas are connected or reachable, where applicable.
 - No overlapping or invalid geometry.
 - Spawn points and important objects are placed within valid cells.
-- Boundary chunks and edge cases do not throw or produce invalid data.
+- Boundary areas and edge cases do not throw or produce invalid data.
 - Cancellation is respected for expensive operations.
 
 Prefer focused tests. Example names:

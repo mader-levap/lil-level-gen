@@ -47,5 +47,7 @@ public sealed record CnfLevelGeneration
       throw new ArgumentException("General config must not be null.", nameof(General));
 
     General.Validate();
+
+    Debug?.Validate();
   }
 }

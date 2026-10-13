@@ -95,6 +95,24 @@ public static class LevelGeneration
   }
 
   /// <summary>
+  /// Test support: restores the pristine never-ran state - status back to
+  /// <see cref="EnGenResult.None"/> with no error, and no generator, so <see cref="World"/>
+  /// returns <see langword="null"/>. Not part of the public API; only test assemblies see
+  /// it through <c>InternalsVisibleTo</c>.
+  /// </summary>
+  /// <exception cref="InvalidOperationException">A run is currently in progress.</exception>
+  internal static void Reset()
+  {
+    // A worker only exists while the status is Running; resetting under it would let the
+    // worker publish its terminal state over the fresh snapshot.
+    if (_statusStore.Current.Result == EnGenResult.Running)
+      throw new InvalidOperationException("Cannot reset while generation is running.");
+
+    _statusStore.Publish(GenerationStatus.Default);
+    _generator = null;
+  }
+
+  /// <summary>
   /// Runs <see cref="LevelGenerator.Execute"/> on a dedicated background thread so that
   /// callers of <see cref="Start"/> or <see cref="Resume"/> return immediately.
   /// Background thread will not keep the process alive on shutdown.
