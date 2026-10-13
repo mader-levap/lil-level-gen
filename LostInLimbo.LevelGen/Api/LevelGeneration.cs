@@ -8,7 +8,7 @@ using LostInLimbo.LevelGen.Internal.Status;
 namespace LostInLimbo.LevelGen.Api;
 
 /// <summary>
-/// <para>Entry point for entire level generator. Serves as layer between consumer and internals.</para>
+/// <para>Entry point for entire level generator. Serves as layer between consumer and internals. There can be only one generation running at once.</para>
 /// <para>All jobs here are run asynchronously. Therefore, all methods return immediately.</para>
 /// </summary>
 public static class LevelGeneration
@@ -41,7 +41,7 @@ public static class LevelGeneration
   }
 
   /// <summary>
-  /// Continue level generation. Works only if generation is paused (run kind was not Full).
+  /// Continue level generation. Works only if generation is paused (run kind was not All).
   /// </summary>
   /// <param name="enRunKind">Kind of run.</param>
   /// <returns>True if successfully resumed generation, otherwise false.</returns>

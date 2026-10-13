@@ -13,7 +13,7 @@ public sealed record CnfGeneral
   /// <summary>Default seed.</summary>
   public const int DefaultSeed = 0;
 
-  /// <summary>Default corruption degree - no corrutpion at all.</summary>
+  /// <summary>Default corruption degree - no corruption at all.</summary>
   public const float DefaultCorruption = 0.0f;
 
   //
