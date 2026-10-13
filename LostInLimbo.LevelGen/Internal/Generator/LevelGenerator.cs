@@ -21,8 +21,8 @@ internal sealed class LevelGenerator
 {
   private static readonly TimeSpan PlaceholderWorkDuration = TimeSpan.FromSeconds(3);
 
-  /// <summary>Kind of run.</summary>
-  private readonly EnRunKind _enRunKind;
+  /// <summary>Kind of run. Mutated only between runs via <see cref="SetRunKind"/>.</summary>
+  private EnRunKind _enRunKind;
   /// <summary>Configuration data for level generation.</summary>
   private readonly CnfLevelGeneration _config;
   /// <summary>Shared, thread-safe status sink owned by the API layer.</summary>
@@ -41,17 +41,34 @@ internal sealed class LevelGenerator
   /// <param name="config">Configuration data for level generation.</param>
   /// <param name="statusStore">Store receiving status snapshots during execution.</param>
   /// <exception cref="ArgumentNullException">A parameter is <see langword="null"/>.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">A numeric config setting is out of range.</exception>
+  /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
   public LevelGenerator(EnRunKind enRunKind, CnfLevelGeneration config, GenerationStatusStore statusStore)
   {
     if (config is null) throw new ArgumentNullException(nameof(config));
     if (statusStore is null) throw new ArgumentNullException(nameof(statusStore));
+
+    // Validate here so every construction path rejects bad config before a run is claimed.
+    config.Validate();
+
     _enRunKind = enRunKind;
     _config = config;
     _statusStore = statusStore;
   }
 
   /// <summary>
-  /// Starts or continues generation.
+  /// Sets the kind of the next run. Called by the API layer when resuming a paused generation
+  /// with a different run kind than the original run used. Must only be called after the run
+  /// has been claimed, so no other thread can be executing this generator at the time.
+  /// </summary>
+  /// <param name="enRunKind">Kind of run.</param>
+  internal void SetRunKind(EnRunKind enRunKind)
+  {
+    _enRunKind = enRunKind;
+  }
+
+  /// <summary>
+  /// Starts or resumes generation.
   /// </summary>
   /// <remarks>
   /// A caught exception does not propagate: this method is meant to run on a background thread,

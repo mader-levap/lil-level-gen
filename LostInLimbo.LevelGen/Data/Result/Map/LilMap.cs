@@ -7,6 +7,4 @@ namespace LostInLimbo.LevelGen.Data.Result.Map;
 /// </summary>
 public sealed record LilMap
 {
-  /// <summary>Default instance.</summary>
-  public static LilMap Default { get; } = new();
 }

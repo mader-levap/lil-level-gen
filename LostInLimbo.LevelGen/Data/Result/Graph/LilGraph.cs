@@ -25,6 +25,4 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// </summary>
 public sealed record LilGraph
 {
-  /// <summary>Default instance.</summary>
-  public static LilGraph Default { get; } = new();
 }

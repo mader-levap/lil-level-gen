@@ -11,12 +11,9 @@ namespace LostInLimbo.LevelGen.Data.Result;
 /// </remarks>
 public sealed record LilWorld
 {
-  /// <summary>Default instance.</summary>
-  public static LilWorld Default { get; } = new();
-
   /// <summary>Abstract representation of level.</summary>
-  public LilGraph Graph { get; set; } = LilGraph.Default;
+  public LilGraph Graph { get; set; } = new();
 
   /// <summary>Concrete representation of map that can be used for generating meshes and object in game.</summary>
-  public LilMap Map { get; set; } = LilMap.Default;
+  public LilMap Map { get; set; } = new();
 }

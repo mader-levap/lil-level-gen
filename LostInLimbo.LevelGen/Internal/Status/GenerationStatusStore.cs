@@ -54,4 +54,29 @@ internal sealed class GenerationStatusStore
         return true;
     }
   }
+
+  /// <summary>
+  /// Atomically claims the right to resume a paused run.
+  /// </summary>
+  /// <remarks>
+  /// Stronger than <see cref="TryBeginRun"/>: the claim only succeeds when the current snapshot
+  /// is <see cref="EnGenResult.Paused"/>, so a caller that checked for "paused" earlier cannot
+  /// claim a state that changed in between.
+  /// </remarks>
+  /// <returns>
+  /// <see langword="true"/> if the run was paused and is now marked as running;
+  /// <see langword="false"/> otherwise.
+  /// </returns>
+  public bool TryBeginResume()
+  {
+    while (true)
+    {
+      var current = Volatile.Read(ref _status);
+      if (current.Result != EnGenResult.Paused) return false;
+
+      // Succeeds only if nobody else changed the snapshot since we read it.
+      if (ReferenceEquals(Interlocked.CompareExchange(ref _status, RunningStatus, current), current))
+        return true;
+    }
+  }
 }
