@@ -179,4 +179,46 @@ public sealed class GenerationStatusStoreTests
     Assert.Equal(1, Volatile.Read(ref wins));
     Assert.Equal(EnGenResult.Running, store.Current.Result);
   }
+
+  [Theory]
+  [InlineData(EnGenResult.None)]
+  [InlineData(EnGenResult.Paused)]
+  [InlineData(EnGenResult.Finished)]
+  [InlineData(EnGenResult.Cancelled)]
+  [InlineData(EnGenResult.Error)]
+  public void TryPublishIdle_WhenNotRunning_ReturnsTrueAndRestoresDefault(EnGenResult result)
+  {
+    // Arrange: Store is in the given non-running state (with a real error object when needed,
+    // respecting the documented GenerationStatus invariant).
+    var store = new GenerationStatusStore();
+    store.Publish(new GenerationStatus
+    {
+      Result = result,
+      Error = result == EnGenResult.Error ? new InvalidOperationException() : null,
+    });
+
+    // Act: Attempting to reset to idle.
+    var published = store.TryPublishIdle();
+
+    // Assert: The reset succeeded and the pristine snapshot replaced the old one.
+    Assert.True(published);
+    Assert.Same(GenerationStatus.Default, store.Current);
+    Assert.Equal(EnGenResult.None, store.Current.Result);
+    Assert.Null(store.Current.Error);
+  }
+
+  [Fact]
+  public void TryPublishIdle_WhileRunning_ReturnsFalse()
+  {
+    // Arrange: Store already claims a run.
+    var store = new GenerationStatusStore();
+    Assert.True(store.TryBeginRun());
+
+    // Act: Attempting to reset to idle under the running claim.
+    var published = store.TryPublishIdle();
+
+    // Assert: The reset is refused and the running status is left untouched.
+    Assert.False(published);
+    Assert.Equal(EnGenResult.Running, store.Current.Result);
+  }
 }

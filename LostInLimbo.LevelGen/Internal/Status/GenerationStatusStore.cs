@@ -79,4 +79,31 @@ internal sealed class GenerationStatusStore
         return true;
     }
   }
+
+  /// <summary>
+  /// Atomically publishes the pristine idle snapshot (<see cref="GenerationStatus.Default"/>),
+  /// but only while no run is in flight.
+  /// </summary>
+  /// <remarks>
+  /// Used by clearing the API state. The compare-and-swap closes the race where a concurrent
+  /// start or resume claims a run between the caller's check and the publish: if a run is
+  /// (or just became) <see cref="EnGenResult.Running"/>, the reset is refused so run-owned
+  /// state is never overwritten.
+  /// </remarks>
+  /// <returns>
+  /// <see langword="true"/> if the store was reset to idle;
+  /// <see langword="false"/> if a run is in progress.
+  /// </returns>
+  public bool TryPublishIdle()
+  {
+    while (true)
+    {
+      var current = Volatile.Read(ref _status);
+      if (current.Result == EnGenResult.Running) return false;
+
+      // Succeeds only if nobody else changed the snapshot since we read it.
+      if (ReferenceEquals(Interlocked.CompareExchange(ref _status, GenerationStatus.Default, current), current))
+        return true;
+    }
+  }
 }

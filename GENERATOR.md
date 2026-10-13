@@ -15,9 +15,6 @@ Configuration must be (de)serializable to/from JSON.
   - `CnfDebug`: Debug configuration data. Placeholder for now.
   - TODO more
 
-_status will have to be altered later, when innards of generator will want to give feedback (update status somehow)
-We also need to get generated data, somehow. Probably held in same way as _status. Ask AI.
-
 ## Structure of map data
 
 - `LilWorld`: All data.

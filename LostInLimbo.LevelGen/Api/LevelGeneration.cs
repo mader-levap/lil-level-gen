@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Other;
@@ -10,7 +11,8 @@ namespace LostInLimbo.LevelGen.Api;
 
 /// <summary>
 /// <para>Entry point for entire level generator. Serves as layer between consumer and internals. There can be only one generation running at once.</para>
-/// <para>All jobs here are run asynchronously. Therefore, all methods return immediately.</para>
+/// <para>Commands like <see cref="Start"/>, <see cref="Resume"/>, <see cref="Cancel"/> and <see cref="Pause"/> are asynchronous and return immediately.
+/// <see cref="Clear"/> is the one exception: when a run is in flight it pauses the run and waits (up to a timeout) for the worker to stop before clearing.</para>
 /// </summary>
 public static class LevelGeneration
 {
@@ -32,9 +34,17 @@ public static class LevelGeneration
 
   /// <summary>
   /// Cancellation source of the run that currently holds the claim, or of the last run.
-  /// Retired (disposed and replaced) when a new run claims, and by <see cref="Reset"/>.
+  /// Retired (disposed and replaced) when a new run claims, and by <see cref="Clear"/>.
   /// </summary>
   private static CancellationTokenSource? _runSource;
+
+  /// <summary>Default upper bound <see cref="Clear"/> waits for an in-flight run to stop.</summary>
+  private static readonly TimeSpan DefaultClearTimeout = TimeSpan.FromSeconds(10);
+
+  /// <summary>Poll interval used while waiting for an in-flight run to reach a terminal state.</summary>
+  private static readonly TimeSpan TerminalPollInterval = TimeSpan.FromMilliseconds(10);
+
+  // COMMANDS
 
   /// <summary>
   /// Begin level generation based on given config. Will discard all and any partial data,
@@ -128,7 +138,7 @@ public static class LevelGeneration
     lock (RunSourceGate)
     {
       // Re-check under the gate: while waiting for it the run may have reached a terminal state
-      // and Reset may have retired the source, so the fast-path observation can go stale.
+      // and Clear may have retired the source, so the fast-path observation can go stale.
       if (_statusStore.Current.Result != EnGenResult.Running) return false;
 
       if (_runSource is null) return false;
@@ -166,6 +176,85 @@ public static class LevelGeneration
   }
 
   /// <summary>
+  /// Restores the pristine never-ran state: status back to <see cref="EnGenResult.None"/> with
+  /// no error, no generator, and no live cancellation source, so <see cref="World"/> returns
+  /// <see langword="null"/>. A subsequent <see cref="Start"/> begins from scratch.
+  /// </summary>
+  /// <remarks>
+  /// Unlike the other commands this one may block. When a run is in flight, the call first
+  /// requests a pause (see <see cref="Pause"/>), then waits for the worker to stop at its next
+  /// step boundary before clearing; the wait is bounded by <paramref name="timeout"/>. Callers
+  /// that must never block can pause themselves, wait until <see cref="Status"/> reports a
+  /// terminal state, and then call this method - it then never waits.
+  /// <para>
+  /// Designed for a single consumer: concurrent calls or calls racing a
+  /// <see cref="Start"/>/<see cref="Resume"/> are resolved by the internal claims, so a run
+  /// that wins the race is never disturbed.
+  /// </para>
+  /// </remarks>
+  /// <param name="timeout">
+  /// Optional upper bound for waiting out an in-flight run. <see cref="TimeSpan.Zero"/> means
+  /// do not wait at all. When <see langword="null"/>, a default of 10 seconds is used.
+  /// </param>
+  /// <returns>
+  /// <see langword="true"/> if the state was cleared;
+  /// <see langword="false"/> if an in-flight run did not stop within <paramref name="timeout"/>
+  /// or another run claimed the state in the meantime - in both cases nothing was cleared.
+  /// </returns>
+  /// <exception cref="ArgumentOutOfRangeException"><paramref name="timeout"/> is negative.</exception>
+  public static bool Clear(TimeSpan? timeout = null)
+  {
+    if (timeout.HasValue && timeout.Value < TimeSpan.Zero)
+      throw new ArgumentOutOfRangeException(nameof(timeout), timeout, "Clear timeout must not be negative.");
+
+    var effectiveTimeout = timeout ?? DefaultClearTimeout;
+
+    // A worker only exists while the status is Running; clearing under it would let the
+    // worker publish its terminal state over the fresh snapshot. Pause first, then wait
+    // for the cooperative stop at the next step boundary.
+    if (_statusStore.Current.Result == EnGenResult.Running)
+    {
+      Pause(); // Best-effort: may return false if the run reached a terminal state in the meantime.
+
+      if (!WaitForTerminal(effectiveTimeout)) return false; // The pause request stands; the run can be cleared once it stops.
+    }
+
+    // Retire the source under the gate so it is never disposed while Cancel invokes it.
+    lock (RunSourceGate)
+    {
+      // The compare-and-swap closes the race where a concurrent Start or Resume claims a run
+      // between the check above and this point: a run that wins the claim is never disturbed.
+      if (!_statusStore.TryPublishIdle()) return false;
+
+      var previous = _runSource;
+      _runSource = null;
+      previous?.Dispose();
+    }
+
+    _generator = null;
+    return true;
+  }
+
+  /// <summary>
+  /// Polls the status store until the current run is no longer <see cref="EnGenResult.Running"/>
+  /// or the given timeout elapses.
+  /// </summary>
+  /// <param name="timeout">Maximum time to wait.</param>
+  /// <returns><see langword="true"/> if a terminal state was reached, <see langword="false"/> on timeout.</returns>
+  private static bool WaitForTerminal(TimeSpan timeout)
+  {
+    var stopwatch = Stopwatch.StartNew();
+    while (true)
+    {
+      if (_statusStore.Current.Result != EnGenResult.Running) return true;
+      if (stopwatch.Elapsed >= timeout) return false;
+      Thread.Sleep(TerminalPollInterval);
+    }
+  }
+
+  // DATA
+
+  /// <summary>
   /// Get status of generation.
   /// </summary>
   /// <returns>Status of generation.</returns>
@@ -198,31 +287,7 @@ public static class LevelGeneration
       : null;
   }
 
-  /// <summary>
-  /// Test support: restores the pristine never-ran state - status back to
-  /// <see cref="EnGenResult.None"/> with no error, no generator, and no live cancellation
-  /// source, so <see cref="World"/> returns <see langword="null"/>. Not part of the public API;
-  /// only test assemblies see it through <c>InternalsVisibleTo</c>.
-  /// </summary>
-  /// <exception cref="InvalidOperationException">A run is currently in progress.</exception>
-  internal static void Reset()
-  {
-    // A worker only exists while the status is Running; resetting under it would let the
-    // worker publish its terminal state over the fresh snapshot.
-    if (_statusStore.Current.Result == EnGenResult.Running)
-      throw new InvalidOperationException("Cannot reset while generation is running.");
-
-    // Retire the source under the gate so it is never disposed while Cancel invokes it.
-    lock (RunSourceGate)
-    {
-      var previous = _runSource;
-      _runSource = null;
-      previous?.Dispose();
-    }
-
-    _statusStore.Publish(GenerationStatus.Default);
-    _generator = null;
-  }
+  // OTHER
 
   /// <summary>
   /// Creates the cancellation source for a new run. When the caller supplied an external token,
@@ -258,7 +323,7 @@ public static class LevelGeneration
 
   /// <summary>
   /// Runs <see cref="LevelGenerator.Execute"/> on a dedicated background thread so that
-  /// callers of <see cref="Start"/> or <see cref="Resume"/> return immediately.
+  /// callers of commands like <see cref="Start"/> or <see cref="Resume"/> return immediately.
   /// Background thread will not keep the process alive on shutdown.
   /// </summary>
   /// <remarks>
@@ -267,7 +332,7 @@ public static class LevelGeneration
   /// <see cref="GenerationStatus.Error"/> and this method returns <see langword="false"/>.
   /// Status therefore can never remain stuck at <see cref="EnGenResult.Running"/> because of
   /// a launch failure. The run's cancellation source stays installed in that case and is
-  /// retired by the next run or by <see cref="Reset"/>.
+  /// retired by the next run or by <see cref="Clear"/>.
   /// </remarks>
   /// <param name="generator">Generator to execute.</param>
   /// <param name="cancellationToken">Token governing the run, handed to the worker thread.</param>

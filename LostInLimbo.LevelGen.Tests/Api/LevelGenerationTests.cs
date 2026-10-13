@@ -53,7 +53,7 @@ public sealed class LevelGenerationTests : IDisposable
   public void Dispose()
   {
     WaitForTerminal();
-    LevelGeneration.Reset();
+    LevelGeneration.Clear();
   }
 
   // TESTS
@@ -183,7 +183,7 @@ public sealed class LevelGenerationTests : IDisposable
   }
 
   [Fact]
-  public void Reset_WhenIdle_RestoresPristineState()
+  public void Clear_WhenIdle_RestoresPristineState()
   {
     // Arrange: A completed run with a visible world.
     Assert.True(LevelGeneration.Start(EnRunKind.All, Config()));
@@ -191,10 +191,11 @@ public sealed class LevelGenerationTests : IDisposable
     Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
     Assert.NotNull(LevelGeneration.World());
 
-    // Act: Reset the static API.
-    LevelGeneration.Reset();
+    // Act: Clear the static API.
+    var cleared = LevelGeneration.Clear();
 
     // Assert: Back to the never-ran state.
+    Assert.True(cleared);
     Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
     Assert.Null(LevelGeneration.Status().Error);
     Assert.Null(LevelGeneration.World());
@@ -407,5 +408,95 @@ public sealed class LevelGenerationTests : IDisposable
     Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
     Assert.NotNull(LevelGeneration.World());
     Assert.Equal(10L, LevelGeneration.World()!.Stats.Steps);
+  }
+
+  [Fact]
+  public void Clear_WhileRunning_PausesStopsAndClears()
+  {
+    // Arrange: A whole-level run long enough that it cannot finish before it is cleared.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+
+    // Act: Clear the API while the run is in flight.
+    var cleared = LevelGeneration.Clear();
+
+    // Assert: The run was paused, stopped, and the state was reset to pristine.
+    Assert.True(cleared);
+    Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
+    Assert.Null(LevelGeneration.Status().Error);
+    Assert.Null(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Clear_WhileRunning_WithZeroTimeout_ReturnsFalseAndKeepsState()
+  {
+    // Arrange: A whole-level run whose first step is still sleeping.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+
+    // Act: Clear with no patience for the in-flight run.
+    var cleared = LevelGeneration.Clear(TimeSpan.Zero);
+
+    // Assert: Nothing was cleared; the run is still in flight (or just paused).
+    Assert.False(cleared);
+    Assert.NotEqual(EnGenResult.None, LevelGeneration.Status().Result);
+
+    // Act: The pause request landed, so the run stops on its own; clear again without rush.
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+    var clearedAfterStop = LevelGeneration.Clear();
+
+    // Assert: With the worker stopped, clearing succeeds.
+    Assert.True(clearedAfterStop);
+    Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
+    Assert.Null(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Clear_WithNegativeTimeout_ThrowsArgumentOutOfRangeException()
+  {
+    // Act/Assert: A negative timeout is rejected before any state is touched.
+    var exception = Assert.Throws<ArgumentOutOfRangeException>(
+      () => LevelGeneration.Clear(TimeSpan.FromMilliseconds(-1)));
+    Assert.Equal("timeout", exception.ParamName);
+    Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
+  }
+
+  [Fact]
+  public void Clear_AfterCancelledRun_ClearsState()
+  {
+    // Arrange: A cancelled run; cancelled is terminal but not yet cleared.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Cancel());
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+
+    // Act: Clear the terminal-but-dirty state.
+    var cleared = LevelGeneration.Clear();
+
+    // Assert: Back to pristine, with no lingering error or world.
+    Assert.True(cleared);
+    Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
+    Assert.Null(LevelGeneration.Status().Error);
+    Assert.Null(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Start_AfterClear_Succeeds()
+  {
+    // Arrange: A paused run with a partial world, then cleared.
+    Assert.True(LevelGeneration.Start(EnRunKind.Step, Config()));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+    Assert.True(LevelGeneration.Clear());
+
+    // Act: Starting a fresh run after the clear.
+    var started = LevelGeneration.Start(EnRunKind.All, Config(sleep: 0));
+
+    // Assert: The fresh run completes normally from scratch.
+    Assert.True(started);
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+    Assert.NotNull(LevelGeneration.World());
   }
 }
