@@ -2,6 +2,10 @@
 
 This is preliminary design. It can and will change.
 
+Generator will create the world. This is finite world, though generator is designed in way that allows adding stuff to already existing world that was properly finished or paused.
+
+Smallest unit of work is step. If you finished step, state of data must be consistent and correct (meaning editor/game can generate level geometry and objects just fine). Only exception: all steps except last one can have map not being consistent with graph.
+
 ## Structure of config
 
 Configuration must be (de)serializable to/from JSON.
@@ -19,6 +23,7 @@ We also need to get generated data, somehow. Probably held in same way as _statu
 - `LilWorld`: All data.
   - Contains `LilGraph`. This is abstract representation of level. Graph is generated first based on config, then `LilMap` is created based on config and graph.
   - Contains `LilMap`. This is concrete representation of map that can be used for generating meshes and object in game.
+  - Contains `LilStats`. Various statistics about current state of world, like count of areas, how many steps were made etc.
 
 ### Graph.
 

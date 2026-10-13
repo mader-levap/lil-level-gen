@@ -110,19 +110,28 @@ internal sealed class LevelGenerator
   /// Placeholder for generation passes. Will be replaced by real layout, validation and
   /// placement passes using <see cref="_enRunKind"/> and <see cref="_config"/>.
   /// </summary>
-  /// <param name="cancellationToken">Token checked by the placeholder wait; future passes will check it between passes.</param>
+  /// <param name="cancellationToken">Cancellation token.</param>
   /// <returns>Generation result. Can be only Finished or Paused.</returns>
   private EnGenResult RunGeneration(CancellationToken cancellationToken)
   {
     if (_config.Debug?.FailAtStart == true) throw new Exception("Deliberate failure at start.");
 
+    MainLoop(cancellationToken);
+
+    // In future we will be able to finish even with run kind different than All.
+    return _enRunKind == EnRunKind.All ? EnGenResult.Finished : EnGenResult.Paused;
+  }
+
+  /// <summary>
+  /// Main loop of generator.
+  /// </summary>
+  /// <param name="cancellationToken">Cancellation token.</param>
+  private void MainLoop(CancellationToken cancellationToken)
+  {
     // Placeholder: pretend to work for the configured duration (debug-overridable, default 3 seconds).
     // Token-aware wait: wakes up as soon as cancellation is requested instead of sleeping through it.
     var sleepMilliseconds = _config.Debug?.PlaceholderSleep ?? CnfDebug.DefaultPlaceholderSleep;
     if (cancellationToken.WaitHandle.WaitOne(sleepMilliseconds))
-      cancellationToken.ThrowIfCancellationRequested();
-
-    // In future we will be able to finish even with run kind different than All.
-    return _enRunKind == EnRunKind.All ? EnGenResult.Finished : EnGenResult.Paused;
+      cancellationToken.ThrowIfCancellationRequested();    
   }
 }
