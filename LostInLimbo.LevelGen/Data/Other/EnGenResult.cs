@@ -17,16 +17,12 @@ public enum EnGenResult
   None,
   /// <summary>Generation is running at this moment.</summary>
   Running,
-  /// <summary>Generation paused. Can happen if run kind is not All.</summary>
+  /// <summary>Generation paused. Can happen if run kind is not <c>All</c> or if pause was explicitly requested.</summary>
   Paused,
   /// <summary>Generation finished successfully.</summary>
   Finished,
   /// <summary>Generation failed. See <see cref="GenerationStatus.Error"/> for details.</summary>
   Error,
-  /// <summary>
-  /// Generation was cancelled through its <see cref="System.Threading.CancellationToken"/>
-  /// before it could finish or pause. Not an error: <see cref="GenerationStatus.Error"/> stays
-  /// <see langword="null"/> and the partial world must not be used.
-  /// </summary>
+  /// <summary>Generation was cancelled.</summary>
   Cancelled,
 }

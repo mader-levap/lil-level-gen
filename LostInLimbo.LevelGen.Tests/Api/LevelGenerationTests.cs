@@ -310,4 +310,102 @@ public sealed class LevelGenerationTests : IDisposable
     Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
     Assert.NotNull(LevelGeneration.World());
   }
+
+  [Fact]
+  public void Pause_WhileRunningAllKind_PublishesPausedAndWorldVisible()
+  {
+    // Arrange: A whole-level run long enough that it cannot finish before it is paused.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+
+    // Act: Request pause of the in-flight whole-level run.
+    var paused = LevelGeneration.Pause();
+
+    // Assert: The run accepted the pause and reports it as its terminal state.
+    Assert.True(paused);
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+
+    // Assert: Pausing is not an error and the partial world is preserved for inspection.
+    Assert.Null(LevelGeneration.Status().Error);
+    Assert.NotNull(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Pause_WhenNoRunIsInFlight_ReturnsFalse()
+  {
+    // Arrange: Pristine state with no run at all.
+    Assert.False(LevelGeneration.Pause());
+
+    // Act: Pausing after the run already reached a terminal state (finished run arranged below).
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+    var paused = LevelGeneration.Pause();
+
+    // Assert: The call is a no-op and does not disturb the finished run.
+    Assert.False(paused);
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+    Assert.NotNull(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Pause_AfterFinished_ReturnsFalse()
+  {
+    // Arrange: A completed run with a visible world.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+
+    // Act: Attempting to pause the finished run.
+    var paused = LevelGeneration.Pause();
+
+    // Assert: There is nothing left to pause and the terminal state stands.
+    Assert.False(paused);
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+    Assert.NotNull(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Pause_AfterCancelledRun_ReturnsFalse()
+  {
+    // Arrange: A cancelled run; cancelled is terminal.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Cancel());
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+
+    // Act: Attempting to pause the cancelled run.
+    var paused = LevelGeneration.Pause();
+
+    // Assert: There is nothing left to pause and the terminal state stands.
+    Assert.False(paused);
+    Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+  }
+
+  [Fact]
+  public void Resume_AfterExplicitPause_WithAllKind_Finishes()
+  {
+    // Arrange: A whole-level run over a 300 ms-per-step placeholder level, long enough to
+    // pause into but short enough that the resumed remainder still finishes well in time.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 3000, steps: 10)));
+
+    // Act: Pause the run, wait for the boundary to be observed.
+    Assert.True(LevelGeneration.Pause());
+    WaitForTerminal();
+
+    // Assert: The whole-level run paused with its partial world preserved.
+    Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+    Assert.NotNull(LevelGeneration.World());
+
+    // Act: Resume the paused generation as a whole-level run again.
+    var resumed = LevelGeneration.Resume(EnRunKind.All);
+
+    // Assert: The resumed run completes the level from where the pause stopped it.
+    Assert.True(resumed);
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+    Assert.NotNull(LevelGeneration.World());
+    Assert.Equal(10L, LevelGeneration.World()!.Stats.Steps);
+  }
 }

@@ -27,6 +27,19 @@ internal sealed class LevelGenerator
   /// <summary>Shared, thread-safe status sink owned by the API layer.</summary>
   private readonly GenerationStatusStore _statusStore;
 
+  /// <summary>
+  /// Serializes pause requests against terminal publishes, so <see cref="TryRequestPause"/>
+  /// never accepts a request for a run that has already committed to a terminal state, and
+  /// the pause flag is always consumed together with that commit.
+  /// </summary>
+  private readonly object _pauseGate = new();
+
+  /// <summary>
+  /// Pause request flag. Written and consumed under <see cref="_pauseGate"/>; read without the
+  /// gate at step boundaries, so it is volatile.
+  /// </summary>
+  private volatile bool _pauseRequested;
+
   /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
   private int TotalPlaceholderSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
@@ -70,6 +83,60 @@ internal sealed class LevelGenerator
   }
 
   /// <summary>
+  /// Requests that the currently running execution stop at its next step boundary and report
+  /// <see cref="EnGenResult.Paused"/>. Called by the API layer on the consumer's thread while
+  /// the worker thread is inside <see cref="Execute"/>.
+  /// </summary>
+  /// <remarks>
+  /// Pause has precedence over cancellation: when both a pause and a cancellation are pending
+  /// at a checkpoint, the run reports <see cref="EnGenResult.Paused"/> and keeps the partial
+  /// world. It never rewrites <see cref="EnGenResult.Error"/> or
+  /// <see cref="EnGenResult.Finished"/>: a failed run has no work to pause, and a run that
+  /// completed its final step before observing the request finishes normally.
+  /// </remarks>
+  /// <returns>
+  /// <see langword="true"/> if a run was in flight and the request was accepted;
+  /// <see langword="false"/> if no run is running (already finished, paused, cancelled,
+  /// failed, or never started), so there is nothing to pause.
+  /// </returns>
+  internal bool TryRequestPause()
+  {
+    lock (_pauseGate)
+    {
+      // Re-check under the gate: a run that committed to a terminal state while we waited
+      // for the gate can no longer observe this request, so it must not be acknowledged.
+      if (_statusStore.Current.Result != EnGenResult.Running) return false;
+
+      _pauseRequested = true;
+      return true;
+    }
+  }
+
+  /// <summary>
+  /// Publishes a terminal status snapshot for a run that is no longer executing, applying
+  /// pause precedence and consuming any pending pause request.
+  /// </summary>
+  /// <remarks>
+  /// Must be called while holding <see cref="_pauseGate"/> semantics (this method takes it):
+  /// the pause flag is rewritten and cleared together with the publish, so a request accepted
+  /// by <see cref="TryRequestPause"/> always belongs to the run that publishes next, and no
+  /// stale pause leaks into a later run.
+  /// </remarks>
+  /// <param name="result">Terminal result to publish.</param>
+  /// <param name="error">Exception to attach when publishing <see cref="EnGenResult.Error"/>.</param>
+  private void PublishTerminal(EnGenResult result, Exception? error = null)
+  {
+    lock (_pauseGate)
+    {
+      // Pause has precedence over cancellation only; Finished and Error always stand.
+      if (_pauseRequested && result == EnGenResult.Cancelled) result = EnGenResult.Paused;
+
+      _pauseRequested = false;
+      _statusStore.Publish(new GenerationStatus { Result = result, Error = error });
+    }
+  }
+
+  /// <summary>
   /// Starts or resumes generation.
   /// </summary>
   /// <remarks>
@@ -80,7 +147,9 @@ internal sealed class LevelGenerator
   /// <para>
   /// Cancellation is not a failure: when <paramref name="cancellationToken"/> is cancelled the run
   /// stops at its next checkpoint and reports <see cref="EnGenResult.Cancelled"/> with a
-  /// <see langword="null"/> error instead.
+  /// <see langword="null"/> error instead. An explicit pause request (see
+  /// <see cref="TryRequestPause"/>) has precedence over cancellation: a run with both pending
+  /// reports <see cref="EnGenResult.Paused"/> and keeps its partial world.
   /// </para>
   /// </remarks>
   /// <param name="cancellationToken">
@@ -96,17 +165,18 @@ internal sealed class LevelGenerator
       cancellationToken.ThrowIfCancellationRequested();
 
       EnGenResult GenResult = RunGeneration(cancellationToken);
-      _statusStore.Publish(new GenerationStatus { Result = GenResult }); // Finished or Paused here.
+      PublishTerminal(GenResult); // Finished or Paused here.
     }
     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
     {
       // Only our own token maps to Cancelled; an unrelated OperationCanceledException
       // still falls through to the generic handler below and reports an error.
-      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Cancelled });
+      // A pending pause request rewrites Cancelled to Paused inside PublishTerminal.
+      PublishTerminal(EnGenResult.Cancelled);
     }
     catch (Exception exception)
     {
-      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Error = exception });
+      PublishTerminal(EnGenResult.Error, exception);
     }
   }
 
@@ -122,8 +192,8 @@ internal sealed class LevelGenerator
 
     MainLoop(cancellationToken);
 
-    // Complete generation means the level is done; otherwise a Step/Area run stopped early
-    // and the run can be resumed to continue with the remaining steps.
+    // Complete generation means the level is done; otherwise the run stopped early (Step/Area
+    // budget exhausted, or an explicit pause request) and can be resumed with remaining steps.
     return IsGenerationComplete() ? EnGenResult.Finished : EnGenResult.Paused;
   }
 
@@ -135,12 +205,14 @@ internal sealed class LevelGenerator
   /// and <c>Step</c> run at most one step per execution.
   /// </para>
   /// <para>
-  /// Each step first checks the token (the only cancellation checkpoint) and then sleeps for
-  /// <c>PlaceholderSleep / PlaceholderSteps</c> milliseconds as an imitation of the work done in
-  /// a single step. The sleep itself is a plain, uninterruptible <see cref="Thread.Sleep(int)"/>;
-  /// cancellation is therefore observed only after the current step completes. Completed steps
-  /// are counted in <see cref="Data.Result.Stats.LilStats.Steps"/> of <see cref="World"/>, which
-  /// survives pausing and resuming because the API keeps this generator instance alive.
+  /// Each step first checks for a pause request (the only pause checkpoint, see
+  /// <see cref="TryRequestPause"/>), then the token (the only cancellation checkpoint), and
+  /// then sleeps for <c>PlaceholderSleep / PlaceholderSteps</c> milliseconds as an imitation of
+  /// the work done in a single step. The sleep itself is a plain, uninterruptible
+  /// <see cref="Thread.Sleep(int)"/>; both pause and cancellation are therefore observed only
+  /// after the current step completes. Completed steps are counted in
+  /// <see cref="Data.Result.Stats.LilStats.Steps"/> of <see cref="World"/>, which survives
+  /// pausing and resuming because the API keeps this generator instance alive.
   /// </para>
   /// </summary>
   /// <param name="cancellationToken">Token checked at every step boundary.</param>
@@ -156,6 +228,11 @@ internal sealed class LevelGenerator
     var stepsRun = 0;
     while (stepsRun < maxStepsThisRun && !IsGenerationComplete())
     {
+      // Pause checkpoint: a request pending before the next step starts ends the run without
+      // throwing. Checked before cancellation so pause has precedence at this boundary;
+      // PublishTerminal is the safety net for a request racing the checks themselves.
+      if (_pauseRequested) return;
+
       // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
       cancellationToken.ThrowIfCancellationRequested();
 

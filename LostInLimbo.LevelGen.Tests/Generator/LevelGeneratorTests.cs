@@ -363,4 +363,167 @@ public sealed class LevelGeneratorTests
     Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
     Assert.Null(statusStore.Current.Error);
   }
+
+  [Fact]
+  public void TryRequestPause_BeforeExecute_PublishesPausedWithZeroSteps()
+  {
+    // Arrange: A claimed run whose generator is asked to pause before any work happens.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
+
+    // Act: Request the pause, then run the claimed execution.
+    var accepted = generator.TryRequestPause();
+    generator.Execute();
+
+    // Assert: The request was accepted and the run stopped before its first step.
+    Assert.True(accepted);
+    Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+    Assert.Null(statusStore.Current.Error);
+    Assert.Equal(0L, generator.World.Stats.Steps);
+  }
+
+  [Fact]
+  public void TryRequestPause_DuringStep_StopsAtNextStepBoundary()
+  {
+    // Arrange: A run whose placeholder steps take 1 second each (10 000 ms over 10 steps),
+    // so sleeping through the whole placeholder duration would far outlast the join window.
+    const int SleepMilliseconds = 10_000;
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var config = CnfLevelGeneration.Default with
+    {
+      Debug = new CnfDebug { PlaceholderSleep = SleepMilliseconds },
+    };
+    var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
+
+    // Act: Run generation on a worker thread and pause while a step is under way.
+    var stopwatch = Stopwatch.StartNew();
+    var worker = new Thread(() => generator.Execute()) { IsBackground = true, Name = "LevelGeneratorTests.PauseProbe" };
+    worker.Start();
+    Thread.Sleep(200); // Give the worker time to enter the placeholder step.
+    var accepted = generator.TryRequestPause();
+    var joined = worker.Join(TimeSpan.FromSeconds(5));
+    stopwatch.Stop();
+
+    // Assert: The request was accepted for the in-flight run.
+    Assert.True(accepted);
+
+    // Assert: The run stopped at the next step boundary instead of sleeping through the rest.
+    Assert.True(joined, $"Generator did not react to pause within 5 s (slept {stopwatch.Elapsed}).");
+    Assert.True(stopwatch.Elapsed < TimeSpan.FromMilliseconds(SleepMilliseconds),
+      $"Generator ran for {stopwatch.Elapsed}, expected well below the {SleepMilliseconds} ms placeholder sleep.");
+    Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+    Assert.Null(statusStore.Current.Error);
+    Assert.True(generator.World.Stats.Steps > 0 && generator.World.Stats.Steps < 10,
+      $"Expected a partial step count, got {generator.World.Stats.Steps}.");
+  }
+
+  [Fact]
+  public void TryRequestPause_OnFinalStep_PublishesFinished()
+  {
+    // Arrange: A single-step run taking 1 second; pausing while that step sleeps means the
+    // step completes before the pause can be observed, so completion wins over the pause.
+    const int SleepMilliseconds = 1000;
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var config = CnfLevelGeneration.Default with
+    {
+      Debug = new CnfDebug { PlaceholderSleep = SleepMilliseconds, PlaceholderSteps = 1 },
+    };
+    var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
+
+    // Act: Run generation on a worker thread and pause while the only step is under way.
+    var worker = new Thread(() => generator.Execute()) { IsBackground = true, Name = "LevelGeneratorTests.PauseFinalStepProbe" };
+    worker.Start();
+    Thread.Sleep(100); // The worker is now inside the single step's sleep.
+    var accepted = generator.TryRequestPause();
+    var joined = worker.Join(TimeSpan.FromSeconds(5));
+
+    // Assert: The request was accepted, but the in-flight step completed the level anyway.
+    Assert.True(accepted);
+    Assert.True(joined, "Generator did not finish within 5 s.");
+    Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+    Assert.Null(statusStore.Current.Error);
+    Assert.Equal(1L, generator.World.Stats.Steps);
+  }
+
+  [Fact]
+  public void TryRequestPause_WithPreCancelledToken_PublishesPausedNotCancelled()
+  {
+    // Arrange: A pause requested before the run gets going and a token that is also cancelled.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
+    using var cancellationTokenSource = new CancellationTokenSource();
+    cancellationTokenSource.Cancel();
+    Assert.True(generator.TryRequestPause());
+
+    // Act: Run generation; both the pause and the cancellation are pending at the first checkpoint.
+    generator.Execute(cancellationTokenSource.Token);
+
+    // Assert: Pause has precedence over cancellation, so the run pauses instead of cancelling.
+    Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+    Assert.Null(statusStore.Current.Error);
+    Assert.Equal(0L, generator.World.Stats.Steps);
+  }
+
+  [Fact]
+  public void TryRequestPause_AfterFinished_ReturnsFalse()
+  {
+    // Arrange: A run that already completed all of its steps.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
+    generator.Execute();
+    Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+
+    // Act: Attempting to pause the finished run.
+    var accepted = generator.TryRequestPause();
+
+    // Assert: There is nothing left to pause, and the terminal state is not disturbed.
+    Assert.False(accepted);
+    Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+  }
+
+  [Fact]
+  public void TryRequestPause_AfterCancelledRun_ReturnsFalse()
+  {
+    // Arrange: A run that already reported cancellation.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
+    using var cancellationTokenSource = new CancellationTokenSource();
+    cancellationTokenSource.Cancel();
+    generator.Execute(cancellationTokenSource.Token);
+    Assert.Equal(EnGenResult.Cancelled, statusStore.Current.Result);
+
+    // Act: Attempting to pause the cancelled run.
+    var accepted = generator.TryRequestPause();
+
+    // Assert: Cancelled is terminal, so there is nothing left to pause.
+    Assert.False(accepted);
+    Assert.Equal(EnGenResult.Cancelled, statusStore.Current.Result);
+  }
+
+  [Fact]
+  public void Execute_AfterPauseRequestedRun_RunsToCompletion()
+  {
+    // Arrange: A run that was paused through an explicit request.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.All, FastConfig(placeholderSteps: 3), statusStore);
+    Assert.True(generator.TryRequestPause());
+    generator.Execute();
+    Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+    Assert.Equal(0L, generator.World.Stats.Steps);
+
+    // Act: Claim and execute the next run the way Resume does.
+    Assert.True(statusStore.TryBeginRun());
+    generator.Execute();
+
+    // Assert: The consumed pause request does not leak into the next run, which finishes.
+    Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+    Assert.Equal(3L, generator.World.Stats.Steps);
+  }
 }

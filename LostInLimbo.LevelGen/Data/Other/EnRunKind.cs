@@ -5,7 +5,7 @@ namespace LostInLimbo.LevelGen.Data.Other;
 /// </summary>
 public enum EnRunKind
 {
-  /// <summary>Generate entire level.</summary>
+  /// <summary>Generate entire level. Can be stopped early by an explicit pause request and resumed later.</summary>
   All,
   /// <summary>
   /// Advance generation by single area. NOTE: while generation is still a placeholder, areas do

@@ -73,7 +73,8 @@ public static class LevelGeneration
 
   /// <summary>
   /// Resume level generation, applying the given run kind to the next segment.
-  /// Works only if generation is paused (previous run kind was not All).
+  /// Works only if generation is paused (run kind budget exhausted or an explicit
+  /// <see cref="Pause"/> request stopped the previous run).
   /// </summary>
   /// <param name="enRunKind">Kind of run.</param>
   /// <param name="cancellationToken">
@@ -110,9 +111,10 @@ public static class LevelGeneration
   /// </summary>
   /// <remarks>
   /// Best-effort: a run that reaches a terminal state concurrently may still report
-  /// <see cref="EnGenResult.Finished"/> or <see cref="EnGenResult.Paused"/>. Calling this when no
-  /// run is in flight is a no-op. Cancellation of a paused run must go through a fresh
-  /// <see cref="Start"/> call instead.
+  /// <see cref="EnGenResult.Finished"/> or <see cref="EnGenResult.Paused"/>. An explicit
+  /// <see cref="Pause"/> request that is already pending takes precedence over cancellation.
+  /// Calling this when no run is in flight is a no-op. Cancellation of a paused run must go
+  /// through a fresh <see cref="Start"/> call instead.
   /// </remarks>
   /// <returns>
   /// <see langword="true"/> if a running generation was asked to cancel;
@@ -134,6 +136,33 @@ public static class LevelGeneration
       _runSource.Cancel();
       return true;
     }
+  }
+
+  /// <summary>
+  /// Request pause of the run that is currently in flight. The worker stops at its next step boundary
+  /// and publishes <see cref="EnGenResult.Paused"/>; the partial world is preserved and
+  /// <see cref="Resume"/> can continue generation later.
+  /// </summary>
+  /// <remarks>
+  /// Like cancellation, the request is observed only at step boundaries: processing of a
+  /// running step is never interrupted. The partial world of the in-flight step's successor
+  /// is therefore consistent, same as after a Step/Area run.
+  /// <para>
+  /// Returns <see langword="false"/> when there is nothing to pause: no run is in flight, or
+  /// the run already reached a terminal state. A request accepted while the final step was
+  /// still executing may lose the race to completion; in that rare case the run reports
+  /// <see cref="EnGenResult.Finished"/> despite this method returning
+  /// <see langword="true"/>. A paused run never reports
+  /// <see cref="EnGenResult.Cancelled"/>: pause takes precedence over cancellation.
+  /// </para>
+  /// </remarks>
+  /// <returns>
+  /// <see langword="true"/> if a running generation was asked to pause;
+  /// <see langword="false"/> otherwise.
+  /// </returns>
+  public static bool Pause()
+  {
+    return _generator?.TryRequestPause() ?? false;
   }
 
   /// <summary>

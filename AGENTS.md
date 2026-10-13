@@ -144,7 +144,7 @@ Other rules:
 
 ### Documentation
 
-- Code should be well-commented.
+- Code should be well-commented, but comments cannot be too long either.
 - Add XML documentation comments to all types and members, except for overridden methods.
 - Explain non-obvious generation rules, constraints, and coordinate-system assumptions.
 - Document units, coordinate origins, and whether coordinates are inclusive or exclusive.
