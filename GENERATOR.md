@@ -17,13 +17,13 @@ We also need to get generated data, somehow. Probably held in same way as _statu
 ## Structure of map data
 
 - `LilWorld`: All data.
-  - Contains `LilGraph`. This is abstract representation of level.
+  - Contains `LilGraph`. This is abstract representation of level. Graph is generated first based on config, then `LilMap` is created based on config and graph.
   - Contains `LilMap`. This is concrete representation of map that can be used for generating meshes and object in game.
 
 ### Graph.
 
 - `LilGraph`: Contains all nodes and relationships between them.
-TODO Maybe there is some lightweight library for that?
+TODO Maybe there is some lightweight library for that? But their data structures need to be serializable to JSON. Alternatively, we implement our own graph data. In this case we will likely need some GUID to uniquely identify nodes.
 
 ### Map.
 

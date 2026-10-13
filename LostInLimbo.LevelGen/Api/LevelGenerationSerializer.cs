@@ -13,7 +13,7 @@ namespace LostInLimbo.LevelGen.Api;
 /// to be forgiving of hand-written files, but everything this type writes is camelCase.
 /// Only strings cross this boundary; file reading and writing stay with the callers.
 /// </remarks>
-public static class CnfLevelGenerationSerializer
+public static class LevelGenerationSerializer
 {
   /// <summary>Serializer options shared by reading and writing, so the format stays consistent.</summary>
   private static readonly JsonSerializerOptions Options = new()

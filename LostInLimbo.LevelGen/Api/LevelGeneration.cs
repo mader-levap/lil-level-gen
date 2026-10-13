@@ -5,10 +5,11 @@ using LostInLimbo.LevelGen.Data.Other;
 namespace LostInLimbo.LevelGen.Api;
 
 /// <summary>
-/// Entry point for entire level generator.
+/// <para>Entry point for entire level generator. Serves as layer between consumer and internals.</para>
+/// <para>All jobs here are run asynchronously. Therefore, all methods return immediately.</para>
 /// </summary>
 /// <remarks>
-/// It is advisable to run it in separate thread.
+/// 
 /// </remarks>
 public static class LevelGeneration
 {
@@ -24,16 +25,16 @@ public static class LevelGeneration
   /// </summary>
   /// <param name="enRunKind">Kind of run.</param>
   /// <param name="config">Configuration data for level generation.</param>
-  /// <returns>True if there is still something to do, otherwise false.</returns>
+  /// <returns>True if successfully started generation, otherwise false.</returns>
   public static bool Start(EnRunKind enRunKind, CnfLevelGeneration config)
   {
-    if (_status.Running) return true;
+    if (_status.Running) return false;
     Volatile.Write(ref _status, new GenerationStatus { Running = true });
 
     // TODO Placeholder
 
     Volatile.Write(ref _status, GenerationStatus.Default);
-    return false;
+    return true;
   }
 
   /// <summary>
@@ -41,16 +42,16 @@ public static class LevelGeneration
   /// Will return immediately if level generation is in progress.
   /// </summary>
   /// <param name="enRunKind">Kind of run.</param>
-  /// <returns>True if there is still something to do, otherwise false.</returns>
+  /// <returns>True if successfully resumed generation, otherwise false.</returns>
   public static bool Continue(EnRunKind enRunKind)
   {
-    if (_status.Running) return true;
+    if (_status.Running) return false;
     Volatile.Write(ref _status, new GenerationStatus { Running = true });
 
     // TODO Placeholder
 
     Volatile.Write(ref _status, GenerationStatus.Default);
-    return false;
+    return true;
   }
 
   /// <summary>

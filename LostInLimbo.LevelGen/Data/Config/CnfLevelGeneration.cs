@@ -6,9 +6,8 @@ namespace LostInLimbo.LevelGen.Data.Config;
 /// Configuration for generating a level. This is the root of the JSON configuration files.
 /// </summary>
 /// <remarks>
-/// Pure data; no randomness is performed here. Same seed with the same configuration
-/// always produces the same level. The shape maps one-to-one to JSON via
-/// <c>LostInLimbo.LevelGen.Api.CnfLevelGenerationSerializer</c>.
+/// Same seed with the same configuration always produces the same level. The shape maps one-to-one to JSON
+/// via <c>LostInLimbo.LevelGen.Api.LevelGenerationSerializer</c>.
 /// </remarks>
 public sealed record CnfLevelGeneration
 {

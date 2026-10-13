@@ -1,0 +1,22 @@
+using LostInLimbo.LevelGen.Data.Result.Graph;
+using LostInLimbo.LevelGen.Data.Result.Map;
+
+namespace LostInLimbo.LevelGen.Data.Result;
+
+/// <summary>
+/// Result of generation.
+/// </summary>
+/// <remarks>
+/// Pure data.
+/// </remarks>
+public sealed record LilWorld
+{
+  /// <summary>Default instance.</summary>
+  public static LilWorld Default { get; } = new();
+
+  /// <summary>Abstract representation of level.</summary>
+  public LilGraph Graph { get; set; } = LilGraph.Default;
+
+  /// <summary>Concrete representation of map that can be used for generating meshes and object in game.</summary>
+  public LilMap Map { get; set; } = LilMap.Default;
+}
