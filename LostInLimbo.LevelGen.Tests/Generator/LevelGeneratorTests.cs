@@ -28,19 +28,6 @@ public sealed class LevelGeneratorTests
   // TESTS
 
   [Fact]
-  public void Constructor_WithNullConfig_ThrowsArgumentNullException()
-  {
-    // Arrange: Valid run kind and store, but null config.
-    var statusStore = new GenerationStatusStore();
-
-    // Act: Constructing with null config.
-    // Assert: ArgumentNullException is thrown naming the config parameter.
-    var exception = Assert.Throws<ArgumentNullException>(
-      () => new LevelGenerator(EnRunKind.All, null!, statusStore));
-    Assert.Equal("config", exception.ParamName);
-  }
-
-  [Fact]
   public void Constructor_WithNullStatusStore_ThrowsArgumentNullException()
   {
     // Arrange: Valid run kind and config, but null store.
@@ -64,39 +51,6 @@ public sealed class LevelGeneratorTests
 
     // Assert: A world instance exists, ready to be built up.
     Assert.NotNull(generator.World);
-  }
-
-  [Fact]
-  public void Constructor_WithInvalidConfig_ThrowsArgumentOutOfRangeException()
-  {
-    // Arrange: Valid store and run kind, but config violating its own invariants.
-    var statusStore = new GenerationStatusStore();
-    var config = CnfLevelGeneration.Default with
-    {
-      General = new CnfGeneral { Corruption = -1.0f },
-    };
-
-    // Act: Constructing with an invalid config.
-    // Assert: Validation rejects it before any run could be claimed.
-    Assert.Throws<ArgumentOutOfRangeException>(
-      () => new LevelGenerator(EnRunKind.All, config, statusStore));
-  }
-
-  [Fact]
-  public void Constructor_WithPlaceholderStepsBelowOne_ThrowsArgumentOutOfRangeException()
-  {
-    // Arrange: Valid store and run kind, but a placeholder step count below one.
-    var statusStore = new GenerationStatusStore();
-    var config = CnfLevelGeneration.Default with
-    {
-      Debug = new CnfDebug { PlaceholderSteps = 0 },
-    };
-
-    // Act: Constructing with the invalid step count.
-    // Assert: Validation rejects it naming the PlaceholderSteps parameter.
-    var exception = Assert.Throws<ArgumentOutOfRangeException>(
-      () => new LevelGenerator(EnRunKind.All, config, statusStore));
-    Assert.Equal("PlaceholderSteps", exception.ParamName);
   }
 
   [Fact]

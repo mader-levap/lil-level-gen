@@ -50,21 +50,16 @@ internal sealed class LevelGenerator
   public LilWorld World { get; } = new();
 
   /// <summary>
-  /// Prepares level generator.
+  /// Prepares level generator. Assumes the config was already validated by the API layer
+  /// (see <see cref="Data.Config.CnfLevelGeneration.Validate"/>) before the run was claimed.
   /// </summary>
   /// <param name="enRunKind">Kind of run.</param>
-  /// <param name="config">Configuration data for level generation.</param>
+  /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
   /// <param name="statusStore">Store receiving status snapshots during execution.</param>
-  /// <exception cref="ArgumentNullException">A parameter is <see langword="null"/>.</exception>
-  /// <exception cref="ArgumentOutOfRangeException">A numeric config setting is out of range.</exception>
-  /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
+  /// <exception cref="ArgumentNullException">Status store is <see langword="null"/>.</exception>
   public LevelGenerator(EnRunKind enRunKind, CnfLevelGeneration config, GenerationStatusStore statusStore)
   {
-    if (config is null) throw new ArgumentNullException(nameof(config));
     if (statusStore is null) throw new ArgumentNullException(nameof(statusStore));
-
-    // Validate here so every construction path rejects bad config before a run is claimed.
-    config.Validate();
 
     _enRunKind = enRunKind;
     _config = config;

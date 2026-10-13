@@ -167,6 +167,33 @@ public sealed class LevelGenerationTests : IDisposable
   }
 
   [Fact]
+  public void Start_WithNullConfig_ThrowsArgumentNullExceptionWithoutClaimingRun()
+  {
+    // Act/Assert: A null config is rejected before the run is claimed.
+    var exception = Assert.Throws<ArgumentNullException>(
+      () => LevelGeneration.Start(EnRunKind.All, null!));
+
+    // Assert: The exception names the parameter and no claim was taken.
+    Assert.Equal("config", exception.ParamName);
+    Assert.NotEqual(EnGenResult.Running, LevelGeneration.Status().Result);
+  }
+
+  [Fact]
+  public void Start_WithPlaceholderStepsBelowOne_ThrowsNamingParameter()
+  {
+    // Arrange: Idle state and a config with a placeholder step count below one.
+    var invalid = Config(steps: 0);
+
+    // Act/Assert: Validation rejects the step count naming the offending parameter.
+    var exception = Assert.Throws<ArgumentOutOfRangeException>(
+      () => LevelGeneration.Start(EnRunKind.All, invalid));
+
+    // Assert: The failed call left no claim behind.
+    Assert.Equal("PlaceholderSteps", exception.ParamName);
+    Assert.NotEqual(EnGenResult.Running, LevelGeneration.Status().Result);
+  }
+
+  [Fact]
   public void Start_WithFailAtStart_PublishesErrorAndWorldIsNull()
   {
     // Arrange: Debug config that fails immediately.

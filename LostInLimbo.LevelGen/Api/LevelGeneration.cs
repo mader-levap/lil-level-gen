@@ -64,21 +64,30 @@ public static class LevelGeneration
   /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
   public static bool Start(EnRunKind enRunKind, CnfLevelGeneration config, CancellationToken cancellationToken = default)
   {
-    // Construct before claiming the run so configuration errors cannot leave status stuck at "running".
-    var generator = new LevelGenerator(enRunKind, config, _statusStore);
+    // Validate before claiming so configuration errors cannot leave status stuck at "running".
+    // This is the only validation pass; the generator trusts its caller.
+    ValidateConfig(config);
 
-    // Private until the claim succeeds: a refused start must not touch the active run's source.
-    var source = CreateRunSource(cancellationToken);
-    if (!_statusStore.TryBeginRun())
+    // Claim before allocating anything: a refused start must not touch the active run's
+    // source or construct a throwaway generator.
+    if (!_statusStore.TryBeginRun()) return false;
+
+    try
     {
-      source.Dispose();
+      // Claim succeeded, so no worker is executing: the previous run's source can be retired safely.
+      var generator = new LevelGenerator(enRunKind, config, _statusStore);
+      var source = CreateRunSource(cancellationToken);
+      InstallRunSource(source);
+      _generator = generator;
+      return TryRunOnNewThread(generator, source.Token);
+    }
+    catch (Exception exception)
+    {
+      // Defensive: a failure after the claim (e.g. source creation on a disposed token)
+      // must not leave status stuck at "running".
+      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Error = exception });
       return false;
     }
-
-    // Claim succeeded, so no worker is executing: the previous run's source can be retired safely.
-    InstallRunSource(source);
-    _generator = generator;
-    return TryRunOnNewThread(generator, source.Token);
   }
 
   /// <summary>
@@ -95,23 +104,30 @@ public static class LevelGeneration
   /// <returns>True if successfully resumed generation, otherwise false.</returns>
   public static bool Resume(EnRunKind enRunKind, CancellationToken cancellationToken = default)
   {
-    // Capture-or-construct before claiming so constructor errors cannot leave status stuck at "running".
-    var generator = _generator ?? new LevelGenerator(enRunKind, CnfLevelGeneration.Default, _statusStore);
+    // Claim before allocating anything: a refused resume must not touch the active run's
+    // source or construct a throwaway generator.
+    if (!_statusStore.TryBeginResume()) return false;
 
-    // Private until the claim succeeds: a refused resume must not touch the active run's source.
-    var source = CreateRunSource(cancellationToken);
-    if (!_statusStore.TryBeginResume())
+    try
     {
-      source.Dispose();
+      // The run is claimed, so no worker can be executing this generator yet: safe to update
+      // the kind before Thread.Start releases it to the worker. The fallback config is
+      // Default, which is valid by construction, so no validation pass is needed here.
+      var generator = _generator ?? new LevelGenerator(enRunKind, CnfLevelGeneration.Default, _statusStore);
+      generator.SetRunKind(enRunKind);
+
+      // Claim succeeded, so the previous run's source can be retired safely.
+      var source = CreateRunSource(cancellationToken);
+      InstallRunSource(source);
+      _generator = generator;
+      return TryRunOnNewThread(generator, source.Token);
+    }
+    catch (Exception exception)
+    {
+      // Defensive: a failure after the claim must not leave status stuck at "running".
+      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Error = exception });
       return false;
     }
-
-    // The run is claimed, so no worker can be executing this generator yet: safe to update the kind
-    // before Thread.Start releases it to the worker.
-    generator.SetRunKind(enRunKind);
-    InstallRunSource(source);
-    _generator = generator;
-    return TryRunOnNewThread(generator, source.Token);
   }
 
   /// <summary>
@@ -288,6 +304,21 @@ public static class LevelGeneration
   }
 
   // OTHER
+
+  /// <summary>
+  /// Validates a generation config before its run is claimed, so a bad config cannot leave
+  /// status stuck at <see cref="EnGenResult.Running"/>. The single validation pass for a run:
+  /// generators receive the config already validated by this method.
+  /// </summary>
+  /// <param name="config">Configuration to validate. Must not be <see langword="null"/>.</param>
+  /// <exception cref="ArgumentNullException">Config is <see langword="null"/>.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">A numeric config setting is out of range.</exception>
+  /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
+  private static void ValidateConfig(CnfLevelGeneration config)
+  {
+    if (config is null) throw new ArgumentNullException(nameof(config));
+    config.Validate();
+  }
 
   /// <summary>
   /// Creates the cancellation source for a new run. When the caller supplied an external token,
