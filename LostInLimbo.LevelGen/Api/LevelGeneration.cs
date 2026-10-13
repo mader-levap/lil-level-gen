@@ -24,23 +24,51 @@ public static class LevelGeneration
   private static volatile LevelGenerator? _generator;
 
   /// <summary>
+  /// Serializes replacement and disposal of the current run's cancellation source against
+  /// <see cref="Cancel"/>. Every access to <see cref="_runSource"/> must hold this gate, so a
+  /// source is never disposed while <see cref="Cancel"/> is invoking it.
+  /// </summary>
+  private static readonly object RunSourceGate = new();
+
+  /// <summary>
+  /// Cancellation source of the run that currently holds the claim, or of the last run.
+  /// Retired (disposed and replaced) when a new run claims, and by <see cref="Reset"/>.
+  /// </summary>
+  private static CancellationTokenSource? _runSource;
+
+  /// <summary>
   /// Begin level generation based on given config. Will discard all and any partial data,
   /// including the world built by any previous run.
   /// </summary>
   /// <param name="enRunKind">Kind of run.</param>
   /// <param name="config">Configuration data for level generation.</param>
+  /// <param name="cancellationToken">
+  /// Optional external token. When cancelled, the run stops at its next checkpoint and reports
+  /// <see cref="EnGenResult.Cancelled"/>. The token is linked into a source owned by this call,
+  /// so this method does not need to observe it again; pass it to <see cref="Resume"/> as well
+  /// if subsequent runs should honor it too.
+  /// </param>
   /// <returns>True if successfully started generation, otherwise false.</returns>
   /// <exception cref="ArgumentNullException">Config is <see langword="null"/>.</exception>
   /// <exception cref="ArgumentOutOfRangeException">A numeric config setting is out of range.</exception>
   /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
-  public static bool Start(EnRunKind enRunKind, CnfLevelGeneration config)
+  public static bool Start(EnRunKind enRunKind, CnfLevelGeneration config, CancellationToken cancellationToken = default)
   {
     // Construct before claiming the run so configuration errors cannot leave status stuck at "running".
     var generator = new LevelGenerator(enRunKind, config, _statusStore);
-    if (!_statusStore.TryBeginRun()) return false;
 
+    // Private until the claim succeeds: a refused start must not touch the active run's source.
+    var source = CreateRunSource(cancellationToken);
+    if (!_statusStore.TryBeginRun())
+    {
+      source.Dispose();
+      return false;
+    }
+
+    // Claim succeeded, so no worker is executing: the previous run's source can be retired safely.
+    InstallRunSource(source);
     _generator = generator;
-    return TryRunOnNewThread(generator);
+    return TryRunOnNewThread(generator, source.Token);
   }
 
   /// <summary>
@@ -48,18 +76,64 @@ public static class LevelGeneration
   /// Works only if generation is paused (previous run kind was not All).
   /// </summary>
   /// <param name="enRunKind">Kind of run.</param>
+  /// <param name="cancellationToken">
+  /// Optional external token, honored exactly like in <see cref="Start"/>. A token given to a
+  /// previous <see cref="Start"/> call does not carry over automatically; pass it again here if
+  /// this resumed run should honor it as well.
+  /// </param>
   /// <returns>True if successfully resumed generation, otherwise false.</returns>
-  public static bool Resume(EnRunKind enRunKind)
+  public static bool Resume(EnRunKind enRunKind, CancellationToken cancellationToken = default)
   {
     // Capture-or-construct before claiming so constructor errors cannot leave status stuck at "running".
     var generator = _generator ?? new LevelGenerator(enRunKind, CnfLevelGeneration.Default, _statusStore);
-    if (!_statusStore.TryBeginResume()) return false;
+
+    // Private until the claim succeeds: a refused resume must not touch the active run's source.
+    var source = CreateRunSource(cancellationToken);
+    if (!_statusStore.TryBeginResume())
+    {
+      source.Dispose();
+      return false;
+    }
 
     // The run is claimed, so no worker can be executing this generator yet: safe to update the kind
     // before Thread.Start releases it to the worker.
     generator.SetRunKind(enRunKind);
+    InstallRunSource(source);
     _generator = generator;
-    return TryRunOnNewThread(generator);
+    return TryRunOnNewThread(generator, source.Token);
+  }
+
+  /// <summary>
+  /// Request cancellation of the run that is currently in flight.
+  /// The worker stops at its next checkpoint and publishes <see cref="EnGenResult.Cancelled"/>;
+  /// the partial world of a cancelled run is discarded.
+  /// </summary>
+  /// <remarks>
+  /// Best-effort: a run that reaches a terminal state concurrently may still report
+  /// <see cref="EnGenResult.Finished"/> or <see cref="EnGenResult.Paused"/>. Calling this when no
+  /// run is in flight is a no-op. Cancellation of a paused run must go through a fresh
+  /// <see cref="Start"/> call instead.
+  /// </remarks>
+  /// <returns>
+  /// <see langword="true"/> if a running generation was asked to cancel;
+  /// <see langword="false"/> otherwise.
+  /// </returns>
+  public static bool Cancel()
+  {
+    // Fast path: nothing to cancel outside of a running claim.
+    if (_statusStore.Current.Result != EnGenResult.Running) return false;
+
+    lock (RunSourceGate)
+    {
+      // Re-check under the gate: while waiting for it the run may have reached a terminal state
+      // and Reset may have retired the source, so the fast-path observation can go stale.
+      if (_statusStore.Current.Result != EnGenResult.Running) return false;
+
+      if (_runSource is null) return false;
+
+      _runSource.Cancel();
+      return true;
+    }
   }
 
   /// <summary>
@@ -80,6 +154,7 @@ public static class LevelGeneration
   /// <see cref="EnGenResult.Paused"/> (partial results of an Area or Step run) and
   /// <see cref="EnGenResult.Finished"/> (complete world). It returns <see langword="null"/>
   /// while running, after <see cref="EnGenResult.Error"/> (partial world must not be used),
+  /// after <see cref="EnGenResult.Cancelled"/> (cancelled runs discard their partial world),
   /// and before the first run. Observing a stable status snapshot guarantees the final data
   /// is visible to the caller.
   /// </remarks>
@@ -96,9 +171,9 @@ public static class LevelGeneration
 
   /// <summary>
   /// Test support: restores the pristine never-ran state - status back to
-  /// <see cref="EnGenResult.None"/> with no error, and no generator, so <see cref="World"/>
-  /// returns <see langword="null"/>. Not part of the public API; only test assemblies see
-  /// it through <c>InternalsVisibleTo</c>.
+  /// <see cref="EnGenResult.None"/> with no error, no generator, and no live cancellation
+  /// source, so <see cref="World"/> returns <see langword="null"/>. Not part of the public API;
+  /// only test assemblies see it through <c>InternalsVisibleTo</c>.
   /// </summary>
   /// <exception cref="InvalidOperationException">A run is currently in progress.</exception>
   internal static void Reset()
@@ -108,8 +183,48 @@ public static class LevelGeneration
     if (_statusStore.Current.Result == EnGenResult.Running)
       throw new InvalidOperationException("Cannot reset while generation is running.");
 
+    // Retire the source under the gate so it is never disposed while Cancel invokes it.
+    lock (RunSourceGate)
+    {
+      var previous = _runSource;
+      _runSource = null;
+      previous?.Dispose();
+    }
+
     _statusStore.Publish(GenerationStatus.Default);
     _generator = null;
+  }
+
+  /// <summary>
+  /// Creates the cancellation source for a new run. When the caller supplied an external token,
+  /// the source is linked to it, so cancelling that token cancels the run as well.
+  /// </summary>
+  /// <param name="externalToken">Optional caller-owned token. May be <see cref="CancellationToken.None"/>.</param>
+  /// <returns>A fresh source; the caller owns it until it is installed via <see cref="InstallRunSource"/>.</returns>
+  private static CancellationTokenSource CreateRunSource(CancellationToken externalToken)
+  {
+    return externalToken.CanBeCanceled
+      ? CancellationTokenSource.CreateLinkedTokenSource(externalToken)
+      : new CancellationTokenSource();
+  }
+
+  /// <summary>
+  /// Publishes the new run's source as the current one and retires the previous run's source.
+  /// </summary>
+  /// <remarks>
+  /// Must only be called after a successful claim: the claim guarantees no worker is still
+  /// using the previous source, and <see cref="Cancel"/> serializes on <see cref="RunSourceGate"/>
+  /// so the disposal below can never race an in-flight cancellation.
+  /// </remarks>
+  /// <param name="source">Source of the run that holds the claim.</param>
+  private static void InstallRunSource(CancellationTokenSource source)
+  {
+    lock (RunSourceGate)
+    {
+      var previous = _runSource;
+      _runSource = source;
+      previous?.Dispose();
+    }
   }
 
   /// <summary>
@@ -122,18 +237,20 @@ public static class LevelGeneration
   /// is published as <see cref="EnGenResult.Error"/> with the exception captured in
   /// <see cref="GenerationStatus.Error"/> and this method returns <see langword="false"/>.
   /// Status therefore can never remain stuck at <see cref="EnGenResult.Running"/> because of
-  /// a launch failure.
+  /// a launch failure. The run's cancellation source stays installed in that case and is
+  /// retired by the next run or by <see cref="Reset"/>.
   /// </remarks>
   /// <param name="generator">Generator to execute.</param>
+  /// <param name="cancellationToken">Token governing the run, handed to the worker thread.</param>
   /// <returns>
   /// <see langword="true"/> if the worker thread was started;
   /// <see langword="false"/> if launching failed (status reports the error).
   /// </returns>
-  private static bool TryRunOnNewThread(LevelGenerator generator)
+  private static bool TryRunOnNewThread(LevelGenerator generator, CancellationToken cancellationToken)
   {
     try
     {
-      var thread = new Thread(generator.Execute)
+      var thread = new Thread(() => generator.Execute(cancellationToken))
       {
         IsBackground = true,
         Name = "LostInLimbo.LevelGenerator",

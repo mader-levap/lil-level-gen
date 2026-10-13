@@ -170,4 +170,115 @@ public sealed class LevelGenerationTests : IDisposable
     Assert.Null(LevelGeneration.Status().Error);
     Assert.Null(LevelGeneration.World());
   }
+
+  [Fact]
+  public void Cancel_WhileRunning_PublishesCancelledWorldNullErrorNull()
+  {
+    // Arrange: A run long enough that it cannot finish before it is cancelled.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+
+    // Act: Request cancellation of the in-flight run.
+    var cancelled = LevelGeneration.Cancel();
+
+    // Assert: The run accepted the cancellation and reports it as its terminal state.
+    Assert.True(cancelled);
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+
+    // Assert: Cancellation is not an error and the partial world is discarded.
+    Assert.Null(LevelGeneration.Status().Error);
+    Assert.Null(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Cancel_WhenNoRunIsInFlight_ReturnsFalse()
+  {
+    // Arrange: Pristine state with no run at all.
+    Assert.False(LevelGeneration.Cancel());
+
+    // Arrange: A completed run with a visible world.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+
+    // Act: Cancelling after the run already reached a terminal state.
+    var cancelled = LevelGeneration.Cancel();
+
+    // Assert: The call is a no-op and does not disturb the finished run.
+    Assert.False(cancelled);
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+    Assert.NotNull(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Start_WithPreCancelledToken_PublishesCancelled()
+  {
+    // Arrange: A token that is already cancelled before the run starts.
+    using var cancellationTokenSource = new CancellationTokenSource();
+    cancellationTokenSource.Cancel();
+
+    // Act: Start the run with the cancelled token.
+    var started = LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000), cancellationTokenSource.Token);
+
+    // Assert: The run is accepted, then ends at its first checkpoint instead of generating.
+    Assert.True(started);
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+    Assert.Null(LevelGeneration.Status().Error);
+    Assert.Null(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Start_WithExternalToken_CancelsRunWhenTokenFires()
+  {
+    // Arrange: A caller-owned token linked into the run.
+    using var cancellationTokenSource = new CancellationTokenSource();
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000), cancellationTokenSource.Token));
+    Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+
+    // Act: The caller cancels through its own token, not through LevelGeneration.Cancel().
+    cancellationTokenSource.Cancel();
+
+    // Assert: The linked source forwards the cancellation to the run.
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+    Assert.Null(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Resume_AfterCancelledRun_ReturnsFalse()
+  {
+    // Arrange: A cancelled run. Cancelled is terminal, so only a fresh Start is allowed.
+    Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Cancel());
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+
+    // Act: Attempting to resume the cancelled run.
+    var resumed = LevelGeneration.Resume(EnRunKind.All);
+
+    // Assert: Resuming is refused because cancelled runs cannot be continued.
+    Assert.False(resumed);
+    Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+  }
+
+  [Fact]
+  public void Start_AfterCancelledRun_Succeeds()
+  {
+    // Arrange: A cancelled run that discarded its partial data.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Cancel());
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+
+    // Act: Starting a fresh run after the cancellation.
+    var started = LevelGeneration.Start(EnRunKind.All, Config(sleep: 0));
+
+    // Assert: The fresh run completes normally and produces a world again.
+    Assert.True(started);
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+    Assert.NotNull(LevelGeneration.World());
+  }
 }

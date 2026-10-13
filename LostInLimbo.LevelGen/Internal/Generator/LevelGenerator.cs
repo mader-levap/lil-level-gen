@@ -73,14 +73,32 @@ internal sealed class LevelGenerator
   /// where an unhandled exception would terminate the host process. Instead the failure is
   /// reported through the status store as <see cref="EnGenResult.Error"/> with the exception
   /// captured in <see cref="GenerationStatus.Error"/>.
+  /// <para>
+  /// Cancellation is not a failure: when <paramref name="cancellationToken"/> is cancelled the run
+  /// stops at its next checkpoint and reports <see cref="EnGenResult.Cancelled"/> with a
+  /// <see langword="null"/> error instead.
+  /// </para>
   /// </remarks>
-  public void Execute()
+  /// <param name="cancellationToken">
+  /// Token governing this run. Checked before any pass starts and awaited during placeholder
+  /// work; future passes receive it as a parameter and check it at pass boundaries.
+  /// </param>
+  public void Execute(CancellationToken cancellationToken = default)
   {
     _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running });
     try
     {
-      EnGenResult GenResult = RunGeneration();
+      // First checkpoint: a token cancelled before the run got going ends it right away.
+      cancellationToken.ThrowIfCancellationRequested();
+
+      EnGenResult GenResult = RunGeneration(cancellationToken);
       _statusStore.Publish(new GenerationStatus { Result = GenResult }); // Finished or Paused here.
+    }
+    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+    {
+      // Only our own token maps to Cancelled; an unrelated OperationCanceledException
+      // still falls through to the generic handler below and reports an error.
+      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Cancelled });
     }
     catch (Exception exception)
     {
@@ -92,13 +110,17 @@ internal sealed class LevelGenerator
   /// Placeholder for generation passes. Will be replaced by real layout, validation and
   /// placement passes using <see cref="_enRunKind"/> and <see cref="_config"/>.
   /// </summary>
+  /// <param name="cancellationToken">Token checked by the placeholder wait; future passes will check it between passes.</param>
   /// <returns>Generation result. Can be only Finished or Paused.</returns>
-  private EnGenResult RunGeneration()
+  private EnGenResult RunGeneration(CancellationToken cancellationToken)
   {
     if (_config.Debug?.FailAtStart == true) throw new Exception("Deliberate failure at start.");
 
     // Placeholder: pretend to work for the configured duration (debug-overridable, default 3 seconds).
-    Thread.Sleep(_config.Debug?.PlaceholderSleep ?? CnfDebug.DefaultPlaceholderSleep);
+    // Token-aware wait: wakes up as soon as cancellation is requested instead of sleeping through it.
+    var sleepMilliseconds = _config.Debug?.PlaceholderSleep ?? CnfDebug.DefaultPlaceholderSleep;
+    if (cancellationToken.WaitHandle.WaitOne(sleepMilliseconds))
+      cancellationToken.ThrowIfCancellationRequested();
 
     // In future we will be able to finish even with run kind different than All.
     return _enRunKind == EnRunKind.All ? EnGenResult.Finished : EnGenResult.Paused;

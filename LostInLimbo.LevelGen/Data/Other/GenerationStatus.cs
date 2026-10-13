@@ -9,7 +9,8 @@ namespace LostInLimbo.LevelGen.Data.Other;
 /// Immutable snapshot: replace the whole instance instead of mutating it, so the status can be
 /// handed to another thread safely.
 /// <para>Lifecycle: <see cref="EnGenResult.None"/> (not run yet) → <see cref="EnGenResult.Running"/> →
-/// <see cref="EnGenResult.Finished"/> or <see cref="EnGenResult.Error"/>.</para>
+/// <see cref="EnGenResult.Paused"/> (optional) → <see cref="EnGenResult.Finished"/>,
+/// <see cref="EnGenResult.Error"/> or <see cref="EnGenResult.Cancelled"/>.</para>
 /// </remarks>
 public sealed record GenerationStatus
 {
@@ -26,6 +27,8 @@ public sealed record GenerationStatus
   /// <summary>
   /// Exception that terminated generation.
   /// Invariant: non-<see langword="null"/> if and only if <see cref="Result"/> is <see cref="EnGenResult.Error"/>.
+  /// Stays <see langword="null"/> for <see cref="EnGenResult.Cancelled"/>, which is a requested
+  /// outcome, not a failure.
   /// </summary>
   public Exception? Error { get; init; }
 }

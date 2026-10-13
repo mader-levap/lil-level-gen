@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Other;
 using LostInLimbo.LevelGen.Data.Result;
@@ -177,5 +179,97 @@ public sealed class LevelGeneratorTests
     Assert.Equal(EnGenResult.Error, statusStore.Current.Result);
     var error = Assert.IsType<Exception>(statusStore.Current.Error);
     Assert.Equal("Deliberate failure at start.", error.Message);
+  }
+
+  [Fact]
+  public void Execute_WithPreCancelledToken_PublishesCancelledWithoutError()
+  {
+    // Arrange: A claimed run and a token cancelled before Execute is entered.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
+    using var cancellationTokenSource = new CancellationTokenSource();
+    cancellationTokenSource.Cancel();
+
+    // Act: Run generation with the already cancelled token.
+    generator.Execute(cancellationTokenSource.Token);
+
+    // Assert: The first checkpoint stops the run before any pass and reports cancellation.
+    Assert.Equal(EnGenResult.Cancelled, statusStore.Current.Result);
+    Assert.Null(statusStore.Current.Error);
+  }
+
+  [Fact]
+  public void Execute_WithPreCancelledTokenAndFailAtStart_PublishesCancelledNotError()
+  {
+    // Arrange: Token already cancelled and debug config that would fail at start.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var config = CnfLevelGeneration.Default with
+    {
+      Debug = new CnfDebug { FailAtStart = true, PlaceholderSleep = 0 },
+    };
+    var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
+    using var cancellationTokenSource = new CancellationTokenSource();
+    cancellationTokenSource.Cancel();
+
+    // Act: Run generation with the cancelled token.
+    generator.Execute(cancellationTokenSource.Token);
+
+    // Assert: The cancellation checkpoint runs before any pass, so cancellation wins.
+    Assert.Equal(EnGenResult.Cancelled, statusStore.Current.Result);
+    Assert.Null(statusStore.Current.Error);
+  }
+
+  [Fact]
+  public void Execute_CancelDuringPlaceholderSleep_ReturnsBeforeSleepEnds()
+  {
+    // Arrange: A run that would sleep for 30 seconds if the wait ignored the token.
+    const int SleepMilliseconds = 30_000;
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var config = CnfLevelGeneration.Default with
+    {
+      Debug = new CnfDebug { PlaceholderSleep = SleepMilliseconds },
+    };
+    var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
+    using var cancellationTokenSource = new CancellationTokenSource();
+
+    // Act: Run generation on a worker thread and cancel while it is under way.
+    var stopwatch = Stopwatch.StartNew();
+    var worker = new Thread(() => generator.Execute(cancellationTokenSource.Token))
+    {
+      IsBackground = true,
+      Name = "LevelGeneratorTests.CancelProbe",
+    };
+    worker.Start();
+    Thread.Sleep(200); // Give the worker time to enter the placeholder wait.
+    cancellationTokenSource.Cancel();
+    var joined = worker.Join(TimeSpan.FromSeconds(5));
+    stopwatch.Stop();
+
+    // Assert: The placeholder wait woke up early instead of sleeping through the cancellation.
+    Assert.True(joined, $"Generator did not react to cancellation within 5 s (slept {stopwatch.Elapsed}).");
+    Assert.True(stopwatch.Elapsed < TimeSpan.FromMilliseconds(SleepMilliseconds),
+      $"Generator ran for {stopwatch.Elapsed}, expected well below the {SleepMilliseconds} ms placeholder sleep.");
+    Assert.Equal(EnGenResult.Cancelled, statusStore.Current.Result);
+    Assert.Null(statusStore.Current.Error);
+  }
+
+  [Fact]
+  public void Execute_WithUncancelledToken_CompletesNormally()
+  {
+    // Arrange: Claimed run with a live (never cancelled) token.
+    var statusStore = new GenerationStatusStore();
+    Assert.True(statusStore.TryBeginRun());
+    var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
+    using var cancellationTokenSource = new CancellationTokenSource();
+
+    // Act: Run generation to completion with the token attached.
+    generator.Execute(cancellationTokenSource.Token);
+
+    // Assert: A token nobody cancels has no effect on the outcome.
+    Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+    Assert.Null(statusStore.Current.Error);
   }
 }

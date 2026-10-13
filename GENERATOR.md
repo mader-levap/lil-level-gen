@@ -57,3 +57,11 @@ This allows thin walls, thin floor/ceiling between storeys and other effects.
 
 TODO: add theme/style config.
 TODO: define and determine what theme, style etc means here.
+
+## Cancellation
+
+Runs are cancellable through `LevelGeneration.Cancel()` or an optional token passed to `Start`/`Resume`. Convention for generator passes:
+
+- Every pass takes a `CancellationToken` parameter (never a stored field) and calls `ThrowIfCancellationRequested()` at pass boundaries.
+- Hot loops (cells, rooms, walls) check only every N iterations, not per element, to keep the cost negligible.
+- Cancellation must never change the output of a run that is not cancelled: it only truncates it. The cancelled run reports `EnGenResult.Cancelled` and its partial data is discarded.

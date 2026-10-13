@@ -10,8 +10,8 @@ namespace LostInLimbo.LevelGen.Data.Config;
 /// </remarks>
 public sealed record CnfDebug
 {
-  /// <summary>Default placeholder sleep in milliseconds. Matches the built-in placeholder duration.</summary>
-  public const int DefaultPlaceholderSleep = 3000;
+  /// <summary>Default placeholder sleep in milliseconds.</summary>
+  public const int DefaultPlaceholderSleep = 0;
 
   //
 
