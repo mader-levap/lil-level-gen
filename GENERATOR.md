@@ -25,7 +25,25 @@ Configuration must be (de)serializable to/from JSON.
 ### Graph.
 
 - `LilGraph`: Contains all nodes and relationships between them.
-TODO Maybe there is some lightweight library for that? But their data structures need to be serializable to JSON. Alternatively, we implement our own graph data. In this case we will likely need some GUID to uniquely identify nodes.
+  - Contains one or more `LilNode`s.
+  - Contains one or more `LilEdge`s.
+
+- `LilNode`: Single place in the level.
+  - Has unique `Id` (GUID).
+  - Contains zero or more `LilPoi`s. Player has access to everything within given place.
+- `LilPoi`: Point of interest inside a node.
+  - Has unique `Id` (GUID), unique across entire graph so conditions can reference a specific POI.
+  - Has type: `Start`, `Exit`, `Goal` or `Solution`.
+  - Example of `Solution`: key/button/lever used to open door.
+- `LilEdge`: Passage between two places (nodes).
+  - Has unique `Id` (GUID).
+  - References source and destination node by `Id`.
+  - Can be bidirectional (most common) or one-way.
+  - Contains zero or more `LilCondition`s. Empty means open (always traversable) passage.
+- `LilCondition`: Single requirement that must be met before passage can be used.
+  - References a specific solution POI (not just its node) by `Id`, because one place can contain multiple solutions each opening a different place.
+  - All conditions on an edge must be met (e.g. door requiring both red and blue keys).
+
 
 ### Map.
 
