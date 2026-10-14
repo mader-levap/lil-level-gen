@@ -101,19 +101,23 @@ public static class LevelGeneration
   /// previous <see cref="Start"/> call does not carry over automatically; pass it again here if
   /// this resumed run should honor it as well.
   /// </param>
-  /// <returns>True if successfully resumed generation, otherwise false.</returns>
+  /// <returns>
+  /// True if successfully resumed generation, otherwise false. A refusal, a launch failure,
+  /// or a violated internal invariant (see <see cref="EnGenResult.Error"/>) all return false;
+  /// use <see cref="Status"/> to tell them apart.
+  /// </returns>
   public static bool Resume(EnRunKind enRunKind, CancellationToken cancellationToken = default)
   {
     // Claim before allocating anything: a refused resume must not touch the active run's
-    // source or construct a throwaway generator.
+    // source or mutate the paused generator.
     if (!_statusStore.TryBeginResume()) return false;
 
     try
     {
       // The run is claimed, so no worker can be executing this generator yet: safe to update
-      // the kind before Thread.Start releases it to the worker. The fallback config is
-      // Default, which is valid by construction, so no validation pass is needed here.
-      var generator = _generator ?? new LevelGenerator(enRunKind, CnfLevelGeneration.Default, _statusStore);
+      // the kind before Thread.Start releases it to the worker.
+      var generator = _generator ?? throw new InvalidOperationException(
+        "Resume requires an existing paused generator, but none is present.");
       generator.SetRunKind(enRunKind);
 
       // Claim succeeded, so the previous run's source can be retired safely.
