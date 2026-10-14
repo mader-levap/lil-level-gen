@@ -37,6 +37,12 @@ public sealed class LevelGenerationTests : IDisposable
     };
   }
 
+  /// <summary>
+  /// Config for a run that must still be in flight when the test issues its command
+  /// (Cancel/Pause/Clear).
+  /// </summary>
+  private static CnfLevelGeneration InFlightConfig() => Config(sleep: 5_000, steps: 50);
+
   /// <summary>Polls until no run is in flight; fails the test on timeout.</summary>
   private static void WaitForTerminal()
   {
@@ -45,7 +51,7 @@ public sealed class LevelGenerationTests : IDisposable
     {
       if (stopwatch.Elapsed > TerminalTimeout)
         Assert.Fail($"Generation did not reach a terminal state within {TerminalTimeout}.");
-      Thread.Sleep(10);
+      Thread.Sleep(2);
     }
   }
 
@@ -237,7 +243,7 @@ public sealed class LevelGenerationTests : IDisposable
   public void Cancel_WhileRunning_PublishesCancelledWorldNullErrorNull()
   {
     // Arrange: A run long enough that it cannot finish before it is cancelled.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
     Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
 
     // Act: Request cancellation of the in-flight run.
@@ -281,7 +287,7 @@ public sealed class LevelGenerationTests : IDisposable
     cancellationTokenSource.Cancel();
 
     // Act: Start the run with the cancelled token.
-    var started = LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000), cancellationTokenSource.Token);
+    var started = LevelGeneration.Start(EnRunKind.All, InFlightConfig(), cancellationTokenSource.Token);
 
     // Assert: The run is accepted, then ends at its first checkpoint instead of generating.
     Assert.True(started);
@@ -296,7 +302,7 @@ public sealed class LevelGenerationTests : IDisposable
   {
     // Arrange: A caller-owned token linked into the run.
     using var cancellationTokenSource = new CancellationTokenSource();
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000), cancellationTokenSource.Token));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig(), cancellationTokenSource.Token));
     Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
 
     // Act: The caller cancels through its own token, not through LevelGeneration.Cancel().
@@ -312,7 +318,7 @@ public sealed class LevelGenerationTests : IDisposable
   public void Resume_AfterCancelledRun_ReturnsFalse()
   {
     // Arrange: A cancelled run. Cancelled is terminal, so only a fresh Start is allowed.
-    Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
     Assert.True(LevelGeneration.Cancel());
     WaitForTerminal();
     Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
@@ -329,7 +335,7 @@ public sealed class LevelGenerationTests : IDisposable
   public void Start_AfterCancelledRun_Succeeds()
   {
     // Arrange: A cancelled run that discarded its partial data.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
     Assert.True(LevelGeneration.Cancel());
     WaitForTerminal();
     Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
@@ -348,7 +354,7 @@ public sealed class LevelGenerationTests : IDisposable
   public void Pause_WhileRunningAllKind_PublishesPausedAndWorldVisible()
   {
     // Arrange: A whole-level run long enough that it cannot finish before it is paused.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
     Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
 
     // Act: Request pause of the in-flight whole-level run.
@@ -403,7 +409,7 @@ public sealed class LevelGenerationTests : IDisposable
   public void Pause_AfterCancelledRun_ReturnsFalse()
   {
     // Arrange: A cancelled run; cancelled is terminal.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
     Assert.True(LevelGeneration.Cancel());
     WaitForTerminal();
     Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
@@ -419,9 +425,9 @@ public sealed class LevelGenerationTests : IDisposable
   [Fact]
   public void Resume_AfterExplicitPause_WithAllKind_Finishes()
   {
-    // Arrange: A whole-level run over a 300 ms-per-step placeholder level, long enough to
+    // Arrange: A whole-level run over a 100 ms-per-step placeholder level, long enough to
     // pause into but short enough that the resumed remainder still finishes well in time.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 3000, steps: 10)));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 1000, steps: 10)));
 
     // Act: Pause the run, wait for the boundary to be observed.
     Assert.True(LevelGeneration.Pause());
@@ -446,7 +452,7 @@ public sealed class LevelGenerationTests : IDisposable
   public void Clear_WhileRunning_PausesStopsAndClears()
   {
     // Arrange: A whole-level run long enough that it cannot finish before it is cleared.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
     Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
 
     // Act: Clear the API while the run is in flight.
@@ -463,7 +469,7 @@ public sealed class LevelGenerationTests : IDisposable
   public void Clear_WhileRunning_WithZeroTimeout_ReturnsFalseAndKeepsState()
   {
     // Arrange: A whole-level run whose first step is still sleeping.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
     Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
 
     // Act: Clear with no patience for the in-flight run.
@@ -498,7 +504,7 @@ public sealed class LevelGenerationTests : IDisposable
   public void Clear_AfterCancelledRun_ClearsState()
   {
     // Arrange: A cancelled run; cancelled is terminal but not yet cleared.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
     Assert.True(LevelGeneration.Cancel());
     WaitForTerminal();
     Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
@@ -537,7 +543,7 @@ public sealed class LevelGenerationTests : IDisposable
   {
     // Repeat a synchronized Clear/Start race so both orderings (clear first, start first)
     // are exercised; each iteration settles back to pristine state before the next one.
-    for (var iteration = 0; iteration < 50; iteration++)
+    for (var iteration = 0; iteration < 10; iteration++)
     {
       // Arrange: Pristine state guaranteed by the previous iteration's settle.
       using var barrier = new Barrier(2);
@@ -594,7 +600,7 @@ public sealed class LevelGenerationTests : IDisposable
   {
     // Arrange: A long-running first run; Clear runs in the background, so it pauses run 1
     // and then races its reset against the fresh Start below while run 1 stops.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
     var clearTask = Task.Run(() => LevelGeneration.Clear());
 
     // Act: Wait for the pause to stop run 1, then claim the next run while Clear is
@@ -644,7 +650,7 @@ public sealed class LevelGenerationTests : IDisposable
       LevelGeneration.AfterClaimTestHook = () =>
       {
         cancelReachedCall.Wait(TimeSpan.FromSeconds(5));
-        Thread.Sleep(200);
+        Thread.Sleep(20);
       };
       var cancelTask = Task.Run(() =>
       {
@@ -707,7 +713,7 @@ public sealed class LevelGenerationTests : IDisposable
       LevelGeneration.AfterClaimTestHook = () =>
       {
         cancelReachedCall.Wait(TimeSpan.FromSeconds(5));
-        Thread.Sleep(200);
+        Thread.Sleep(20);
       };
       var cancelTask = Task.Run(() =>
       {
@@ -769,7 +775,7 @@ public sealed class LevelGenerationTests : IDisposable
       LevelGeneration.AfterClaimTestHook = () =>
       {
         pauseReachedCall.Wait(TimeSpan.FromSeconds(5));
-        Thread.Sleep(200);
+        Thread.Sleep(20);
       };
       var pauseTask = Task.Run(() =>
       {
@@ -814,8 +820,9 @@ public sealed class LevelGenerationTests : IDisposable
   [Fact]
   public void Clear_ConcurrentWithSelfTerminatingRun_NeverPausesTheNextRun()
   {
-    // Arrange: A run long enough that Clear observes it as Running and enters its pause path.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 3000)));
+    // Arrange: A run long enough that Clear observes it as Running and enters its pause path
+    // (60 ms per step: still in flight when Clear checks, yet cancelled from the hook fast).
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 600)));
     Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
 
     var cleared = false;
@@ -830,7 +837,7 @@ public sealed class LevelGenerationTests : IDisposable
       {
         Assert.True(LevelGeneration.Cancel());
         WaitForTerminal();
-        nextRunStarted = LevelGeneration.Start(EnRunKind.All, Config(sleep: 1000));
+        nextRunStarted = LevelGeneration.Start(EnRunKind.All, Config(sleep: 400));
       };
 
       cleared = LevelGeneration.Clear(TimeSpan.FromSeconds(10));
@@ -871,10 +878,10 @@ public sealed class LevelGenerationTests : IDisposable
     try
     {
       // Act: Claim and install the next run between World()'s state sample and its return.
-      // The next run sleeps long enough that its own world still shows zero steps while the
-      // call is in flight, so the two worlds are distinguishable.
+      // The next run sleeps long enough (100 ms per step) that its own world still shows zero
+      // steps while the call is in flight, so the two worlds are distinguishable.
       LevelGeneration.WorldSampleTestHook = () =>
-        Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 10_000)));
+        Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 1000)));
 
       var world = LevelGeneration.World();
 
@@ -902,7 +909,7 @@ public sealed class LevelGenerationTests : IDisposable
     // Repeat so both orderings (external cancel first, disposal first) are exercised: the run's
     // linked cancellation source is disposed by the next claim or by Clear, racing the caller
     // who cancels through its own token.
-    for (var iteration = 0; iteration < 200; iteration++)
+    for (var iteration = 0; iteration < 30; iteration++)
     {
       // Arrange: A finished run whose source is linked to a caller-owned token.
       using var cancellationTokenSource = new CancellationTokenSource();

@@ -268,14 +268,14 @@ public sealed class LevelGeneratorTests
   [Fact]
   public void Execute_CancelDuringStep_ReturnsAtNextStepBoundary()
   {
-    // Arrange: A run whose placeholder steps take 1 second each (10 000 ms over 10 steps),
+    // Arrange: A run whose placeholder steps take 100 ms each (10 000 ms over 100 steps),
     // so sleeping through the whole placeholder duration would far outlast the join window.
     const int SleepMilliseconds = 10_000;
     var statusStore = new GenerationStatusStore();
     Assert.True(statusStore.TryBeginRun());
     var config = CnfLevelGeneration.Default with
     {
-      Debug = new CnfDebug { PlaceholderSleep = SleepMilliseconds },
+      Debug = new CnfDebug { PlaceholderSleep = SleepMilliseconds, PlaceholderSteps = 100 },
     };
     var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
     using var cancellationTokenSource = new CancellationTokenSource();
@@ -340,14 +340,14 @@ public sealed class LevelGeneratorTests
   [Fact]
   public void TryRequestPause_DuringStep_StopsAtNextStepBoundary()
   {
-    // Arrange: A run whose placeholder steps take 1 second each (10 000 ms over 10 steps),
+    // Arrange: A run whose placeholder steps take 100 ms each (10 000 ms over 100 steps),
     // so sleeping through the whole placeholder duration would far outlast the join window.
     const int SleepMilliseconds = 10_000;
     var statusStore = new GenerationStatusStore();
     Assert.True(statusStore.TryBeginRun());
     var config = CnfLevelGeneration.Default with
     {
-      Debug = new CnfDebug { PlaceholderSleep = SleepMilliseconds },
+      Debug = new CnfDebug { PlaceholderSleep = SleepMilliseconds, PlaceholderSteps = 100 },
     };
     var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
 
@@ -376,9 +376,9 @@ public sealed class LevelGeneratorTests
   [Fact]
   public void TryRequestPause_OnFinalStep_PublishesFinished()
   {
-    // Arrange: A single-step run taking 1 second; pausing while that step sleeps means the
+    // Arrange: A single-step run taking 400 ms; pausing while that step sleeps means the
     // step completes before the pause can be observed, so completion wins over the pause.
-    const int SleepMilliseconds = 1000;
+    const int SleepMilliseconds = 400;
     var statusStore = new GenerationStatusStore();
     Assert.True(statusStore.TryBeginRun());
     var config = CnfLevelGeneration.Default with
