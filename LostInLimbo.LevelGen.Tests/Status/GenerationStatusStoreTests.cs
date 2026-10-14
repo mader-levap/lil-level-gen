@@ -189,16 +189,18 @@ public sealed class GenerationStatusStoreTests
   public void TryPublishIdle_WhenNotRunning_ReturnsTrueAndRestoresDefault(EnGenResult result)
   {
     // Arrange: Store is in the given non-running state (with a real error object when needed,
-    // respecting the documented GenerationStatus invariant).
+    // respecting the documented GenerationStatus invariant). No claim has happened yet, so the
+    // current claim id identifies the state to clear.
     var store = new GenerationStatusStore();
     store.Publish(new GenerationStatus
     {
       Result = result,
       Error = result == EnGenResult.Error ? new InvalidOperationException() : null,
     });
+    var expectedClaimId = store.ClaimId;
 
     // Act: Attempting to reset to idle.
-    var published = store.TryPublishIdle();
+    var published = store.TryPublishIdle(expectedClaimId);
 
     // Assert: The reset succeeded and the pristine snapshot replaced the old one.
     Assert.True(published);
@@ -213,12 +215,120 @@ public sealed class GenerationStatusStoreTests
     // Arrange: Store already claims a run.
     var store = new GenerationStatusStore();
     Assert.True(store.TryBeginRun());
+    var expectedClaimId = store.ClaimId;
 
     // Act: Attempting to reset to idle under the running claim.
-    var published = store.TryPublishIdle();
+    var published = store.TryPublishIdle(expectedClaimId);
 
     // Assert: The reset is refused and the running status is left untouched.
     Assert.False(published);
     Assert.Equal(EnGenResult.Running, store.Current.Result);
+  }
+
+  [Fact]
+  public void TryPublishIdle_WithCurrentClaimIdAfterTerminal_ResetsToDefault()
+  {
+    // Arrange: A claimed run reached a terminal state and the id was captured for clearing.
+    var store = new GenerationStatusStore();
+    Assert.True(store.TryBeginRun());
+    store.Publish(new GenerationStatus { Result = EnGenResult.Finished });
+    var expectedClaimId = store.ClaimId;
+
+    // Act: Resetting with the id of the run that actually produced this state.
+    var published = store.TryPublishIdle(expectedClaimId);
+
+    // Assert: The reset succeeds because the observed run still holds the claim.
+    Assert.True(published);
+    Assert.Equal(EnGenResult.None, store.Current.Result);
+  }
+
+  [Fact]
+  public void TryPublishIdle_WithStaleClaimId_ReturnsFalse()
+  {
+    // Arrange: The caller observed run 1, but run 2 claimed afterwards and finished on its own.
+    var store = new GenerationStatusStore();
+    Assert.True(store.TryBeginRun());
+    var staleClaimId = store.ClaimId;
+    store.Publish(new GenerationStatus { Result = EnGenResult.Paused });
+    Assert.True(store.TryBeginRun());
+    store.Publish(new GenerationStatus { Result = EnGenResult.Finished });
+
+    // Act: Attempting to clear with the id captured before run 2 claimed.
+    var published = store.TryPublishIdle(staleClaimId);
+
+    // Assert: The reset is refused; run 2's state is never wiped by a stale clear.
+    Assert.False(published);
+    Assert.Equal(EnGenResult.Finished, store.Current.Result);
+    Assert.NotEqual(staleClaimId, store.ClaimId);
+  }
+
+  [Fact]
+  public void ClaimId_BumpsOnEachSuccessfulClaim()
+  {
+    // Arrange: Fresh store.
+    var store = new GenerationStatusStore();
+    var initialClaimId = store.ClaimId;
+
+    // Act: One refused claim (already running) and two successful claims with a publish between.
+    Assert.True(store.TryBeginRun());
+    var firstClaimId = store.ClaimId;
+    Assert.False(store.TryBeginRun()); // Refused: must not bump the id.
+    store.Publish(new GenerationStatus { Result = EnGenResult.Paused });
+    Assert.True(store.TryBeginRun());
+    var secondClaimId = store.ClaimId;
+
+    // Assert: Id grows strictly per successful claim; refused claims leave it alone.
+    Assert.True(firstClaimId > initialClaimId);
+    Assert.True(secondClaimId > firstClaimId);
+    Assert.Equal(secondClaimId, store.ClaimId);
+  }
+
+  [Fact]
+  public async Task TryPublishIdle_WhenClaimRacesClear_NeverResetsAStaleRun()
+  {
+    // Repeat the race so both orderings (clear first, claim first) are exercised.
+    for (var iteration = 0; iteration < 50; iteration++)
+    {
+      // Arrange: Run 1 finished and its claim id was captured for clearing; a concurrent
+      // claim for run 2 (which then finishes on its own) races the reset.
+      var store = new GenerationStatusStore();
+      Assert.True(store.TryBeginRun());
+      store.Publish(new GenerationStatus { Result = EnGenResult.Finished });
+      var staleClaimId = store.ClaimId;
+      using var barrier = new Barrier(2);
+      var cleared = false;
+      var claimed = false;
+
+      var clearTask = Task.Run(() =>
+      {
+        barrier.SignalAndWait();
+        cleared = store.TryPublishIdle(staleClaimId);
+      });
+      var claimTask = Task.Run(() =>
+      {
+        barrier.SignalAndWait();
+        claimed = store.TryBeginRun();
+        if (claimed) store.Publish(new GenerationStatus { Result = EnGenResult.Finished });
+      });
+
+      // Act: Wait until both racers finished.
+      await Task.WhenAll(clearTask, claimTask);
+
+      if (cleared)
+      {
+        // Assert: The reset won, so the claim must have followed from idle and run 2's
+        // terminal state is the last thing published - never wiped by the stale reset.
+        Assert.True(claimed);
+        Assert.Equal(EnGenResult.Finished, store.Current.Result);
+      }
+      else
+      {
+        // Assert: A refusal must be explained by the concurrent claim winning first;
+        // run 2's state is left untouched.
+        Assert.True(claimed);
+        Assert.Equal(EnGenResult.Finished, store.Current.Result);
+        Assert.NotEqual(staleClaimId, store.ClaimId);
+      }
+    }
   }
 }

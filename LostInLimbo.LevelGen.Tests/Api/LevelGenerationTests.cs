@@ -526,4 +526,95 @@ public sealed class LevelGenerationTests : IDisposable
     Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
     Assert.NotNull(LevelGeneration.World());
   }
+
+  [Fact]
+  public async Task Clear_And_Start_WhenRaced_NeverLeaveInconsistentState()
+  {
+    // Repeat a synchronized Clear/Start race so both orderings (clear first, start first)
+    // are exercised; each iteration settles back to pristine state before the next one.
+    for (var iteration = 0; iteration < 50; iteration++)
+    {
+      // Arrange: Pristine state guaranteed by the previous iteration's settle.
+      using var barrier = new Barrier(2);
+      var started = false;
+      var cleared = false;
+
+      // Act: Race a fresh run against a clear with a zero wait budget.
+      var startTask = Task.Run(() =>
+      {
+        barrier.SignalAndWait();
+        started = LevelGeneration.Start(EnRunKind.All, Config(sleep: 100));
+      });
+      var clearTask = Task.Run(() =>
+      {
+        barrier.SignalAndWait();
+        cleared = LevelGeneration.Clear(TimeSpan.Zero);
+      });
+      await Task.WhenAll(startTask, clearTask);
+
+      // Assert: Start is never refused: every iteration begins from a non-running state.
+      Assert.True(started);
+
+      // Act: Let whatever run won the race reach its terminal state.
+      WaitForTerminal();
+      var result = LevelGeneration.Status().Result;
+
+      // Assert: Any stable state must expose its world - a state that reports Finished or
+      // Paused with a null world means Clear wiped the run's generator mid-flight.
+      if (result is EnGenResult.Finished or EnGenResult.Paused)
+        Assert.NotNull(LevelGeneration.World());
+
+      // Assert: The winning run's state is coherent with what the clear could have done.
+      Assert.True(result is EnGenResult.Finished or EnGenResult.Paused,
+        $"Unexpected terminal state {result} after clear={cleared}, start={started}.");
+
+      // Act: Settle back to pristine for the next iteration.
+      var settled = LevelGeneration.Clear();
+
+      // Assert: Once the run reached a terminal state, clearing always succeeds.
+      Assert.True(settled);
+      Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
+      Assert.Null(LevelGeneration.World());
+    }
+
+    // Assert: After the storm, a full run still starts and completes normally.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+    Assert.NotNull(LevelGeneration.World());
+  }
+
+  [Fact]
+  public async Task Clear_ConcurrentWithStartOfNewRun_NeverWipesTheNewRun()
+  {
+    // Arrange: A long-running first run; Clear runs in the background, so it pauses run 1
+    // and then races its reset against the fresh Start below while run 1 stops.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 30_000)));
+    var clearTask = Task.Run(() => LevelGeneration.Clear());
+
+    // Act: Wait for the pause to stop run 1, then claim the next run while Clear is
+    // between observing the terminal state and publishing the reset.
+    WaitForTerminal();
+    var startedNew = LevelGeneration.Start(EnRunKind.All, Config(sleep: 0));
+
+    // Act: Let the background clear reach its decision.
+    var cleared = await clearTask.WaitAsync(TerminalTimeout);
+
+    // Act: Run 2 (or the run started after a successful clear) completes on its own.
+    WaitForTerminal();
+    var result = LevelGeneration.Status().Result;
+
+    // Assert: The fresh start was never refused: the state was non-running when claimed.
+    Assert.True(startedNew);
+
+    // Assert: Whichever side won the race, the surviving run reports a stable state with a
+    // visible world. A Clear that waited out run 2 and then wiped it would end in None with
+    // a null world instead.
+    Assert.Equal(EnGenResult.Finished, result);
+    Assert.NotNull(LevelGeneration.World());
+
+    // Assert: The clear either reset before the claim (startedNew then ran from scratch)
+    // or correctly refused once the new claim appeared - never both disturbed states.
+    if (!cleared) Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+  }
 }

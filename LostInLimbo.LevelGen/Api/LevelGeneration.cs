@@ -77,8 +77,7 @@ public static class LevelGeneration
       // Claim succeeded, so no worker is executing: the previous run's source can be retired safely.
       var generator = new LevelGenerator(enRunKind, config, _statusStore);
       var source = CreateRunSource(cancellationToken);
-      InstallRunSource(source);
-      _generator = generator;
+      InstallRunState(generator, source);
       return TryRunOnNewThread(generator, source.Token);
     }
     catch (Exception exception)
@@ -122,8 +121,7 @@ public static class LevelGeneration
 
       // Claim succeeded, so the previous run's source can be retired safely.
       var source = CreateRunSource(cancellationToken);
-      InstallRunSource(source);
-      _generator = generator;
+      InstallRunState(generator, source);
       return TryRunOnNewThread(generator, source.Token);
     }
     catch (Exception exception)
@@ -208,8 +206,10 @@ public static class LevelGeneration
   /// terminal state, and then call this method - it then never waits.
   /// <para>
   /// Designed for a single consumer: concurrent calls or calls racing a
-  /// <see cref="Start"/>/<see cref="Resume"/> are resolved by the internal claims, so a run
-  /// that wins the race is never disturbed.
+  /// <see cref="Start"/>/<see cref="Resume"/> are resolved by the internal claims. This call
+  /// captures the claim id of the run it observes and only clears while that same run still
+  /// holds the claim; a run that wins a concurrent claim is never disturbed, and a new run
+  /// that claims after this call started makes it return <see langword="false"/>.
   /// </para>
   /// </remarks>
   /// <param name="timeout">
@@ -229,6 +229,11 @@ public static class LevelGeneration
 
     var effectiveTimeout = timeout ?? DefaultClearTimeout;
 
+    // Identify the run this call intends to clear. Everything below is conditional on this
+    // id staying current: a concurrent Start or Resume bumps it and makes this call refuse
+    // instead of wiping state that belongs to the newly claimed run.
+    var claimId = _statusStore.ClaimId;
+
     // A worker only exists while the status is Running; clearing under it would let the
     // worker publish its terminal state over the fresh snapshot. Pause first, then wait
     // for the cooperative stop at the next step boundary.
@@ -236,36 +241,45 @@ public static class LevelGeneration
     {
       Pause(); // Best-effort: may return false if the run reached a terminal state in the meantime.
 
-      if (!WaitForTerminal(effectiveTimeout)) return false; // The pause request stands; the run can be cleared once it stops.
+      if (!WaitForTerminal(claimId, effectiveTimeout)) return false; // Timed out, or a newer run claimed; either way nothing was cleared.
     }
 
-    // Retire the source under the gate so it is never disposed while Cancel invokes it.
+    // Retire the source and the generator under the gate so neither can be observed (or the
+    // source disposed) while a concurrent claim installs fresh run state.
     lock (RunSourceGate)
     {
       // The compare-and-swap closes the race where a concurrent Start or Resume claims a run
       // between the check above and this point: a run that wins the claim is never disturbed.
-      if (!_statusStore.TryPublishIdle()) return false;
+      if (!_statusStore.TryPublishIdle(claimId)) return false;
 
       var previous = _runSource;
       _runSource = null;
+      _generator = null;
       previous?.Dispose();
     }
 
-    _generator = null;
     return true;
   }
 
   /// <summary>
-  /// Polls the status store until the current run is no longer <see cref="EnGenResult.Running"/>
-  /// or the given timeout elapses.
+  /// Polls the status store until the run identified by <paramref name="claimId"/> is no longer
+  /// <see cref="EnGenResult.Running"/>, a newer run claims the state, or the timeout elapses.
   /// </summary>
+  /// <param name="claimId">Claim id captured when this wait decided which run to wait for.</param>
   /// <param name="timeout">Maximum time to wait.</param>
-  /// <returns><see langword="true"/> if a terminal state was reached, <see langword="false"/> on timeout.</returns>
-  private static bool WaitForTerminal(TimeSpan timeout)
+  /// <returns>
+  /// <see langword="true"/> if the observed run reached a terminal state;
+  /// <see langword="false"/> if a newer run claimed in the meantime (do not clear) or on timeout.
+  /// </returns>
+  private static bool WaitForTerminal(long claimId, TimeSpan timeout)
   {
     var stopwatch = Stopwatch.StartNew();
     while (true)
     {
+      // A new claim means this wait no longer observes the run it was started for; waiting
+      // out the new run and then clearing would wipe state that won the race.
+      if (_statusStore.ClaimId != claimId) return false;
+
       if (_statusStore.Current.Result != EnGenResult.Running) return true;
       if (stopwatch.Elapsed >= timeout) return false;
       Thread.Sleep(TerminalPollInterval);
@@ -329,7 +343,7 @@ public static class LevelGeneration
   /// the source is linked to it, so cancelling that token cancels the run as well.
   /// </summary>
   /// <param name="externalToken">Optional caller-owned token. May be <see cref="CancellationToken.None"/>.</param>
-  /// <returns>A fresh source; the caller owns it until it is installed via <see cref="InstallRunSource"/>.</returns>
+  /// <returns>A fresh source; the caller owns it until it is installed via <see cref="InstallRunState"/>.</returns>
   private static CancellationTokenSource CreateRunSource(CancellationToken externalToken)
   {
     return externalToken.CanBeCanceled
@@ -338,20 +352,26 @@ public static class LevelGeneration
   }
 
   /// <summary>
-  /// Publishes the new run's source as the current one and retires the previous run's source.
+  /// Publishes the new run's generator and cancellation source as the current ones and retires
+  /// the previous run's source, as one atomic step.
   /// </summary>
   /// <remarks>
   /// Must only be called after a successful claim: the claim guarantees no worker is still
   /// using the previous source, and <see cref="Cancel"/> serializes on <see cref="RunSourceGate"/>
-  /// so the disposal below can never race an in-flight cancellation.
+  /// so the disposal below can never race an in-flight cancellation. Assigning
+  /// <see cref="_generator"/> under the same gate pairs with <see cref="Clear"/> nulling it
+  /// under the gate: a generator can never be wiped between a successful clear and a
+  /// concurrent claim, nor claimed-and-nulled while its run is in flight.
   /// </remarks>
-  /// <param name="source">Source of the run that holds the claim.</param>
-  private static void InstallRunSource(CancellationTokenSource source)
+  /// <param name="generator">Generator of the run that holds the claim.</param>
+  /// <param name="source">Cancellation source of the run that holds the claim.</param>
+  private static void InstallRunState(LevelGenerator generator, CancellationTokenSource source)
   {
     lock (RunSourceGate)
     {
       var previous = _runSource;
       _runSource = source;
+      _generator = generator;
       previous?.Dispose();
     }
   }
