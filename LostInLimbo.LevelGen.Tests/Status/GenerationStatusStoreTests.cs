@@ -1,4 +1,5 @@
 using LostInLimbo.LevelGen.Data.Other;
+using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Internal.Status;
 
 namespace LostInLimbo.LevelGen.Tests.Status;
@@ -330,5 +331,70 @@ public sealed class GenerationStatusStoreTests
         Assert.NotEqual(staleClaimId, store.ClaimId);
       }
     }
+  }
+
+  [Fact]
+  public void Publish_WithWorld_PairsWorldWithStatusAsOneSnapshot()
+  {
+    // Arrange: Fresh store and a world instance to pair with a terminal status.
+    var store = new GenerationStatusStore();
+    var world = new LilWorld();
+
+    // Act: Publish a paused snapshot that exposes its world.
+    store.Publish(new GenerationStatus { Result = EnGenResult.Paused }, world);
+
+    // Assert: Status and world come from one read and describe the same run.
+    var snapshot = store.CurrentSnapshot;
+    Assert.Equal(EnGenResult.Paused, snapshot.Status.Result);
+    Assert.Same(world, snapshot.World);
+    Assert.Same(snapshot.Status, store.Current);
+  }
+
+  [Fact]
+  public void Publish_WithoutWorld_KeepsWorldHidden()
+  {
+    // Arrange: Fresh store and a status that must not expose a world.
+    var store = new GenerationStatusStore();
+
+    // Act: Publish without pairing a world (the single-argument overload).
+    store.Publish(new GenerationStatus { Result = EnGenResult.Cancelled });
+
+    // Assert: The snapshot carries no world alongside the status.
+    var snapshot = store.CurrentSnapshot;
+    Assert.Equal(EnGenResult.Cancelled, snapshot.Status.Result);
+    Assert.Null(snapshot.World);
+  }
+
+  [Fact]
+  public void TryBeginRun_AfterTerminalWithWorld_DropsWorldFromSnapshot()
+  {
+    // Arrange: Store whose terminal snapshot exposes a world.
+    var store = new GenerationStatusStore();
+    store.Publish(new GenerationStatus { Result = EnGenResult.Finished }, new LilWorld());
+
+    // Act: Claim the next run.
+    Assert.True(store.TryBeginRun());
+
+    // Assert: The claim replaces the whole pair, so the new run's Running status never keeps
+    // the previous run's world attached.
+    var snapshot = store.CurrentSnapshot;
+    Assert.Equal(EnGenResult.Running, snapshot.Status.Result);
+    Assert.Null(snapshot.World);
+  }
+
+  [Fact]
+  public void TryPublishIdle_AfterTerminalWithWorld_DropsWorldFromSnapshot()
+  {
+    // Arrange: Store whose terminal snapshot exposes a world and the claim id to clear with.
+    var store = new GenerationStatusStore();
+    store.Publish(new GenerationStatus { Result = EnGenResult.Finished }, new LilWorld());
+    var expectedClaimId = store.ClaimId;
+
+    // Act: Reset to idle.
+    Assert.True(store.TryPublishIdle(expectedClaimId));
+
+    // Assert: The pristine snapshot carries neither status nor world of the cleared run.
+    Assert.Same(GenerationStatus.Default, store.Current);
+    Assert.Null(store.CurrentSnapshot.World);
   }
 }

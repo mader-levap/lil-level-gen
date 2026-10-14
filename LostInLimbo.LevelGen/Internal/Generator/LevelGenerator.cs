@@ -18,8 +18,10 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// <remarks>
 /// NOTE: right now it is placeholder that pretends to do something: it advances a fixed number
 /// of steps, each imitating work by sleeping (see <see cref="MainLoop"/>).
-/// Mutates <see cref="World"/> in place on the worker thread; consumers must only read it
-/// after status reports <see cref="EnGenResult.Finished"/>.
+/// Mutates <see cref="World"/> in place on the worker thread, so consumers never get it from a
+/// running run: terminal publishes pair it with a <see cref="EnGenResult.Paused"/> or
+/// <see cref="EnGenResult.Finished"/> status in the store, and every other outcome pairs with
+/// no world at all (see <see cref="PublishTerminal"/>).
 /// </remarks>
 internal sealed class LevelGenerator
 {
@@ -119,7 +121,9 @@ internal sealed class LevelGenerator
   /// Must be called while holding <see cref="_pauseGate"/> semantics (this method takes it):
   /// the pause flag is rewritten and cleared together with the publish, so a request accepted
   /// by <see cref="TryRequestPause"/> always belongs to the run that publishes next, and no
-  /// stale pause leaks into a later run.
+  /// stale pause leaks into a later run. Paused and finished results carry this generator's
+  /// world into the store, so <c>World</c> reads status and world as one unit; every other
+  /// result hides the world by pairing with <see langword="null"/>.
   /// </remarks>
   /// <param name="result">Terminal result to publish.</param>
   /// <param name="error">Exception to attach when publishing <see cref="EnGenResult.Error"/>.</param>
@@ -131,7 +135,8 @@ internal sealed class LevelGenerator
       if (_pauseRequested && result == EnGenResult.Cancelled) result = EnGenResult.Paused;
 
       _pauseRequested = false;
-      _statusStore.Publish(new GenerationStatus { Result = result, Error = error });
+      var world = result is EnGenResult.Paused or EnGenResult.Finished ? World : null;
+      _statusStore.Publish(new GenerationStatus { Result = result, Error = error }, world);
     }
   }
 

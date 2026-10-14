@@ -1,25 +1,30 @@
 using System.Threading;
 
 using LostInLimbo.LevelGen.Data.Other;
+using LostInLimbo.LevelGen.Data.Result;
 
 namespace LostInLimbo.LevelGen.Internal.Status;
 
 /// <summary>
-/// Thread-safe single source of truth for generation status.
+/// Thread-safe single source of truth for generation status and the world it exposes.
 /// </summary>
 /// <remarks>
-/// Producers replace the whole <see cref="GenerationStatus"/> snapshot instead of mutating it,
-/// so consumers can poll <see cref="Current"/> from any thread without locks.
+/// Producers replace the whole <see cref="GenerationSnapshot"/> (status + world) instead of
+/// mutating it, so consumers can poll <see cref="Current"/> or <see cref="CurrentSnapshot"/>
+/// from any thread without locks and always observe a pair that belongs to a single run.
 /// Owned by the API layer and injected into generators; contains no knowledge of when
 /// status transitions happen.
 /// </remarks>
 internal sealed class GenerationStatusStore
 {
-  /// <summary>Cached snapshot published when a run begins; reused so CAS compares references.</summary>
+  /// <summary>Cached status published when a run begins; reused so CAS compares references.</summary>
   private static readonly GenerationStatus RunningStatus = new() { Result = EnGenResult.Running };
 
+  /// <summary>Cached snapshot published when a run begins; a running run never exposes a world.</summary>
+  private static readonly GenerationSnapshot RunningSnapshot = new(RunningStatus, null);
+
   /// <summary>Latest status snapshot. Replaced as a whole, never mutated.</summary>
-  private GenerationStatus _status = GenerationStatus.Default;
+  private GenerationSnapshot _snapshot = GenerationSnapshot.Default;
 
   /// <summary>
   /// Id of the most recent successful claim (see <see cref="TryBeginRun"/> and
@@ -31,7 +36,17 @@ internal sealed class GenerationStatusStore
   /// <summary>
   /// Latest status snapshot. Safe to read from any thread at any time.
   /// </summary>
-  public GenerationStatus Current => Volatile.Read(ref _status);
+  public GenerationStatus Current => Volatile.Read(ref _snapshot).Status;
+
+  /// <summary>
+  /// Latest status and world snapshot, read as one unit. Safe to read from any thread.
+  /// </summary>
+  /// <remarks>
+  /// Use this instead of reading <see cref="Current"/> and resolving a world separately:
+  /// only the pair guarantees that both halves describe the same run, even while a concurrent
+  /// claim installs a new generator or the worker publishes a terminal state.
+  /// </remarks>
+  public GenerationSnapshot CurrentSnapshot => Volatile.Read(ref _snapshot);
 
   /// <summary>
   /// Id of the run that holds (or last held) the claim. Safe to read from any thread.
@@ -47,9 +62,14 @@ internal sealed class GenerationStatusStore
   /// Replaces the whole status snapshot.
   /// </summary>
   /// <param name="status">New snapshot.</param>
-  public void Publish(GenerationStatus status)
+  /// <param name="world">
+  /// World to pair with the status, or <see langword="null"/> (default) when the status must
+  /// not expose one. Terminal publishes of a paused or finished run pass their world here so
+  /// consumers can read status and world as one unit.
+  /// </param>
+  public void Publish(GenerationStatus status, LilWorld? world = null)
   {
-    Volatile.Write(ref _status, status);
+    Volatile.Write(ref _snapshot, new GenerationSnapshot(status, world));
   }
 
   /// <summary>
@@ -63,11 +83,11 @@ internal sealed class GenerationStatusStore
   {
     while (true)
     {
-      var current = Volatile.Read(ref _status);
-      if (current.Result == EnGenResult.Running) return false;
+      var current = Volatile.Read(ref _snapshot);
+      if (current.Status.Result == EnGenResult.Running) return false;
 
       // Succeeds only if nobody else changed the snapshot since we read it.
-      if (ReferenceEquals(Interlocked.CompareExchange(ref _status, RunningStatus, current), current))
+      if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, RunningSnapshot, current), current))
       {
         Interlocked.Increment(ref _claimId);
         return true;
@@ -91,11 +111,11 @@ internal sealed class GenerationStatusStore
   {
     while (true)
     {
-      var current = Volatile.Read(ref _status);
-      if (current.Result != EnGenResult.Paused) return false;
+      var current = Volatile.Read(ref _snapshot);
+      if (current.Status.Result != EnGenResult.Paused) return false;
 
       // Succeeds only if nobody else changed the snapshot since we read it.
-      if (ReferenceEquals(Interlocked.CompareExchange(ref _status, RunningStatus, current), current))
+      if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, RunningSnapshot, current), current))
       {
         Interlocked.Increment(ref _claimId);
         return true;
@@ -104,7 +124,7 @@ internal sealed class GenerationStatusStore
   }
 
   /// <summary>
-  /// Atomically publishes the pristine idle snapshot (<see cref="GenerationStatus.Default"/>),
+  /// Atomically publishes the pristine idle snapshot (<see cref="GenerationSnapshot.Default"/>),
   /// but only while the run identified by <paramref name="expectedClaimId"/> still holds the
   /// claim and no run is in flight.
   /// </summary>
@@ -132,8 +152,8 @@ internal sealed class GenerationStatusStore
   {
     while (true)
     {
-      var current = Volatile.Read(ref _status);
-      if (current.Result == EnGenResult.Running) return false;
+      var current = Volatile.Read(ref _snapshot);
+      if (current.Status.Result == EnGenResult.Running) return false;
 
       // Checked after the snapshot read: a completed claim updates the status before it
       // bumps the id, so its terminal state is either seen here as Running or rejected by
@@ -141,7 +161,7 @@ internal sealed class GenerationStatusStore
       if (Interlocked.Read(ref _claimId) != expectedClaimId) return false;
 
       // Succeeds only if nobody else changed the snapshot since we read it.
-      if (ReferenceEquals(Interlocked.CompareExchange(ref _status, GenerationStatus.Default, current), current))
+      if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, GenerationSnapshot.Default, current), current))
         return true;
     }
   }

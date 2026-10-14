@@ -52,6 +52,11 @@ public sealed class LevelGenerationTests : IDisposable
   /// <summary>Restores pristine state so the next test starts from None with no world.</summary>
   public void Dispose()
   {
+    // Clear every test seam first: a hook left behind by a failed test must never fire in a
+    // later test's commands.
+    LevelGeneration.AfterClaimTestHook = null;
+    LevelGeneration.BeforeClearPauseTestHook = null;
+    LevelGeneration.WorldSampleTestHook = null;
     WaitForTerminal();
     LevelGeneration.Clear();
   }
@@ -616,5 +621,338 @@ public sealed class LevelGenerationTests : IDisposable
     // Assert: The clear either reset before the claim (startedNew then ran from scratch)
     // or correctly refused once the new claim appeared - never both disturbed states.
     if (!cleared) Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+  }
+
+  [Fact]
+  public async Task Cancel_DuringClaimWindowOfNextRun_CancelsTheNewRun()
+  {
+    // Arrange: A paused run, so the previous run's cancellation source is still installed when
+    // the next run claims the state.
+    Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 0)));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+
+    using var cancelReachedCall = new ManualResetEventSlim(false);
+    var startReturned = false;
+    var cancelReturned = false;
+    Exception? cancelFailure = null;
+
+    try
+    {
+      // Act: Hold the claim window open until the racer reached its Cancel call, then give it
+      // time to execute Cancel inside that window.
+      LevelGeneration.AfterClaimTestHook = () =>
+      {
+        cancelReachedCall.Wait(TimeSpan.FromSeconds(5));
+        Thread.Sleep(200);
+      };
+      var cancelTask = Task.Run(() =>
+      {
+        // Wait until the claim of the new run made the store report Running.
+        var deadline = Stopwatch.StartNew();
+        while (LevelGeneration.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
+          Thread.Sleep(1);
+        cancelReachedCall.Set();
+        try { cancelReturned = LevelGeneration.Cancel(); }
+        catch (Exception exception) { cancelFailure = exception; }
+      });
+      var startTask = Task.Run(() => startReturned = LevelGeneration.Start(EnRunKind.All, Config(sleep: 2000)));
+
+      // Act: Let both commands and the run they targeted settle.
+      await Task.WhenAll(startTask, cancelTask);
+      WaitForTerminal();
+
+      // Assert: Both calls reported success, and no command threw.
+      Assert.Null(cancelFailure);
+      Assert.True(startReturned);
+      Assert.True(cancelReturned);
+
+      // Assert: The cancellation reached the run that held the claim when Cancel ran. Cancelling
+      // the previous run's retired source instead would leave this run untouched, so it would
+      // run its full budget and report Finished.
+      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+      Assert.Null(LevelGeneration.World());
+    }
+    finally
+    {
+      LevelGeneration.AfterClaimTestHook = null;
+
+      // Act: Never leave a running state behind for Dispose, whatever the outcome above was.
+      if (LevelGeneration.Status().Result == EnGenResult.Running)
+      {
+        LevelGeneration.Cancel();
+        WaitForTerminal();
+      }
+    }
+  }
+
+  [Fact]
+  public async Task Cancel_DuringResumeClaimWindow_CancelsTheResumedRun()
+  {
+    // Arrange: A paused stepwise run whose full placeholder sleep is paid on resume, so the
+    // resumed segment is long enough to observe and the paused run's source is still installed.
+    Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 2000)));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+
+    using var cancelReachedCall = new ManualResetEventSlim(false);
+    var resumeReturned = false;
+    var cancelReturned = false;
+    Exception? cancelFailure = null;
+
+    try
+    {
+      // Act: Hold the claim window open until the racer reached its Cancel call, then give it
+      // time to execute Cancel inside that window.
+      LevelGeneration.AfterClaimTestHook = () =>
+      {
+        cancelReachedCall.Wait(TimeSpan.FromSeconds(5));
+        Thread.Sleep(200);
+      };
+      var cancelTask = Task.Run(() =>
+      {
+        // Wait until the claim of the resumed run made the store report Running.
+        var deadline = Stopwatch.StartNew();
+        while (LevelGeneration.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
+          Thread.Sleep(1);
+        cancelReachedCall.Set();
+        try { cancelReturned = LevelGeneration.Cancel(); }
+        catch (Exception exception) { cancelFailure = exception; }
+      });
+      var resumeTask = Task.Run(() => resumeReturned = LevelGeneration.Resume(EnRunKind.All));
+
+      // Act: Let both commands and the run they targeted settle.
+      await Task.WhenAll(resumeTask, cancelTask);
+      WaitForTerminal();
+
+      // Assert: Both calls reported success, and no command threw.
+      Assert.Null(cancelFailure);
+      Assert.True(resumeReturned);
+      Assert.True(cancelReturned);
+
+      // Assert: The cancellation reached the resumed run. Cancelling the paused run's retired
+      // source instead would leave the resumed segment untouched, so it would report Finished.
+      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+      Assert.Null(LevelGeneration.World());
+    }
+    finally
+    {
+      LevelGeneration.AfterClaimTestHook = null;
+
+      // Act: Never leave a running state behind for Dispose, whatever the outcome above was.
+      if (LevelGeneration.Status().Result == EnGenResult.Running)
+      {
+        LevelGeneration.Cancel();
+        WaitForTerminal();
+      }
+    }
+  }
+
+  [Fact]
+  public async Task Pause_DuringClaimWindowOfNextRun_PausesTheNewRun()
+  {
+    // Arrange: A paused run, so the previous run's generator is still installed when the next
+    // run claims the state.
+    Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 0)));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+
+    using var pauseReachedCall = new ManualResetEventSlim(false);
+    var startReturned = false;
+    var pauseReturned = false;
+    Exception? pauseFailure = null;
+
+    try
+    {
+      // Act: Hold the claim window open until the racer reached its Pause call, then give it
+      // time to execute Pause inside that window.
+      LevelGeneration.AfterClaimTestHook = () =>
+      {
+        pauseReachedCall.Wait(TimeSpan.FromSeconds(5));
+        Thread.Sleep(200);
+      };
+      var pauseTask = Task.Run(() =>
+      {
+        // Wait until the claim of the new run made the store report Running.
+        var deadline = Stopwatch.StartNew();
+        while (LevelGeneration.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
+          Thread.Sleep(1);
+        pauseReachedCall.Set();
+        try { pauseReturned = LevelGeneration.Pause(); }
+        catch (Exception exception) { pauseFailure = exception; }
+      });
+      var startTask = Task.Run(() => startReturned = LevelGeneration.Start(EnRunKind.All, Config(sleep: 2000)));
+
+      // Act: Let both commands and the run they targeted settle.
+      await Task.WhenAll(startTask, pauseTask);
+      WaitForTerminal();
+
+      // Assert: Both calls reported success, and no command threw.
+      Assert.Null(pauseFailure);
+      Assert.True(startReturned);
+      Assert.True(pauseReturned);
+
+      // Assert: The accepted request stopped the new run. Acknowledging the previous run's dead
+      // generator instead would leave this run untouched, so it would report Finished.
+      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+      Assert.True(LevelGeneration.World()!.Stats.Steps < 10,
+        $"Expected a partially stepped run, got {LevelGeneration.World()!.Stats.Steps} steps.");
+    }
+    finally
+    {
+      LevelGeneration.AfterClaimTestHook = null;
+
+      // Act: Never leave a running state behind for Dispose, whatever the outcome above was.
+      if (LevelGeneration.Status().Result == EnGenResult.Running)
+      {
+        LevelGeneration.Cancel();
+        WaitForTerminal();
+      }
+    }
+  }
+
+  [Fact]
+  public void Clear_ConcurrentWithSelfTerminatingRun_NeverPausesTheNextRun()
+  {
+    // Arrange: A run long enough that Clear observes it as Running and enters its pause path.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 3000)));
+    Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+
+    var cleared = false;
+    var nextRunStarted = false;
+
+    try
+    {
+      // Act: Inside Clear's window between capturing the claim and requesting the pause, the
+      // observed run terminates by itself and the next run claims the state - so Clear no
+      // longer owns the run it is about to pause.
+      LevelGeneration.BeforeClearPauseTestHook = () =>
+      {
+        Assert.True(LevelGeneration.Cancel());
+        WaitForTerminal();
+        nextRunStarted = LevelGeneration.Start(EnRunKind.All, Config(sleep: 1000));
+      };
+
+      cleared = LevelGeneration.Clear(TimeSpan.FromSeconds(10));
+
+      // Act: Let the run that claimed during Clear settle.
+      WaitForTerminal();
+
+      // Assert: Clear refused because a newer run claimed the state it captured.
+      Assert.True(nextRunStarted);
+      Assert.False(cleared);
+
+      // Assert: The newer run was never disturbed by the refused Clear: it ran its full step
+      // budget instead of stopping at a pause nobody requested for it.
+      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+      Assert.Equal(10L, LevelGeneration.World()!.Stats.Steps);
+    }
+    finally
+    {
+      LevelGeneration.BeforeClearPauseTestHook = null;
+
+      // Act: Never leave a running state behind for Dispose, whatever the outcome above was.
+      if (LevelGeneration.Status().Result == EnGenResult.Running)
+      {
+        LevelGeneration.Cancel();
+        WaitForTerminal();
+      }
+    }
+  }
+
+  [Fact]
+  public void World_WhenNextRunClaimsDuringCall_ReturnsTheObservedRunsWorld()
+  {
+    // Arrange: A finished run whose world holds every completed step.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+
+    try
+    {
+      // Act: Claim and install the next run between World()'s state sample and its return.
+      // The next run sleeps long enough that its own world still shows zero steps while the
+      // call is in flight, so the two worlds are distinguishable.
+      LevelGeneration.WorldSampleTestHook = () =>
+        Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 10_000)));
+
+      var world = LevelGeneration.World();
+
+      // Assert: The returned world belongs to the run whose status the call observed (finished,
+      // all steps), never to the run that claimed while the call was in flight (no steps yet).
+      Assert.NotNull(world);
+      Assert.Equal(10L, world!.Stats.Steps);
+    }
+    finally
+    {
+      LevelGeneration.WorldSampleTestHook = null;
+
+      // Act: Stop the long-running claim the hook started so Dispose never waits for it.
+      if (LevelGeneration.Status().Result == EnGenResult.Running)
+      {
+        LevelGeneration.Cancel();
+        WaitForTerminal();
+      }
+    }
+  }
+
+  [Fact]
+  public async Task ExternalTokenCancel_RacingDisposalOfItsRunSource_NeverThrows()
+  {
+    // Repeat so both orderings (external cancel first, disposal first) are exercised: the run's
+    // linked cancellation source is disposed by the next claim or by Clear, racing the caller
+    // who cancels through its own token.
+    for (var iteration = 0; iteration < 200; iteration++)
+    {
+      // Arrange: A finished run whose source is linked to a caller-owned token.
+      using var cancellationTokenSource = new CancellationTokenSource();
+      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0), cancellationTokenSource.Token));
+      WaitForTerminal();
+
+      using var barrier = new Barrier(2);
+      Exception? cancelFailure = null;
+      var nextRunStarted = false;
+      var cleared = false;
+
+      // Act: Race the external cancel against whatever disposes that run's linked source.
+      var cancelTask = Task.Run(() =>
+      {
+        try
+        {
+          barrier.SignalAndWait();
+          cancellationTokenSource.Cancel();
+        }
+        catch (Exception exception)
+        {
+          cancelFailure = exception;
+        }
+      });
+      var disposalTask = Task.Run(() =>
+      {
+        barrier.SignalAndWait();
+        if (iteration % 2 == 0)
+        {
+          nextRunStarted = LevelGeneration.Start(EnRunKind.All, Config(sleep: 0));
+        }
+        else
+        {
+          cleared = LevelGeneration.Clear();
+        }
+      });
+      await Task.WhenAll(cancelTask, disposalTask);
+
+      // Assert: The caller's Cancel never observes the disposal of the linked source.
+      Assert.Null(cancelFailure);
+
+      // Assert: The disposal side of the race went through: the state was terminal beforehand,
+      // so both a fresh claim and a reset must always be accepted.
+      if (iteration % 2 == 0) Assert.True(nextRunStarted);
+      else Assert.True(cleared);
+
+      // Act: Settle back to pristine for the next iteration.
+      WaitForTerminal();
+      if (LevelGeneration.Status().Result != EnGenResult.None)
+        Assert.True(LevelGeneration.Clear());
+    }
   }
 }
