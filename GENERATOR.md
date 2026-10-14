@@ -4,7 +4,7 @@ This is preliminary design. It can and will change.
 
 Generator will create the world. This is finite world, though generator is designed in way that allows adding stuff to already existing world that was properly finished or paused.
 
-Smallest unit of work is step. If you finished step, state of data must be consistent and correct (meaning editor/game can generate level geometry and objects just fine). Only exception: all steps except last one can have map not being consistent with graph.
+Smallest unit of work is step. If you finished step, state of data must be consistent and correct (meaning editor/game can generate level geometry and objects just fine). Only exception: all steps except last one can have map not being consistent with graph and map might not be beatable.
 
 ## Structure of config
 

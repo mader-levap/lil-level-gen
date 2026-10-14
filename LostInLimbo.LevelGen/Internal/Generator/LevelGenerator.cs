@@ -4,6 +4,9 @@ using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Other;
 using LostInLimbo.LevelGen.Data.Result;
+using LostInLimbo.LevelGen.Data.Result.Stats;
+using LostInLimbo.LevelGen.Internal.Generator.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Map;
 using LostInLimbo.LevelGen.Internal.Status;
 
 namespace LostInLimbo.LevelGen.Internal.Generator;
@@ -20,6 +23,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// </remarks>
 internal sealed class LevelGenerator
 {
+  private MapGenerator _mapGenerator;
+
   /// <summary>Kind of run. Mutated only between runs via <see cref="SetRunKind"/>.</summary>
   private EnRunKind _enRunKind;
   /// <summary>Configuration data for level generation.</summary>
@@ -41,17 +46,14 @@ internal sealed class LevelGenerator
   private volatile bool _pauseRequested;
 
   /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
-  private int TotalPlaceholderSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
+  private int _totalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
-  /// <summary>
-  /// Result of generation. Placeholder: not populated yet. Will be built up in place
-  /// by generation passes during <see cref="Execute"/>.
-  /// </summary>
+  /// <summary>World: partial or complete result of generation.</summary>
   public LilWorld World { get; } = new();
 
   /// <summary>
   /// Prepares level generator. Assumes the config was already validated by the API layer
-  /// (see <see cref="Data.Config.CnfLevelGeneration.Validate"/>) before the run was claimed.
+  /// (see <see cref="CnfLevelGeneration.Validate"/>) before the run was claimed.
   /// </summary>
   /// <param name="enRunKind">Kind of run.</param>
   /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
@@ -64,6 +66,8 @@ internal sealed class LevelGenerator
     _enRunKind = enRunKind;
     _config = config;
     _statusStore = statusStore;
+
+    _mapGenerator = new MapGenerator(enRunKind, config, statusStore, World);
   }
 
   /// <summary>
@@ -192,8 +196,39 @@ internal sealed class LevelGenerator
     return IsGenerationComplete() ? EnGenResult.Finished : EnGenResult.Paused;
   }
 
+  //
+
   /// <summary>
-  /// <para>Placeholder for generation passes. Advances generation by a bounded number of steps.</para>
+  /// <para>Main loop.</para>
+  /// </summary>
+  /// <param name="cancellationToken">Token checked at every step boundary.</param>
+  private void MainLoop(CancellationToken cancellationToken)
+  {
+    if (!RunGraph(cancellationToken)) return;
+    RunMap(cancellationToken);
+  }
+
+  /// <summary>
+  /// <para>Execute graph generator. This is considered single step.</para>
+  /// </summary>
+  /// <returns>True if should continue, otherwise false.</returns>
+  private bool RunGraph(CancellationToken cancellationToken)
+  {
+    // Are we in correct phase?
+    if (World.Phase != EnPhase.Graph) return true;
+    // Pause checkpoint: a request pending before the next step starts ends the run.
+    if (_pauseRequested) return false;
+    // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
+    cancellationToken.ThrowIfCancellationRequested();
+
+    GraphGenerator graphGenerator = new GraphGenerator(_config, _statusStore, World);
+    bool Result = graphGenerator.Execute();
+    if (Result) World.Phase = EnPhase.Map; // move to next phase
+    return Result;
+  }
+
+  /// <summary>
+  /// <para>Execute map generator. This can and will take many steps.</para>
   /// <para>
   /// Loops while generation is not complete yet (see <see cref="IsGenerationComplete"/>) and the
   /// run kind still allows more work: <c>EnRunKind.All</c> runs until generation completes, <c>Area</c>
@@ -206,16 +241,14 @@ internal sealed class LevelGenerator
   /// the work done in a single step. The sleep itself is a plain, uninterruptible
   /// <see cref="Thread.Sleep(int)"/>; both pause and cancellation are therefore observed only
   /// after the current step completes. Completed steps are counted in
-  /// <see cref="Data.Result.Stats.LilStats.Steps"/> of <see cref="World"/>, which survives
+  /// <see cref="LilStats.Steps"/> of <see cref="World"/>, which survives
   /// pausing and resuming because the API keeps this generator instance alive.
   /// </para>
   /// </summary>
-  /// <param name="cancellationToken">Token checked at every step boundary.</param>
-  private void MainLoop(CancellationToken cancellationToken)
+  private void RunMap(CancellationToken cancellationToken)
   {
-    var totalSteps = TotalPlaceholderSteps;
-    var sleepMilliseconds = _config.Debug?.PlaceholderSleep ?? CnfDebug.DefaultPlaceholderSleep;
-    var stepSleepMilliseconds = sleepMilliseconds / totalSteps;
+    // Are we in correct phase?
+    if (World.Phase != EnPhase.Map) return;
 
     // Maximum number of steps this execution may add; real passes will budget work differently.
     var maxStepsThisRun = _enRunKind == EnRunKind.All ? int.MaxValue : 1;
@@ -223,18 +256,14 @@ internal sealed class LevelGenerator
     var stepsRun = 0;
     while (stepsRun < maxStepsThisRun && !IsGenerationComplete())
     {
-      // Pause checkpoint: a request pending before the next step starts ends the run without
-      // throwing. Checked before cancellation so pause has precedence at this boundary;
-      // PublishTerminal is the safety net for a request racing the checks themselves.
+      // Pause checkpoint: a request pending before the next step starts ends the run.
       if (_pauseRequested) return;
 
       // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
       cancellationToken.ThrowIfCancellationRequested();
 
-      // Imitation of the work of a single step; deliberately not token-aware.
-      Thread.Sleep(stepSleepMilliseconds);
+      _mapGenerator.ExecuteStep();
 
-      World.Stats.Steps++;
       stepsRun++;
     }
   }
@@ -246,6 +275,6 @@ internal sealed class LevelGenerator
   /// </summary>
   private bool IsGenerationComplete()
   {
-    return World.Stats.Steps >= TotalPlaceholderSteps;
+    return World.Stats.Steps >= _totalSteps;
   }
 }
