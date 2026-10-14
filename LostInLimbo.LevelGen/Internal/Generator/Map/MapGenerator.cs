@@ -12,8 +12,6 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Map;
 /// </summary>
 internal sealed class MapGenerator
 {
-  /// <summary>Kind of run. Mutated only between runs via <see cref="SetRunKind"/>.</summary>
-  private readonly EnRunKind _enRunKind;
   /// <summary>Configuration data for level generation.</summary>
   private readonly CnfLevelGeneration _config;
   /// <summary>Shared, thread-safe status sink owned by the API layer.</summary>
@@ -28,13 +26,11 @@ internal sealed class MapGenerator
   /// <summary>
   /// Prepares map generator.
   /// </summary>
-  /// <param name="enRunKind">Kind of run.</param>
   /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
   /// <param name="statusStore">Store receiving status snapshots during execution.</param>
   /// <param name="world">World to modify.</param>
-  public MapGenerator(EnRunKind enRunKind, CnfLevelGeneration config, GenerationStatusStore statusStore, LilWorld world)
+  public MapGenerator(CnfLevelGeneration config, GenerationStatusStore statusStore, LilWorld world)
   {
-    _enRunKind = enRunKind;
     _config = config;
     _statusStore = statusStore;
     _world = world;

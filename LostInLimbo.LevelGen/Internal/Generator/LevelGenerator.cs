@@ -67,7 +67,7 @@ internal sealed class LevelGenerator
     _config = config;
     _statusStore = statusStore;
 
-    _mapGenerator = new MapGenerator(enRunKind, config, statusStore, World);
+    _mapGenerator = new MapGenerator(config, statusStore, World);
   }
 
   /// <summary>
