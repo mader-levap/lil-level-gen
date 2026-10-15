@@ -1,6 +1,6 @@
-using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Prepass;
+using LostInLimbo.LevelGen.Internal.Utils;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Prepass;
 
@@ -30,8 +30,9 @@ internal sealed class PrepassGenerator
   /// <returns>Prepass data or null if it failed for some reason.</returns>
   public PrepData Create()
   {
-    _prepData.SeedGraph = 0;
-    _prepData.SeedMap = 0;
+    var worldSeed = _config.General.Seed;
+    _prepData.SeedGraph = SeedDerivation.Derive(worldSeed, SeedChannels.Graph);
+    _prepData.SeedMap = SeedDerivation.Derive(worldSeed, SeedChannels.Map);
     return _prepData;
   }
 }
