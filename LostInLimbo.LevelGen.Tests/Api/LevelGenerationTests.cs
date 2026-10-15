@@ -72,6 +72,26 @@ public sealed class LevelGenerationTests
     LevelGeneration.Clear();
   }
 
+  /// <summary>Tests the pristine never-ran state exposed before any command runs.</summary>
+  [Collection("LevelGenerationApi")]
+  public sealed class InitialStateTests : IDisposable
+  {
+    /// <inheritdoc cref="LevelGenerationTests.ResetState"/>
+    public void Dispose() => ResetState();
+
+    [Fact]
+    public void Status_BeforeAnyRun_ReportsNoneWithNullWorld()
+    {
+      // Arrange: Pristine state guaranteed by the previous test's Dispose (or by being
+      // the first test in a fresh process; both end at the same never-ran state).
+
+      // Assert: The API reports the never-ran status and exposes no world.
+      Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
+      Assert.Null(LevelGeneration.Status().Error);
+      Assert.Null(LevelGeneration.World());
+    }
+  }
+
   /// <summary>Tests <see cref="LevelGeneration.Start(EnRunKind, CnfLevelGeneration, CancellationToken)"/>: claims, validation and start failures.</summary>
   [Collection("LevelGenerationApi")]
   public sealed class StartTests : IDisposable
@@ -182,6 +202,25 @@ public sealed class LevelGenerationTests
       Assert.NotNull(LevelGeneration.Status().Error);
       Assert.Null(LevelGeneration.World());
     }
+
+    [Fact]
+    public void Start_AfterErrorRun_Succeeds()
+    {
+      // Arrange: A failed run; Error is terminal but a fresh Start may claim a new run.
+      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(failAtStart: true)));
+      WaitForTerminal();
+      Assert.Equal(EnGenResult.Error, LevelGeneration.Status().Result);
+
+      // Act: Starting a fresh run after the failure.
+      var started = LevelGeneration.Start(EnRunKind.All, Config(sleep: 0));
+
+      // Assert: The fresh run completes normally and replaces the failed run's state.
+      Assert.True(started);
+      WaitForTerminal();
+      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+      Assert.Null(LevelGeneration.Status().Error);
+      Assert.NotNull(LevelGeneration.World());
+    }
   }
 
   /// <summary>Tests <see cref="LevelGeneration.Resume(EnRunKind)"/>: stepwise and whole-level resumes.</summary>
@@ -262,6 +301,24 @@ public sealed class LevelGenerationTests
       Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
       Assert.NotNull(LevelGeneration.World());
       Assert.Equal(10L, LevelGeneration.World()!.Stats.Steps);
+    }
+
+    [Fact]
+    public void Resume_AfterErrorRun_ReturnsFalse()
+    {
+      // Arrange: A failed run; only a paused run can be resumed.
+      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(failAtStart: true)));
+      WaitForTerminal();
+      Assert.Equal(EnGenResult.Error, LevelGeneration.Status().Result);
+
+      // Act: Attempting to resume the failed run.
+      var resumed = LevelGeneration.Resume(EnRunKind.All);
+
+      // Assert: Resuming is refused because failed runs cannot be continued, and the
+      // error state is left untouched.
+      Assert.False(resumed);
+      Assert.Equal(EnGenResult.Error, LevelGeneration.Status().Result);
+      Assert.NotNull(LevelGeneration.Status().Error);
     }
   }
 
@@ -389,6 +446,23 @@ public sealed class LevelGenerationTests
       // Assert: The call is a no-op and does not disturb the finished run.
       Assert.False(cancelled);
       Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+      Assert.NotNull(LevelGeneration.World());
+    }
+
+    [Fact]
+    public void Cancel_AfterPausedRun_ReturnsFalse()
+    {
+      // Arrange: A paused run; it is no longer in flight, so there is nothing to cancel.
+      Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 0)));
+      WaitForTerminal();
+      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+
+      // Act: Cancelling the paused run.
+      var cancelled = LevelGeneration.Cancel();
+
+      // Assert: The call is a no-op; cancelling a paused run goes through a fresh Start.
+      Assert.False(cancelled);
+      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
       Assert.NotNull(LevelGeneration.World());
     }
 

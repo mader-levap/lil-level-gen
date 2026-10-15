@@ -3,6 +3,7 @@ using System.Diagnostics;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Other;
 using LostInLimbo.LevelGen.Data.Result;
+using LostInLimbo.LevelGen.Data.Result.Stats;
 using LostInLimbo.LevelGen.Internal.Generator;
 using LostInLimbo.LevelGen.Internal.Status;
 
@@ -218,6 +219,46 @@ public sealed class LevelGeneratorTests
       Assert.Equal(3, executions);
       Assert.Equal(3L, generator.World.Stats.Steps);
     }
+
+    [Fact]
+    public void Execute_WithAllRunKind_AdvancesPhaseFromGraphToMap()
+    {
+      // Arrange: Claimed full run over a fresh world, which starts in the graph phase.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
+      Assert.Equal(EnPhase.Graph, generator.World.Phase);
+
+      // Act: Run generation to completion.
+      generator.Execute();
+
+      // Assert: The successful graph pass moved the world into the map phase.
+      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Map, generator.World.Phase);
+    }
+
+    [Fact]
+    public void Execute_AfterPausedStepRun_AdvancesOnlyMapPhaseOnResume()
+    {
+      // Arrange: A stepwise run whose first execution covers the graph pass plus one map step.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var generator = new LevelGenerator(EnRunKind.Step, FastConfig(placeholderSteps: 3), statusStore);
+      generator.Execute();
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Equal(1L, generator.World.Stats.Steps);
+      Assert.Equal(EnPhase.Map, generator.World.Phase);
+
+      // Act: Claim and run the remainder as a full run the way Resume does.
+      Assert.True(statusStore.TryBeginRun());
+      generator.SetRunKind(EnRunKind.All);
+      generator.Execute();
+
+      // Assert: The resumed run stays in the map phase; the graph pass ran only once.
+      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Map, generator.World.Phase);
+      Assert.Equal(3L, generator.World.Stats.Steps);
+    }
   }
 
   /// <summary>Tests <see cref="LevelGenerator.Execute"/> failure reporting and cancellation-token handling.</summary>
@@ -359,6 +400,24 @@ public sealed class LevelGeneratorTests
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
       Assert.Null(statusStore.Current.Error);
       Assert.Equal(0L, generator.World.Stats.Steps);
+    }
+
+    [Fact]
+    public void TryRequestPause_BeforeExecute_KeepsPhaseAtGraph()
+    {
+      // Arrange: A claimed run asked to pause before it touches any generation pass.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
+      Assert.Equal(EnPhase.Graph, generator.World.Phase);
+
+      // Act: Request the pause, then run the claimed execution.
+      Assert.True(generator.TryRequestPause());
+      generator.Execute();
+
+      // Assert: The graph pass never ran, so the world stays in its initial phase.
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Graph, generator.World.Phase);
     }
 
     [Fact]

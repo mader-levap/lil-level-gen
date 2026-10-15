@@ -200,6 +200,23 @@ public sealed class GenerationStatusStoreTests
     }
 
     [Fact]
+    public void TryBeginResume_AfterPausedWithWorld_DropsWorldFromSnapshot()
+    {
+      // Arrange: Store whose paused snapshot exposes the partial world of the paused run.
+      var store = new GenerationStatusStore();
+      store.Publish(new GenerationStatus { Result = EnGenResult.Paused }, new LilWorld());
+
+      // Act: Claim the resume.
+      Assert.True(store.TryBeginResume());
+
+      // Assert: The claim replaces the whole pair, so the new run's Running status never keeps
+      // the paused run's world attached.
+      var snapshot = store.CurrentSnapshot;
+      Assert.Equal(EnGenResult.Running, snapshot.Status.Result);
+      Assert.Null(snapshot.World);
+    }
+
+    [Fact]
     public void ClaimId_BumpsOnEachSuccessfulClaim()
     {
       // Arrange: Fresh store.

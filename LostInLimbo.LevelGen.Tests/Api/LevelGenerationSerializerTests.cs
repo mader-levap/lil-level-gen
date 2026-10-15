@@ -169,6 +169,30 @@ public sealed class LevelGenerationSerializerTests
     }
 
     [Fact]
+    public void Deserialize_WithInvalidDebugSleep_ThrowsNamingPlaceholderSleep()
+    {
+      // Arrange: Well-formed JSON whose debug section violates its own invariants.
+      var json = "{ \"debug\": { \"placeholderSleep\": -1 } }";
+
+      // Act/Assert: Validation runs on the deserialized result and names the nested property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(
+        () => LevelGenerationSerializer.DeserializeConfig(json));
+      Assert.Equal("PlaceholderSleep", exception.ParamName);
+    }
+
+    [Fact]
+    public void Deserialize_WithInvalidDebugSteps_ThrowsNamingPlaceholderSteps()
+    {
+      // Arrange: Well-formed JSON whose debug section asks for less than one step.
+      var json = "{ \"debug\": { \"placeholderSteps\": 0 } }";
+
+      // Act/Assert: Validation runs on the deserialized result and names the nested property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(
+        () => LevelGenerationSerializer.DeserializeConfig(json));
+      Assert.Equal("PlaceholderSteps", exception.ParamName);
+    }
+
+    [Fact]
     public void Deserialize_WithNullGraphSection_ThrowsArgumentExceptionNamingGraph()
     {
       // Arrange: Well-formed JSON explicitly nulling the graph section.
