@@ -8,6 +8,7 @@ namespace LostInLimbo.LevelGen.Tests.Data.Config.Graph;
 public sealed class CnfGraphTests
 {
   [Theory]
+  [InlineData(EnGraphBuilder.OneNode)]
   [InlineData(EnGraphBuilder.Simple)]
   [InlineData(EnGraphBuilder.Linear)]
   public void Validate_WithDefinedBuilder_DoesNotThrow(EnGraphBuilder builder)

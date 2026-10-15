@@ -13,6 +13,7 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
 public sealed class AGraphBuilderTests
 {
   [Theory]
+  [InlineData(EnGraphBuilder.OneNode)]
   [InlineData(EnGraphBuilder.Simple)]
   [InlineData(EnGraphBuilder.Linear)]
   public void Setup_WithNullConfig_ThrowsArgumentNullException(EnGraphBuilder builderKind)
@@ -27,6 +28,7 @@ public sealed class AGraphBuilderTests
   }
 
   [Theory]
+  [InlineData(EnGraphBuilder.OneNode)]
   [InlineData(EnGraphBuilder.Simple)]
   [InlineData(EnGraphBuilder.Linear)]
   public void Setup_WithNullPrepData_ThrowsArgumentNullException(EnGraphBuilder builderKind)
@@ -41,6 +43,7 @@ public sealed class AGraphBuilderTests
   }
 
   [Theory]
+  [InlineData(EnGraphBuilder.OneNode)]
   [InlineData(EnGraphBuilder.Simple)]
   [InlineData(EnGraphBuilder.Linear)]
   public void Setup_WithNullGraph_ThrowsArgumentNullException(EnGraphBuilder builderKind)
@@ -57,7 +60,7 @@ public sealed class AGraphBuilderTests
   [Theory]
   [InlineData(EnGraphBuilder.Simple)]
   [InlineData(EnGraphBuilder.Linear)]
-  public void Setup_ThenBuild_WithValidInputs_LeavesGraphEmpty(EnGraphBuilder builderKind)
+  public void Setup_ThenBuild_WithPlaceholderBuilders_LeavesGraphEmpty(EnGraphBuilder builderKind)
   {
     // Arrange: Fresh builder, valid inputs and an empty target graph.
     var builder = GraphBuilderFactory.Create(builderKind);
@@ -67,7 +70,8 @@ public sealed class AGraphBuilderTests
     builder.Setup(CnfLevelGeneration.Default, new PrepData(), graph);
     builder.Build();
 
-    // Assert: Placeholders emit nothing yet, so the graph stays empty.
+    // Assert: The placeholder builders emit nothing, so the graph stays empty.
+    // OneNode is covered by its own tests because it produces a real graph.
     Assert.Empty(graph.Nodes);
     Assert.Empty(graph.Edges);
   }

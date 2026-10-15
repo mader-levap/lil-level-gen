@@ -9,6 +9,7 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
 public sealed class GraphBuilderFactoryTests
 {
   [Theory]
+  [InlineData(EnGraphBuilder.OneNode, typeof(OneNodeGraphBuilder))]
   [InlineData(EnGraphBuilder.Simple, typeof(SimpleGraphBuilder))]
   [InlineData(EnGraphBuilder.Linear, typeof(LinearGraphBuilder))]
   public void Create_WithDefinedBuilder_ReturnsMatchingBuilder(EnGraphBuilder builder, Type expectedType)
