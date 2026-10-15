@@ -1,3 +1,4 @@
+using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Internal.Status;
@@ -6,7 +7,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 
 /// <summary>
 /// <para>Generates abstract graph representing level and its features. Modifies <c>LilGraph</c>.</para>
-/// NOTE: right now it is placeholder.
+/// Dispatches to the <see cref="IGraphBuilder"/> implementation selected by configuration
+/// (see <see cref="GraphBuilderFactory"/>).
 /// </summary>
 internal sealed class GraphGenerator
 {
@@ -35,10 +37,12 @@ internal sealed class GraphGenerator
   /// <summary>
   /// Creates whole graph. It is treated as single step.
   /// </summary>
+  /// <param name="cancellationToken">Token checked before the builder runs.</param>
   /// <returns>True if graph generation was successful, otherwise false.</returns>
-  public bool Execute()
+  public bool Execute(CancellationToken cancellationToken = default)
   {
-    // TODO
-    return true;  
+    IGraphBuilder builder = GraphBuilderFactory.Create(_config.Graph.Builder);
+    builder.Build(_config, _world.Graph, cancellationToken);
+    return true;
   }
 }

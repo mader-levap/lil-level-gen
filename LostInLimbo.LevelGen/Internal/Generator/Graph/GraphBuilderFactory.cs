@@ -1,0 +1,31 @@
+using System;
+using LostInLimbo.LevelGen.Data.Config.Graph;
+
+namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
+
+/// <summary>
+/// Creates the <see cref="IGraphBuilder"/> implementation selected by configuration.
+/// </summary>
+/// <remarks>
+/// Kept as a separate, pure factory so the dispatch rule is directly unit-testable.
+/// Unknown values are rejected here as defense in depth; the config layer already
+/// validates <see cref="CnfGraph.Builder"/> before a run is claimed.
+/// </remarks>
+internal static class GraphBuilderFactory
+{
+  /// <summary>
+  /// Creates the builder implementation matching the configured value.
+  /// </summary>
+  /// <param name="builder">Configured graph builder kind.</param>
+  /// <returns>Fresh builder instance.</returns>
+  /// <exception cref="ArgumentOutOfRangeException">The value names no known builder.</exception>
+  public static IGraphBuilder Create(EnGraphBuilder builder)
+  {
+    return builder switch
+    {
+      EnGraphBuilder.Simple => new SimpleGraphBuilder(),
+      EnGraphBuilder.Linear => new LinearGraphBuilder(),
+      _ => throw new ArgumentOutOfRangeException(nameof(builder), builder, "Unknown graph builder."),
+    };
+  }
+}

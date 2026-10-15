@@ -227,7 +227,7 @@ internal sealed class LevelGenerator
     cancellationToken.ThrowIfCancellationRequested();
 
     GraphGenerator graphGenerator = new GraphGenerator(_config, _statusStore, World);
-    bool Result = graphGenerator.Execute();
+    bool Result = graphGenerator.Execute(cancellationToken);
     if (Result) World.Phase = EnPhase.Map; // move to next phase
     return Result;
   }
