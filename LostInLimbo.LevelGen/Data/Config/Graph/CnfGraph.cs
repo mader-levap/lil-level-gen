@@ -33,7 +33,7 @@ public sealed record CnfGraph
   /// <summary>
   /// Checks that this config can be used for generation.
   /// </summary>
-  /// <exception cref="ArgumentOutOfRangeException">Number is outside range.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">The builder is not a defined enum value, or the complexity is out of range.</exception>
   public void Validate()
   {
     if (!Enum.IsDefined(typeof(EnGraphBuilder), Builder))
