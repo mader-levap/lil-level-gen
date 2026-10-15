@@ -1,16 +1,21 @@
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 
 /// <summary>
-/// Builds the simplest possible level graph: a single node containing both the start and
-/// the exit POI, with no edges, conditions or obstacles. The player can beeline from start
-/// to exit immediately. Useful for tests, debug and special scenarios.
+/// <para>
+/// Builds the simple level graph: One or more nodes, but no obstacles. Start and exit may or may not be in same node.
+/// Node can be connected to any other node, but there cannot be more than 4 outgoing relationships from same node.
+/// </para>
 /// </summary>
-/// <remarks>NOTE: right now this is a placeholder; the real algorithm lands later.</remarks>
+/// <remarks>
+/// <para>Ignores graph complexity.</para>
+/// <para>NOTE: right now this is a placeholder; the real algorithm lands later.</para>
+/// </remarks>
 internal sealed class SimpleGraphBuilder : AGraphBuilder
 {
   /// <inheritdoc/>
-  public override void Build()
+  public override bool Build()
   {
-    // Placeholder: the real algorithm (single node + Start/Exit POIs) lands later.
+    // Placeholder: the real algorithm lands later.
+    return true;
   }
 }

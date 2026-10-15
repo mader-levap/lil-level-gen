@@ -38,7 +38,7 @@ public sealed class LevelGenerationSerializerTests
       // Assert: The graph section is part of the canonical format and the builder enum
       // is written as its member name, not as a number.
       Assert.Matches(@"\r?\n +""graph""", json);
-      Assert.Contains("\"builder\": \"Simple\"", json);
+      Assert.Contains("\"builder\": \"OneNode\"", json);
     }
 
     [Fact]

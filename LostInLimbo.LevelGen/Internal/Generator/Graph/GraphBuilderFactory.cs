@@ -24,6 +24,7 @@ internal static class GraphBuilderFactory
   {
     return builder switch
     {
+      EnGraphBuilder.OneNode => new OneNodeGraphBuilder(),
       EnGraphBuilder.Simple => new SimpleGraphBuilder(),
       EnGraphBuilder.Linear => new LinearGraphBuilder(),
       _ => throw new ArgumentOutOfRangeException(nameof(builder), builder, "Unknown graph builder."),

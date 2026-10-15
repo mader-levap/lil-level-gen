@@ -7,13 +7,22 @@ using LostInLimbo.LevelGen.Data.Result.Graph;
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 
 /// <summary>
+/// <para>
 /// Strategy that fills a level graph with nodes, edges, POIs and conditions.
 /// One implementation exists per <see cref="EnGraphBuilder"/> value.
+/// </para>
+/// <para>
+/// Graph build can fail. For example, if size is 1 (one node, no relationships) and complexity
+/// is > 0, it will fail because it is impossible to set up obstacles without relationships.
+/// </para>
+/// <para>
+/// Note: overly complex graphs might fail later during map generation. For example, it might be
+/// physically impossible to generate large amount of passages from one place to another.
+/// </para>
 /// </summary>
 /// <remarks>
-/// Usage contract: call <see cref="Setup"/> once to hand over the inputs, then call
-/// <see cref="Build"/> once to fill the target graph. <see cref="Build"/> must not be
-/// called before <see cref="Setup"/>.
+/// <para>Usage contract: call <see cref="Setup"/> once to hand over the inputs, then call
+/// <see cref="Build"/> once to fill the target graph.</para>
 /// <para>Implementations must obey the following contract:</para>
 /// <list type="bullet">
 /// <item><b>Determinism</b>: the same configuration (including the world seed) always produces
@@ -24,11 +33,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 /// No softlocks.</item>
 /// <item><b>Preconditions</b>: the target graph is guaranteed to be empty when
 /// <see cref="Build"/> is called (graph generation is a single phase step and the whole run's
-/// world is discarded when it ends cancelled).</item>
-/// <item><b>Cancellation</b>: cancellation is observed by the caller at phase boundaries
-/// before the builder runs; a cancelled run reports <c>EnGenResult.Cancelled</c> and its
-/// partial world is discarded. A token passed to builders lands later, with the real
-/// algorithms.</item>
+/// world is discarded when it is cancelled).</item>
 /// </list>
 /// </remarks>
 internal abstract class AGraphBuilder
@@ -70,5 +75,6 @@ internal abstract class AGraphBuilder
   }
 
   /// <summary>Fills the target graph with the complete abstract level description.</summary>
-  public abstract void Build();
+  /// <returns>True if graph generation was successful, otherwise false.</returns>
+  public abstract bool Build();
 }
