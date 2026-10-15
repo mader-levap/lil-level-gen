@@ -18,7 +18,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// <remarks>
 /// NOTE: right now it is placeholder that pretends to do something: it advances a fixed number
 /// of steps, each imitating work by sleeping (see <see cref="MainLoop"/>).
-/// Mutates <see cref="World"/> in place on the worker thread, so consumers never get it from a
+/// Mutates its world in place on the worker thread, so consumers never get it from a
 /// running run: terminal publishes pair it with a <see cref="EnGenResult.Paused"/> or
 /// <see cref="EnGenResult.Finished"/> status in the store, and every other outcome pairs with
 /// no world at all (see <see cref="PublishTerminal"/>).
@@ -50,8 +50,9 @@ internal sealed class LevelGenerator
   /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
   private int _totalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
-  /// <summary>World: partial or complete result of generation.</summary>
-  public LilWorld World { get; } = new();
+  /// <summary>World: partial or complete result of generation. Published to consumers only
+  /// through <see cref="PublishTerminal"/>, never exposed while a run is in flight.</summary>
+  private readonly LilWorld _world = new();
 
   /// <summary>
   /// Prepares level generator. Assumes the config was already validated by the API layer
@@ -69,7 +70,7 @@ internal sealed class LevelGenerator
     _config = config;
     _statusStore = statusStore;
 
-    _mapGenerator = new MapGenerator(config, statusStore, World);
+    _mapGenerator = new MapGenerator(config, statusStore, _world);
   }
 
   /// <summary>
@@ -135,7 +136,7 @@ internal sealed class LevelGenerator
       if (_pauseRequested && result == EnGenResult.Cancelled) result = EnGenResult.Paused;
 
       _pauseRequested = false;
-      var world = result is EnGenResult.Paused or EnGenResult.Finished ? World : null;
+      var world = result is EnGenResult.Paused or EnGenResult.Finished ? _world : null;
       _statusStore.Publish(new GenerationStatus { Result = result, Error = error }, world);
     }
   }
@@ -220,15 +221,15 @@ internal sealed class LevelGenerator
   private bool RunGraph(CancellationToken cancellationToken)
   {
     // Are we in correct phase?
-    if (World.Phase != EnPhase.Graph) return true;
+    if (_world.Phase != EnPhase.Graph) return true;
     // Pause checkpoint: a request pending before the next step starts ends the run.
     if (_pauseRequested) return false;
     // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
     cancellationToken.ThrowIfCancellationRequested();
 
-    GraphGenerator graphGenerator = new GraphGenerator(_config, _statusStore, World);
+    GraphGenerator graphGenerator = new GraphGenerator(_config, _statusStore, _world);
     bool Result = graphGenerator.Execute(cancellationToken);
-    if (Result) World.Phase = EnPhase.Map; // move to next phase
+    if (Result) _world.Phase = EnPhase.Map; // move to next phase
     return Result;
   }
 
@@ -246,14 +247,14 @@ internal sealed class LevelGenerator
   /// the work done in a single step. The sleep itself is a plain, uninterruptible
   /// <see cref="Thread.Sleep(int)"/>; both pause and cancellation are therefore observed only
   /// after the current step completes. Completed steps are counted in
-  /// <see cref="LilStats.Steps"/> of <see cref="World"/>, which survives
+  /// <see cref="LilStats.Steps"/> of <see cref="_world"/>, which survives
   /// pausing and resuming because the API keeps this generator instance alive.
   /// </para>
   /// </summary>
   private void RunMap(CancellationToken cancellationToken)
   {
     // Are we in correct phase?
-    if (World.Phase != EnPhase.Map) return;
+    if (_world.Phase != EnPhase.Map) return;
 
     // Maximum number of steps this execution may add; real passes will budget work differently.
     var maxStepsThisRun = _enRunKind == EnRunKind.All ? int.MaxValue : 1;
@@ -280,6 +281,6 @@ internal sealed class LevelGenerator
   /// </summary>
   private bool IsGenerationComplete()
   {
-    return World.Stats.Steps >= _totalSteps;
+    return _world.Stats.Steps >= _totalSteps;
   }
 }

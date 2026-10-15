@@ -33,7 +33,23 @@ public sealed class LevelGeneratorTests
     };
   }
 
-  /// <summary>Tests <see cref="LevelGenerator"/> construction: argument validation and world creation.</summary>
+  /// <summary>
+  /// Reads the world paired with the store's current snapshot, which exists once a run
+  /// published a paused or finished terminal state. The generator keeps its world private,
+  /// so the store is the only observation point for tests. Fails the test when the
+  /// snapshot does not carry a world.
+  /// </summary>
+  /// <param name="statusStore">Store whose snapshot carries the published world.</param>
+  /// <returns>The published world.</returns>
+  private static LilWorld PublishedWorld(GenerationStatusStore statusStore)
+  {
+    // Assert: A paused or finished run always publishes its world with the status.
+    var world = statusStore.CurrentSnapshot.World;
+    Assert.NotNull(world);
+    return world;
+  }
+
+  /// <summary>Tests <see cref="LevelGenerator"/> construction: argument validation.</summary>
   [Collection("LevelGeneratorTests")]
   public sealed class ConstructionTests
   {
@@ -49,19 +65,6 @@ public sealed class LevelGeneratorTests
         () => new LevelGenerator(EnRunKind.All, config, null!));
       Assert.Equal("statusStore", exception.ParamName);
     }
-
-    [Fact]
-    public void Constructor_CreatesWorld()
-    {
-      // Arrange: Valid arguments.
-      var statusStore = new GenerationStatusStore();
-
-      // Act: Constructing the generator.
-      var generator = new LevelGenerator(EnRunKind.All, CnfLevelGeneration.Default, statusStore);
-
-      // Assert: A world instance exists, ready to be built up.
-      Assert.NotNull(generator.World);
-    }
   }
 
   /// <summary>Tests <see cref="LevelGenerator.Execute"/> semantics: run kinds, step counts, world mutation and run-kind switching.</summary>
@@ -71,16 +74,22 @@ public sealed class LevelGeneratorTests
     [Fact]
     public void Execute_KeepsSameWorldInstance()
     {
-      // Arrange: Generator and its world before running.
+      // Arrange: Generator and a first run paused after one step, so its world is published.
       var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
       var generator = new LevelGenerator(EnRunKind.Step, FastConfig(), statusStore);
-      LilWorld worldBefore = generator.World;
+      generator.Execute();
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      LilWorld worldBefore = PublishedWorld(statusStore);
 
-      // Act: Run generation to completion.
+      // Act: Claim and run the remainder to completion the way Resume does.
+      Assert.True(statusStore.TryBeginRun());
+      generator.SetRunKind(EnRunKind.All);
       generator.Execute();
 
-      // Assert: World is mutated in place, never replaced.
-      Assert.Same(worldBefore, generator.World);
+      // Assert: World is mutated in place, never replaced across pause and resume.
+      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Same(worldBefore, PublishedWorld(statusStore));
     }
 
     [Fact]
@@ -163,7 +172,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: Exactly one step was made and the run pauses with the rest still pending.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
-      Assert.Equal(1L, generator.World.Stats.Steps);
+      Assert.Equal(1L, PublishedWorld(statusStore).Stats.Steps);
     }
 
     [Fact]
@@ -179,7 +188,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: Exactly one step was made and the run pauses with the rest still pending.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
-      Assert.Equal(1L, generator.World.Stats.Steps);
+      Assert.Equal(1L, PublishedWorld(statusStore).Stats.Steps);
     }
 
     [Fact]
@@ -195,7 +204,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: Every step was made and the run finished.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
-      Assert.Equal(3L, generator.World.Stats.Steps);
+      Assert.Equal(3L, PublishedWorld(statusStore).Stats.Steps);
     }
 
     [Fact]
@@ -217,7 +226,7 @@ public sealed class LevelGeneratorTests
       // Assert: Three steps total, so the third execution finished the level.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
       Assert.Equal(3, executions);
-      Assert.Equal(3L, generator.World.Stats.Steps);
+      Assert.Equal(3L, PublishedWorld(statusStore).Stats.Steps);
     }
 
     [Fact]
@@ -227,14 +236,13 @@ public sealed class LevelGeneratorTests
       var statusStore = new GenerationStatusStore();
       Assert.True(statusStore.TryBeginRun());
       var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
-      Assert.Equal(EnPhase.Graph, generator.World.Phase);
 
       // Act: Run generation to completion.
       generator.Execute();
 
       // Assert: The successful graph pass moved the world into the map phase.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
-      Assert.Equal(EnPhase.Map, generator.World.Phase);
+      Assert.Equal(EnPhase.Map, PublishedWorld(statusStore).Phase);
     }
 
     [Fact]
@@ -246,8 +254,9 @@ public sealed class LevelGeneratorTests
       var generator = new LevelGenerator(EnRunKind.Step, FastConfig(placeholderSteps: 3), statusStore);
       generator.Execute();
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
-      Assert.Equal(1L, generator.World.Stats.Steps);
-      Assert.Equal(EnPhase.Map, generator.World.Phase);
+      LilWorld partialWorld = PublishedWorld(statusStore);
+      Assert.Equal(1L, partialWorld.Stats.Steps);
+      Assert.Equal(EnPhase.Map, partialWorld.Phase);
 
       // Act: Claim and run the remainder as a full run the way Resume does.
       Assert.True(statusStore.TryBeginRun());
@@ -256,8 +265,9 @@ public sealed class LevelGeneratorTests
 
       // Assert: The resumed run stays in the map phase; the graph pass ran only once.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
-      Assert.Equal(EnPhase.Map, generator.World.Phase);
-      Assert.Equal(3L, generator.World.Stats.Steps);
+      LilWorld finishedWorld = PublishedWorld(statusStore);
+      Assert.Equal(EnPhase.Map, finishedWorld.Phase);
+      Assert.Equal(3L, finishedWorld.Stats.Steps);
     }
   }
 
@@ -399,7 +409,7 @@ public sealed class LevelGeneratorTests
       Assert.True(accepted);
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
       Assert.Null(statusStore.Current.Error);
-      Assert.Equal(0L, generator.World.Stats.Steps);
+      Assert.Equal(0L, PublishedWorld(statusStore).Stats.Steps);
     }
 
     [Fact]
@@ -409,7 +419,6 @@ public sealed class LevelGeneratorTests
       var statusStore = new GenerationStatusStore();
       Assert.True(statusStore.TryBeginRun());
       var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
-      Assert.Equal(EnPhase.Graph, generator.World.Phase);
 
       // Act: Request the pause, then run the claimed execution.
       Assert.True(generator.TryRequestPause());
@@ -417,7 +426,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: The graph pass never ran, so the world stays in its initial phase.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
-      Assert.Equal(EnPhase.Graph, generator.World.Phase);
+      Assert.Equal(EnPhase.Graph, PublishedWorld(statusStore).Phase);
     }
 
     [Fact]
@@ -452,8 +461,9 @@ public sealed class LevelGeneratorTests
         $"Generator ran for {stopwatch.Elapsed}, expected well below the {SleepMilliseconds} ms placeholder sleep.");
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
       Assert.Null(statusStore.Current.Error);
-      Assert.True(generator.World.Stats.Steps > 0 && generator.World.Stats.Steps < 10,
-        $"Expected a partial step count, got {generator.World.Stats.Steps}.");
+      var partialWorld = PublishedWorld(statusStore);
+      Assert.True(partialWorld.Stats.Steps > 0 && partialWorld.Stats.Steps < 10,
+        $"Expected a partial step count, got {partialWorld.Stats.Steps}.");
     }
 
     [Fact]
@@ -482,7 +492,7 @@ public sealed class LevelGeneratorTests
       Assert.True(joined, "Generator did not finish within 5 s.");
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
       Assert.Null(statusStore.Current.Error);
-      Assert.Equal(1L, generator.World.Stats.Steps);
+      Assert.Equal(1L, PublishedWorld(statusStore).Stats.Steps);
     }
 
     [Fact]
@@ -502,7 +512,7 @@ public sealed class LevelGeneratorTests
       // Assert: Pause has precedence over cancellation, so the run pauses instead of cancelling.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
       Assert.Null(statusStore.Current.Error);
-      Assert.Equal(0L, generator.World.Stats.Steps);
+      Assert.Equal(0L, PublishedWorld(statusStore).Stats.Steps);
     }
 
     [Fact]
@@ -553,7 +563,7 @@ public sealed class LevelGeneratorTests
       Assert.True(generator.TryRequestPause());
       generator.Execute();
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
-      Assert.Equal(0L, generator.World.Stats.Steps);
+      Assert.Equal(0L, PublishedWorld(statusStore).Stats.Steps);
 
       // Act: Claim and execute the next run the way Resume does.
       Assert.True(statusStore.TryBeginRun());
@@ -561,7 +571,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: The consumed pause request does not leak into the next run, which finishes.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
-      Assert.Equal(3L, generator.World.Stats.Steps);
+      Assert.Equal(3L, PublishedWorld(statusStore).Stats.Steps);
     }
   }
 }
