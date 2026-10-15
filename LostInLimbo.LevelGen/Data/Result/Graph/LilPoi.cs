@@ -15,12 +15,12 @@ public sealed record LilPoi
 {
   /// <summary>
   /// Unique identifier of this POI across the entire graph. Assigned by the generator;
-  /// should not be <see cref="Guid.Empty"/>.
+  /// must not be <see cref="Guid.Empty"/>.
   /// </summary>
-  public Guid Id { get; init; }
+  public required Guid Id { get; init; }
 
   /// <summary>Type of this POI.</summary>
-  public EnPoiType Type { get; init; }
+  public required EnPoiType Type { get; init; }
 
   /// <summary>
   /// Optional human-readable label, e.g. <c>Red Key</c>. Not used by generation logic;

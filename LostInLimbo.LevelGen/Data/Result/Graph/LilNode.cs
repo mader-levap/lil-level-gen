@@ -20,9 +20,14 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 public sealed record LilNode
 {
   /// <summary>
-  /// Unique identifier of this node. Assigned by the generator; should not be <see cref="Guid.Empty"/>.
+  /// Unique identifier of this node. Assigned by the generator; must not be <see cref="Guid.Empty"/>.
   /// </summary>
-  public Guid Id { get; init; }
+  public required Guid Id { get; init; }
+
+  /// <summary>
+  /// Size relative to other nodes. Must be set by the generator.
+  /// </summary>
+  public required int RelSize { get; init; }
 
   /// <summary>
   /// Points of interest contained in this place. May be empty (plain pass-through place).

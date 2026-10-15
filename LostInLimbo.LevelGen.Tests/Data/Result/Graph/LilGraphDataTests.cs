@@ -13,6 +13,9 @@ namespace LostInLimbo.LevelGen.Tests.Data.Result.Graph;
 /// </remarks>
 public sealed class LilGraphDataTests
 {
+  /// <summary>Relative size used by test nodes; only required to satisfy <see cref="LilNode.RelSize"/>.</summary>
+  private const int NodeRelSize = 1;
+
   /// <summary>Tests <see cref="LilGraph"/>: default state and built-graph contents.</summary>
   public sealed class GraphTests
   {
@@ -41,13 +44,24 @@ public sealed class LilGraphDataTests
       {
         Nodes =
         [
-          new LilNode { Id = startId, Pois = [new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Start }] },
+          new LilNode
+          {
+            Id = startId,
+            RelSize = NodeRelSize,
+            Pois = [new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Start }],
+          },
           new LilNode
           {
             Id = keyNodeId,
+            RelSize = NodeRelSize,
             Pois = [new LilPoi { Id = keyPoiId, Type = EnPoiType.Solution, Name = "Key" }],
           },
-          new LilNode { Id = exitId, Pois = [new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Exit }] },
+          new LilNode
+          {
+            Id = exitId,
+            RelSize = NodeRelSize,
+            Pois = [new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Exit }],
+          },
         ],
         Edges =
         [
@@ -76,19 +90,20 @@ public sealed class LilGraphDataTests
     }
   }
 
-  /// <summary>Tests <see cref="LilNode"/>: defaults, multiple POIs, equality and with-expressions.</summary>
+  /// <summary>Tests <see cref="LilNode"/>: required members, multiple POIs, equality and with-expressions.</summary>
   public sealed class NodeTests
   {
     [Fact]
-    public void LilNode_WithDefaultConstruction_HasEmptyPoisList()
+    public void LilNode_WithRequiredMembersOnly_HasEmptyPoisList()
     {
-      // Arrange/Act: Create node without any data.
-      var node = new LilNode();
+      // Arrange/Act: Create node with only the required members set.
+      var node = new LilNode { Id = Guid.NewGuid(), RelSize = NodeRelSize };
 
-      // Assert: Pois list is present and empty, never null.
+      // Assert: Required members hold given values; Pois list is present and empty, never null.
       Assert.NotNull(node.Pois);
       Assert.Empty(node.Pois);
-      Assert.Equal(Guid.Empty, node.Id);
+      Assert.NotEqual(Guid.Empty, node.Id);
+      Assert.Equal(NodeRelSize, node.RelSize);
     }
 
     [Fact]
@@ -100,6 +115,7 @@ public sealed class LilGraphDataTests
       var node = new LilNode
       {
         Id = Guid.NewGuid(),
+        RelSize = NodeRelSize,
         Pois =
         [
           new LilPoi { Id = redKeyId, Type = EnPoiType.Solution, Name = "Red Key" },
@@ -125,8 +141,19 @@ public sealed class LilGraphDataTests
     {
       // Arrange: Same id and same POIs in two instances (separate list instances).
       var id = Guid.NewGuid();
-      var node1 = new LilNode { Id = id, Pois = [new LilPoi { Type = EnPoiType.Start }] };
-      var node2 = new LilNode { Id = id, Pois = [new LilPoi { Type = EnPoiType.Start }] };
+      var poiId = Guid.NewGuid();
+      var node1 = new LilNode
+      {
+        Id = id,
+        RelSize = NodeRelSize,
+        Pois = [new LilPoi { Id = poiId, Type = EnPoiType.Start }],
+      };
+      var node2 = new LilNode
+      {
+        Id = id,
+        RelSize = NodeRelSize,
+        Pois = [new LilPoi { Id = poiId, Type = EnPoiType.Start }],
+      };
 
       // Act/Assert: Record equality compares the list property by reference, so two nodes
       // with equal-content but distinct list instances are NOT record-equal. Verify field
@@ -141,12 +168,17 @@ public sealed class LilGraphDataTests
     public void LilNode_WithExpression_ProducesModifiedCopy()
     {
       // Arrange: Node with a single POI.
-      var node = new LilNode { Pois = [new LilPoi { Type = EnPoiType.Goal }] };
+      var node = new LilNode
+      {
+        Id = Guid.NewGuid(),
+        RelSize = NodeRelSize,
+        Pois = [new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Goal }],
+      };
 
       // Act: Add another POI via with-expression.
       var copy = node with
       {
-        Pois = [.. node.Pois, new LilPoi { Type = EnPoiType.Exit }],
+        Pois = [.. node.Pois, new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Exit }],
       };
 
       // Assert: Copy has both POIs; original is unchanged.
@@ -159,18 +191,21 @@ public sealed class LilGraphDataTests
   public sealed class EdgeTests
   {
     [Fact]
-    public void LilEdge_WithDefaultConstruction_IsOpenBidirectional()
+    public void LilEdge_WithRequiredMembersOnly_IsOpenBidirectional()
     {
-      // Arrange/Act: Create edge without any data.
-      var edge = new LilEdge();
+      // Arrange/Act: Create edge with only the required members set.
+      var id = Guid.NewGuid();
+      var from = Guid.NewGuid();
+      var to = Guid.NewGuid();
+      var edge = new LilEdge { Id = id, From = from, To = to };
 
-      // Assert: Defaults describe an open, bidirectional passage.
+      // Assert: Required members hold given values; defaults describe an open, bidirectional passage.
+      Assert.Equal(id, edge.Id);
+      Assert.Equal(from, edge.From);
+      Assert.Equal(to, edge.To);
       Assert.Equal(EnPassageDirection.Bidirectional, edge.Direction);
       Assert.NotNull(edge.Conditions);
       Assert.Empty(edge.Conditions);
-      Assert.Equal(Guid.Empty, edge.Id);
-      Assert.Equal(Guid.Empty, edge.From);
-      Assert.Equal(Guid.Empty, edge.To);
     }
 
     [Fact]
@@ -213,6 +248,7 @@ public sealed class LilGraphDataTests
       var keyNode = new LilNode
       {
         Id = Guid.NewGuid(),
+        RelSize = NodeRelSize,
         Pois =
         [
           new LilPoi { Id = redKeyId, Type = EnPoiType.Solution, Name = "Red Key" },
@@ -256,7 +292,7 @@ public sealed class LilGraphDataTests
         Id = id,
         From = from,
         To = to,
-        Conditions = [new LilCondition { RequiresPoi = Guid.NewGuid() }],
+        Conditions = [new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = Guid.NewGuid() }],
       };
       var edge2 = new LilEdge
       {

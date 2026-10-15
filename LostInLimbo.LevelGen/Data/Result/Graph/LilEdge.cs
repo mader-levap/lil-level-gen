@@ -25,15 +25,15 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 public sealed record LilEdge
 {
   /// <summary>
-  /// Unique identifier of this edge. Assigned by the generator; should not be <see cref="Guid.Empty"/>.
+  /// Unique identifier of this edge. Assigned by the generator; must not be <see cref="Guid.Empty"/>.
   /// </summary>
-  public Guid Id { get; init; }
+  public required Guid Id { get; init; }
 
   /// <summary>Identifier of the source node.</summary>
-  public Guid From { get; init; }
+  public required Guid From { get; init; }
 
   /// <summary>Identifier of the destination node.</summary>
-  public Guid To { get; init; }
+  public required Guid To { get; init; }
 
   /// <summary>Direction of this passage.</summary>
   public EnPassageDirection Direction { get; init; } = EnPassageDirection.Bidirectional;

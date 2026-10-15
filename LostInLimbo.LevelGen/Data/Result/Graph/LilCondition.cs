@@ -26,11 +26,11 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 public sealed record LilCondition
 {
   /// <summary>Kind of this condition.</summary>
-  public EnConditionType Type { get; init; }
+  public required EnConditionType Type { get; init; }
 
   /// <summary>
   /// Identifier of the POI that must be collected before this passage can be used.
-  /// Should not be <see cref="Guid.Empty"/> and should reference an existing POI.
+  /// Must not be <see cref="Guid.Empty"/> and should reference an existing POI.
   /// </summary>
-  public Guid RequiresPoi { get; init; }
+  public required Guid RequiresPoi { get; init; }
 }
