@@ -9,6 +9,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Map;
 
 /// <summary>
 /// <para>Generates map data. Modifies <c>LilMap</c>.</para>
+/// NOTE: right now it is placeholder.
 /// </summary>
 internal sealed class MapGenerator
 {

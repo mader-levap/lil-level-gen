@@ -1,4 +1,5 @@
 using System;
+using LostInLimbo.LevelGen.Data.Config.Graph;
 
 namespace LostInLimbo.LevelGen.Data.Config;
 
@@ -28,6 +29,9 @@ public sealed record CnfLevelGeneration
   /// <summary>General configuration.</summary>
   public CnfGeneral General { get; init; } = CnfGeneral.Default;
 
+  /// <summary>Graph configuration.</summary>
+  public CnfGraph Graph { get; init; } = CnfGraph.Default;
+
   /// <summary>Debug configuration. Ignored if null.</summary>
   public CnfDebug? Debug { get; init; } = null;
 
@@ -42,12 +46,13 @@ public sealed record CnfLevelGeneration
   {
     if (ConfigVersion < 1)
       throw new ArgumentOutOfRangeException(nameof(ConfigVersion), ConfigVersion, "Config version must be at least 1.");
-
     if (General is null)
       throw new ArgumentException("General config must not be null.", nameof(General));
+    if (Graph is null)
+      throw new ArgumentException("Graph config must not be null.", nameof(Graph));
 
     General.Validate();
-
+    Graph.Validate();
     Debug?.Validate();
   }
 }

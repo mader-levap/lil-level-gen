@@ -6,6 +6,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 
 /// <summary>
 /// <para>Generates abstract graph representing level and its features. Modifies <c>LilGraph</c>.</para>
+/// NOTE: right now it is placeholder.
 /// </summary>
 internal sealed class GraphGenerator
 {

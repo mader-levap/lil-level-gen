@@ -156,6 +156,8 @@ Other rules:
 
 ## Generation design
 
+Right now do not worry about backward compatibility.
+
 ### General generation rules
 The generator should be structured as separate, testable passes, for example:
 

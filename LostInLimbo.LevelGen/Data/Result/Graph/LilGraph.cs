@@ -20,7 +20,7 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// <item>Represent passages between places. It can be single door or entire width of open level.</item>
 /// <item>Passage can be open or conditional.</item>
 /// <item>Passage can be bidirectional (most common case) or one-way.</item>
-/// <item>Example of <c>condition</c>: door that requires key.</item>
+/// <item>Example of <c>condition</c>: door that requires a key.</item>
 /// </list>
 /// </para>
 /// <para>Algorithm that generates graph needs to ensure graph is possible to solve: for example, key (<c>solution</c>) is always before door that requires it (<c>condition</c>). No softlock.</para>
@@ -29,7 +29,7 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// Mutable containers: generator builds the graph in place by appending nodes and edges.
 /// Nodes and edges themselves are immutable once created (see <see cref="LilNode"/>,
 /// <see cref="LilEdge"/>). Iteration order of these lists is not significant; consumers
-/// must sort explicitly before using order in generation logic (see AGENTS.md).
+/// must sort explicitly before using order in generation logic.
 /// </remarks>
 public sealed record LilGraph
 {

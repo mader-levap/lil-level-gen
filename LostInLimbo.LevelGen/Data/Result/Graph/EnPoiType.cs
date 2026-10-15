@@ -5,7 +5,7 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// </summary>
 /// <remarks>
 /// A POI marks what a place is for in the level design. Example of <see cref="Solution"/>:
-/// key/button/lever used to open a door (see <c>GENERATOR.md</c>).
+/// key/button/lever used to open a door.
 /// </remarks>
 public enum EnPoiType
 {
