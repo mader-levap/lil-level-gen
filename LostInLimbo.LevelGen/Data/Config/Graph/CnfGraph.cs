@@ -4,7 +4,10 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 
 /// <summary>
 /// <para>Graph configuration data.</para>
-/// <para>Note: Some builders can ignore some configuration variables.</para>
+/// <para>
+/// Note: Some builders can ignore some configuration variables. Also it is up to builder to interpret
+/// these variables, especially vaguer ones like Connectivity.
+/// </para>
 /// </summary>
 public sealed record CnfGraph
 {
@@ -31,13 +34,13 @@ public sealed record CnfGraph
   public EnGraphBuilder Builder { get; init; } = DefaultBuilder;
 
   /// <summary>
-  /// Size of graph. Usually number of nodes. Soft cap - builder is allowed to add more nodes if
-  /// small number of nodes makes it impossible to make graph while fulfilling other settings.
+  /// Size of graph. Usually just number of nodes. Soft cap - builder is allowed to add more nodes
+  /// if small number of nodes makes it impossible to make graph while fulfilling other settings.
   /// </summary>
   public int Size { get; init; } = DefaultSize;
 
   /// <summary>
-  /// General connectivity of graph. Bigger number means it is more likely that given node will have more relationships.
+  /// General connectivity of graph. It is not amount of relationships between nodes, at least not directly.
   /// Zero simply means graph generator will try to make as few relationships as possible.
   /// </summary>
   public int Connectivity { get; init; } = DefaultConnectivity;
@@ -60,7 +63,7 @@ public sealed record CnfGraph
     if (Size < 1)
       throw new ArgumentOutOfRangeException(nameof(Size), Size, "Size must be at least 1.");
     if (Connectivity < 0)
-      throw new ArgumentOutOfRangeException(nameof(Connectivity), Connectivity, "Connectivity must be at least 1.");
+      throw new ArgumentOutOfRangeException(nameof(Connectivity), Connectivity, "Connectivity must be at least 0.");
     if (Complexity < 0)
       throw new ArgumentOutOfRangeException(nameof(Complexity), Complexity, "Complexity must be at least 0.");
   }

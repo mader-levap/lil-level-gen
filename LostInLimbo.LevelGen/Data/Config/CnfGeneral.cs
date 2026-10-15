@@ -28,7 +28,7 @@ public sealed record CnfGeneral
   public long Seed { get; init; } = DefaultSeed;
 
   /// <summary>
-  /// Corruption degree. The more world is corrupted, the worse are effects on map generation.
+  /// Corruption rate. The more world is corrupted, the worse are effects on map generation.
   /// 0 means no corruption.
   /// </summary>
   public float Corruption { get; init; } = DefaultCorruption;

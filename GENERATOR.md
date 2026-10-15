@@ -12,10 +12,12 @@ Configuration must be (de)serializable to/from JSON.
 
 - `CnfLevelGeneration`: Root of configuration.
   - `CnfGeneral`: General configuration data like `Seed` or `Corruption`.
-  - `CnfGraph`: Graph configuration.
+  - `CnfGraph`: Graph configuration. Builders interpret these settings.
     - `Builder`: Which graph builder to use (`OneNode`, `Simple` or `Linear`; `OneNode` is the default). More builders will come.
-    - `Complexity`: General complexity of the graph; builders interpret it (e.g. amount of nodes and obstacles).
-  - `CnfDebug`: Debug configuration data. Placeholder for now.
+    - `Size`: Size of graph. Usually number of nodes. Soft cap - builder is allowed to add more nodes if small number of nodes makes it impossible to make graph while fulfilling other settings.
+    - `Connectivity`: General connectivity of graph. It is not amount of relationships between nodes, at least not directly.
+    - `Complexity`: General complexity of graph. Usually number of obstacles..
+  - `CnfDebug`: Debug configuration data.
   - TODO more
 
 ## Structure of map data
@@ -34,6 +36,8 @@ Configuration must be (de)serializable to/from JSON.
 - `LilNode`: Single place in the level.
   - Has unique `Id` (GUID).
   - Contains zero or more `LilPoi`s. Player has access to everything within given place.
+  - Has `RelSize`. If node A has value 1 and node B 2, latter node is *roughly* twice as big, volume-wise. It is soft requirement.
+    For example, if node A is processed by MapGenerator into two 2x2x1 rooms, node B should have around 16 cells, give or take. It does not matter if node B represents one big 4x4x1 room or seven 1x2x1 small rooms or even 1x1x17 chimney (though you would need some serious Corruption rate to get such deranged result). Volume of taken space matters.
 - `LilPoi`: Point of interest inside a node.
   - Has unique `Id` (GUID), unique across entire graph so conditions can reference a specific POI.
   - Has type: `Start`, `Exit`, `Goal` or `Solution`.
