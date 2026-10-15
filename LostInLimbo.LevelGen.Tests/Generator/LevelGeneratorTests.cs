@@ -426,7 +426,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: The graph pass never ran, so the world stays in its initial phase.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
-      Assert.Equal(EnPhase.Graph, PublishedWorld(statusStore).Phase);
+      Assert.Equal(EnPhase.Prepass, PublishedWorld(statusStore).Phase);
     }
 
     [Fact]

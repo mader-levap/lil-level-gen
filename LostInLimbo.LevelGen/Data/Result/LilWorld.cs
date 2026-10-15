@@ -13,7 +13,7 @@ namespace LostInLimbo.LevelGen.Data.Result;
 public sealed record LilWorld
 {
   /// <summary>Current phase of generation.</summary>
-  public EnPhase Phase { get; set; } = EnPhase.Graph;
+  public EnPhase Phase { get; set; } = EnPhase.Prepass;
 
   /// <summary>Abstract representation of level.</summary>
   public LilGraph Graph { get; set; } = new();

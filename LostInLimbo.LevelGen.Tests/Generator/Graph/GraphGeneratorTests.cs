@@ -1,5 +1,6 @@
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Prepass;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Internal.Generator.Graph;
 using LostInLimbo.LevelGen.Internal.Status;
@@ -21,8 +22,9 @@ public sealed class GraphGeneratorTests
     {
       Graph = new CnfGraph { Builder = builder },
     };
+    var prepass = new PrepData();
     var world = new LilWorld();
-    var generator = new GraphGenerator(config, new GenerationStatusStore(), world);
+    var generator = new GraphGenerator(config, prepass, world);
 
     // Act: Run graph generation.
     var success = generator.Execute();
@@ -32,20 +34,5 @@ public sealed class GraphGeneratorTests
     Assert.True(success);
     Assert.Empty(world.Graph.Nodes);
     Assert.Empty(world.Graph.Edges);
-  }
-
-  [Fact]
-  public void Execute_WithPreCancelledToken_ThrowsOperationCanceledException()
-  {
-    // Arrange: Generator with default builder and a token cancelled before the run.
-    var config = CnfLevelGeneration.Default;
-    var generator = new GraphGenerator(
-      config, new GenerationStatusStore(), new LilWorld());
-    using var cancellationTokenSource = new CancellationTokenSource();
-    cancellationTokenSource.Cancel();
-
-    // Act/Assert: The pass boundary rejects the cancelled token before any building starts.
-    Assert.Throws<OperationCanceledException>(
-      () => generator.Execute(cancellationTokenSource.Token));
   }
 }

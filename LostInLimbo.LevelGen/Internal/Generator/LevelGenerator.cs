@@ -3,10 +3,12 @@ using System.Threading;
 
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Other;
+using LostInLimbo.LevelGen.Data.Prepass;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Data.Result.Stats;
 using LostInLimbo.LevelGen.Internal.Generator.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Map;
+using LostInLimbo.LevelGen.Internal.Generator.Prepass;
 using LostInLimbo.LevelGen.Internal.Status;
 
 namespace LostInLimbo.LevelGen.Internal.Generator;
@@ -31,8 +33,14 @@ internal sealed class LevelGenerator
   private EnRunKind _enRunKind;
   /// <summary>Configuration data for level generation.</summary>
   private readonly CnfLevelGeneration _config;
+  /// <summary>Preparatory data based on config.</summary>
+  private PrepData? _prepData = null;
   /// <summary>Shared, thread-safe status sink owned by the API layer.</summary>
   private readonly GenerationStatusStore _statusStore;
+
+  /// <summary>World: partial or complete result of generation. Published to consumers only
+  /// through <see cref="PublishTerminal"/>, never exposed while a run is in flight.</summary>
+  private readonly LilWorld _world = new();
 
   /// <summary>
   /// Serializes pause requests against terminal publishes, so <see cref="TryRequestPause"/>
@@ -50,10 +58,6 @@ internal sealed class LevelGenerator
   /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
   private int _totalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
-  /// <summary>World: partial or complete result of generation. Published to consumers only
-  /// through <see cref="PublishTerminal"/>, never exposed while a run is in flight.</summary>
-  private readonly LilWorld _world = new();
-
   /// <summary>
   /// Prepares level generator. Assumes the config was already validated by the API layer
   /// (see <see cref="CnfLevelGeneration.Validate"/>) before the run was claimed.
@@ -70,7 +74,7 @@ internal sealed class LevelGenerator
     _config = config;
     _statusStore = statusStore;
 
-    _mapGenerator = new MapGenerator(config, statusStore, _world);
+    _mapGenerator = new MapGenerator(config, _prepData!, _world);
   }
 
   /// <summary>
@@ -210,8 +214,31 @@ internal sealed class LevelGenerator
   /// <param name="cancellationToken">Token checked at every step boundary.</param>
   private void MainLoop(CancellationToken cancellationToken)
   {
+    if (!RunPrepass(cancellationToken)) return;
     if (!RunGraph(cancellationToken)) return;
     RunMap(cancellationToken);
+  }
+
+  /// <summary>
+  /// <para>Execute prepass generator. This is considered single step.</para>
+  /// </summary>
+  /// <returns>True if should continue, otherwise false.</returns>
+  private bool RunPrepass(CancellationToken cancellationToken)
+  {
+    // Are we in correct phase?
+    if (_world.Phase != EnPhase.Prepass) return true;
+    // Pause checkpoint: a request pending before the next step starts ends the run.
+    if (_pauseRequested) return false;
+    // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
+    cancellationToken.ThrowIfCancellationRequested();
+
+    PrepassGenerator prepassGenerator = new PrepassGenerator(_config);
+    _prepData = prepassGenerator.Create();
+    if (_prepData != null) {
+      _world.Phase = EnPhase.Graph; // move to next phase
+      return true;
+    }
+    return false;
   }
 
   /// <summary>
@@ -227,8 +254,8 @@ internal sealed class LevelGenerator
     // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
     cancellationToken.ThrowIfCancellationRequested();
 
-    GraphGenerator graphGenerator = new GraphGenerator(_config, _statusStore, _world);
-    bool Result = graphGenerator.Execute(cancellationToken);
+    GraphGenerator graphGenerator = new GraphGenerator(_config, _prepData!, _world);
+    bool Result = graphGenerator.Execute();
     if (Result) _world.Phase = EnPhase.Map; // move to next phase
     return Result;
   }
@@ -264,7 +291,6 @@ internal sealed class LevelGenerator
     {
       // Pause checkpoint: a request pending before the next step starts ends the run.
       if (_pauseRequested) return;
-
       // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
       cancellationToken.ThrowIfCancellationRequested();
 

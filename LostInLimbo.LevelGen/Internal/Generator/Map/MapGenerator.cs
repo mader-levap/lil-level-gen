@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Other;
+using LostInLimbo.LevelGen.Data.Prepass;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Internal.Status;
 
@@ -15,8 +16,8 @@ internal sealed class MapGenerator
 {
   /// <summary>Configuration data for level generation.</summary>
   private readonly CnfLevelGeneration _config;
-  /// <summary>Shared, thread-safe status sink owned by the API layer.</summary>
-  private readonly GenerationStatusStore _statusStore;
+  /// <summary>Preparatory data based on config.</summary>
+  private readonly PrepData _prepData;
 
   /// <summary>World: partial or complete result of generation.</summary>
   private LilWorld _world;
@@ -28,12 +29,12 @@ internal sealed class MapGenerator
   /// Prepares map generator.
   /// </summary>
   /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
-  /// <param name="statusStore">Store receiving status snapshots during execution.</param>
+  /// <param name="prepData">Preparatory data based on config.</param>
   /// <param name="world">World to modify.</param>
-  public MapGenerator(CnfLevelGeneration config, GenerationStatusStore statusStore, LilWorld world)
+  public MapGenerator(CnfLevelGeneration config, PrepData prepData, LilWorld world)
   {
     _config = config;
-    _statusStore = statusStore;
+    _prepData = prepData;
     _world = world;
   }
 

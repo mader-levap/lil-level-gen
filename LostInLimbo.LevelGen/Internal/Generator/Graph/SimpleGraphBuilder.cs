@@ -1,5 +1,6 @@
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
+using LostInLimbo.LevelGen.Data.Prepass;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
@@ -13,9 +14,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 internal sealed class SimpleGraphBuilder : IGraphBuilder
 {
   /// <inheritdoc/>
-  public void Build(CnfLevelGeneration config, LilGraph graph, CancellationToken cancellationToken)
+  public void Build(CnfLevelGeneration config, PrepData prepData, LilGraph graph)
   {
-    cancellationToken.ThrowIfCancellationRequested();
     // Placeholder: the real algorithm (single node + Start/Exit POIs) lands later.
   }
 }

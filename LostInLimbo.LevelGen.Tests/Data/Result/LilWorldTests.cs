@@ -16,7 +16,7 @@ public sealed class LilWorldTests
     var world = new LilWorld();
 
     // Assert: Generation starts in the graph phase with every section present but empty.
-    Assert.Equal(EnPhase.Graph, world.Phase);
+    Assert.Equal(EnPhase.Prepass, world.Phase);
     Assert.NotNull(world.Graph);
     Assert.NotNull(world.Map);
     Assert.NotNull(world.Stats);

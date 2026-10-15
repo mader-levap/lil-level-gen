@@ -5,6 +5,8 @@ namespace LostInLimbo.LevelGen.Data.Result.Stats;
 /// </summary>
 public enum EnPhase
 {
+  /// <summary>Currently generating prepass data. Counts as single step.</summary>
+  Prepass,
   /// <summary>Currently generating graph. Counts as single step.</summary>
   Graph,
   /// <summary>Currently generating map.</summary>

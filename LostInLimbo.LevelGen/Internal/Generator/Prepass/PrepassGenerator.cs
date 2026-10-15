@@ -1,0 +1,37 @@
+using System.Threading;
+using LostInLimbo.LevelGen.Data.Config;
+using LostInLimbo.LevelGen.Data.Prepass;
+
+namespace LostInLimbo.LevelGen.Internal.Generator.Prepass;
+
+/// <summary>
+/// <para>Creates instance of <c>PrepData</c> based on configuration.</para>
+/// </summary>
+internal sealed class PrepassGenerator
+{
+  /// <summary>Configuration data for level generation.</summary>
+  private readonly CnfLevelGeneration _config;
+
+  /// <summary>Generated preparatory data.</summary>
+  private readonly PrepData _prepData = new();
+
+  /// <summary>
+  /// Prepares map generator.
+  /// </summary>
+  /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
+  public PrepassGenerator(CnfLevelGeneration config)
+  {
+    _config = config;
+  }
+
+  /// <summary>
+  /// Create prepass data.
+  /// </summary>
+  /// <returns>Prepass data or null if it failed for some reason.</returns>
+  public PrepData Create()
+  {
+    _prepData.SeedGraph = 0;
+    _prepData.SeedMap = 0;
+    return _prepData;
+  }
+}

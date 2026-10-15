@@ -1,5 +1,6 @@
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
+using LostInLimbo.LevelGen.Data.Prepass;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
@@ -31,7 +32,7 @@ internal interface IGraphBuilder
   /// Fills the target graph with the complete abstract level description.
   /// </summary>
   /// <param name="config">Full generation configuration.</param>
+  /// <param name="prepData">Preparatory data based on config.</param>
   /// <param name="graph">Target graph. Empty on entry; append nodes and edges in place.</param>
-  /// <param name="cancellationToken">Token checked at pass boundaries.</param>
-  void Build(CnfLevelGeneration config, LilGraph graph, CancellationToken cancellationToken);
+  void Build(CnfLevelGeneration config, PrepData prepData, LilGraph graph);
 }

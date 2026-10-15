@@ -1,5 +1,6 @@
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
+using LostInLimbo.LevelGen.Data.Prepass;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Internal.Status;
 
@@ -14,8 +15,8 @@ internal sealed class GraphGenerator
 {
   /// <summary>Configuration data for level generation.</summary>
   private readonly CnfLevelGeneration _config;
-  /// <summary>Shared, thread-safe status sink owned by the API layer.</summary>
-  private readonly GenerationStatusStore _statusStore;
+  /// <summary>Preparatory data based on config.</summary>
+  private readonly PrepData _prepData;
 
   /// <summary>World: partial or complete result of generation.</summary>
   private LilWorld _world;
@@ -25,12 +26,12 @@ internal sealed class GraphGenerator
   /// (see <see cref="CnfLevelGeneration.Validate"/>) before the run was claimed.
   /// </summary>
   /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
-  /// <param name="statusStore">Store receiving status snapshots during execution.</param>
+  /// <param name="prepData">Preparatory data based on config..</param>
   /// <param name="world">World to modify.</param>
-  public GraphGenerator(CnfLevelGeneration config, GenerationStatusStore statusStore, LilWorld world)
+  public GraphGenerator(CnfLevelGeneration config, PrepData prepData, LilWorld world)
   {
     _config = config;
-    _statusStore = statusStore;
+    _prepData = prepData;
     _world = world;
   }
 
@@ -39,10 +40,10 @@ internal sealed class GraphGenerator
   /// </summary>
   /// <param name="cancellationToken">Token checked before the builder runs.</param>
   /// <returns>True if graph generation was successful, otherwise false.</returns>
-  public bool Execute(CancellationToken cancellationToken = default)
+  public bool Execute()
   {
     IGraphBuilder builder = GraphBuilderFactory.Create(_config.Graph.Builder);
-    builder.Build(_config, _world.Graph, cancellationToken);
+    builder.Build(_config, _prepData, _world.Graph);
     return true;
   }
 }

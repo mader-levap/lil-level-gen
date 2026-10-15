@@ -76,7 +76,7 @@ public sealed class LevelGenerationTests
   [Collection("LevelGenerationApi")]
   public sealed class InitialStateTests : IDisposable
   {
-    /// <inheritdoc cref="LevelGenerationTests.ResetState"/>
+    /// <inheritdoc cref="ResetState"/>
     public void Dispose() => ResetState();
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class LevelGenerationTests
   [Collection("LevelGenerationApi")]
   public sealed class StartTests : IDisposable
   {
-    /// <inheritdoc cref="LevelGenerationTests.ResetState"/>
+    /// <inheritdoc cref="ResetState"/>
     public void Dispose() => ResetState();
 
     [Fact]
@@ -227,7 +227,7 @@ public sealed class LevelGenerationTests
   [Collection("LevelGenerationApi")]
   public sealed class ResumeTests : IDisposable
   {
-    /// <inheritdoc cref="LevelGenerationTests.ResetState"/>
+    /// <inheritdoc cref="ResetState"/>
     public void Dispose() => ResetState();
 
     [Fact]
@@ -326,7 +326,7 @@ public sealed class LevelGenerationTests
   [Collection("LevelGenerationApi")]
   public sealed class PauseTests : IDisposable
   {
-    /// <inheritdoc cref="LevelGenerationTests.ResetState"/>
+    /// <inheritdoc cref="ResetState"/>
     public void Dispose() => ResetState();
 
     [Fact]
@@ -406,7 +406,7 @@ public sealed class LevelGenerationTests
   [Collection("LevelGenerationApi")]
   public sealed class CancelTests : IDisposable
   {
-    /// <inheritdoc cref="LevelGenerationTests.ResetState"/>
+    /// <inheritdoc cref="ResetState"/>
     public void Dispose() => ResetState();
 
     [Fact]
@@ -542,7 +542,7 @@ public sealed class LevelGenerationTests
   [Collection("LevelGenerationApi")]
   public sealed class ClearTests : IDisposable
   {
-    /// <inheritdoc cref="LevelGenerationTests.ResetState"/>
+    /// <inheritdoc cref="ResetState"/>
     public void Dispose() => ResetState();
 
     [Fact]
@@ -659,7 +659,7 @@ public sealed class LevelGenerationTests
   [Collection("LevelGenerationApi")]
   public sealed class RaceTests : IDisposable
   {
-    /// <inheritdoc cref="LevelGenerationTests.ResetState"/>
+    /// <inheritdoc cref="ResetState"/>
     public void Dispose() => ResetState();
 
     [Fact]
