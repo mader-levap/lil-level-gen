@@ -606,8 +606,25 @@ public sealed class LevelGenerationTests
       Assert.Null(LevelGeneration.World());
     }
 
-    [Fact]
-    public void Clear_WithNegativeTimeout_ThrowsArgumentOutOfRangeException()
+  [Fact]
+  public void Clear_OnTerminalRun_WithZeroTimeout_Clears()
+  {
+    // Arrange: A completed run that is terminal but not yet cleared.
+    Assert.True(LevelGeneration.Start(EnRunKind.All, Config()));
+    WaitForTerminal();
+    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+
+    // Act: Clear the settled state with no patience.
+    var cleared = LevelGeneration.Clear(TimeSpan.Zero);
+
+    // Assert: Zero timeout only refuses an in-flight run; an already terminal state clears.
+    Assert.True(cleared);
+    Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
+    Assert.Null(LevelGeneration.World());
+  }
+
+  [Fact]
+  public void Clear_WithNegativeTimeout_ThrowsArgumentOutOfRangeException()
     {
       // Act/Assert: A negative timeout is rejected before any state is touched.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(

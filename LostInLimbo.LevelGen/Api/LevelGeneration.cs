@@ -271,12 +271,17 @@ public static class LevelGeneration
   /// </remarks>
   /// <param name="timeout">
   /// Optional upper bound for waiting out an in-flight run. <see cref="TimeSpan.Zero"/> means
-  /// do not wait at all. When <see langword="null"/>, a default of 10 seconds is used.
+  /// do not wait at all: while a run is in flight this call then always returns
+  /// <see langword="false"/> and clears nothing (the pause is still requested); only a state
+  /// that is already terminal or idle is cleared. When <see langword="null"/>, a default of
+  /// 10 seconds is used.
   /// </param>
   /// <returns>
   /// <see langword="true"/> if the state was cleared;
-  /// <see langword="false"/> if an in-flight run did not stop within <paramref name="timeout"/>
-  /// or another run claimed the state in the meantime - in both cases nothing was cleared.
+  /// <see langword="false"/> if the run was in flight when this call began and did not stop
+  /// within <paramref name="timeout"/> (a <see cref="TimeSpan.Zero"/> timeout always takes
+  /// this path while a run is in flight), or another run claimed the state in the meantime -
+  /// in both cases nothing was cleared.
   /// </returns>
   /// <exception cref="ArgumentOutOfRangeException"><paramref name="timeout"/> is negative.</exception>
   public static bool Clear(TimeSpan? timeout = null)
@@ -307,6 +312,12 @@ public static class LevelGeneration
 
         _generator?.TryRequestPause(); // Best-effort: may return false if the run reached a terminal state in the meantime.
       }
+
+      // Zero budget: the outcome is decided by the entry observation above, not by a re-sample
+      // after the pause - a run that is in flight when this call began never counts as stopped
+      // within a zero timeout, so a pause landing before the wait's first read (or a worker
+      // stopping at its first checkpoint) can never flip this call into a clear.
+      if (effectiveTimeout == TimeSpan.Zero) return false;
 
       if (!WaitForTerminal(claimId, effectiveTimeout)) return false; // Timed out, or a newer run claimed; either way nothing was cleared.
     }
