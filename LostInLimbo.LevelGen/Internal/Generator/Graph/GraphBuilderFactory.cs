@@ -4,7 +4,7 @@ using LostInLimbo.LevelGen.Data.Config.Graph;
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 
 /// <summary>
-/// Creates the <see cref="IGraphBuilder"/> implementation selected by configuration.
+/// Creates the <see cref="AGraphBuilder"/> implementation selected by configuration.
 /// </summary>
 /// <remarks>
 /// Kept as a separate, pure factory so the dispatch rule is directly unit-testable.
@@ -14,12 +14,13 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 internal static class GraphBuilderFactory
 {
   /// <summary>
-  /// Creates the builder implementation matching the configured value.
+  /// Creates the builder implementation matching the configured value. The caller must
+  /// invoke <see cref="AGraphBuilder.Setup"/> before <see cref="AGraphBuilder.Build"/>.
   /// </summary>
   /// <param name="builder">Configured graph builder kind.</param>
   /// <returns>Fresh builder instance.</returns>
   /// <exception cref="ArgumentOutOfRangeException">The value names no known builder.</exception>
-  public static IGraphBuilder Create(EnGraphBuilder builder)
+  public static AGraphBuilder Create(EnGraphBuilder builder)
   {
     return builder switch
     {

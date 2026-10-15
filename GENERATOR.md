@@ -49,12 +49,12 @@ Configuration must be (de)serializable to/from JSON.
 
 ### Graph builders.
 
-The graph phase runs as a single step: `GraphGenerator` creates the `IGraphBuilder` implementation selected by `CnfGraph.Builder` (via `GraphBuilderFactory`) and lets it fill `LilGraph` in place.
+The graph phase runs as a single step: `GraphGenerator` creates the `AGraphBuilder` implementation selected by `CnfGraph.Builder` (via `GraphBuilderFactory`), hands it the run's inputs with `Setup(config, prepData, graph)`, and calls the parameterless `Build()` to fill `LilGraph` in place.
 
 - `SimpleGraphBuilder`: Single node containing both start and exit POI, no edges, conditions or obstacles. Player can beeline to exit immediately. Useful for tests, debug and special scenarios.
 - `LinearGraphBuilder`: Chain of nodes - first holds start, last holds exit, in-between nodes link to previous and next node. Amount of nodes and obstacles is determined by `Complexity`. Even this simple shape allows different scenarios, e.g. every node has a solution for the conditional passage to the next node, or every passage but the last is unconditional and the last one requires all solutions.
 
-All builders share the `IGraphBuilder` interface. Every builder must be deterministic for the same configuration (IDs derived from the seed, never random GUIDs) and must produce a solvable graph (no softlock).
+All builders share the `AGraphBuilder` abstract base class, which stores the setup inputs in protected fields (`Config`, `PrepData`, `Graph`). Every builder must be deterministic for the same configuration (IDs derived from the seed, never random GUIDs) and must produce a solvable graph (no softlock).
 
 NOTE: builders are placeholders right now; the real algorithms land later.
 

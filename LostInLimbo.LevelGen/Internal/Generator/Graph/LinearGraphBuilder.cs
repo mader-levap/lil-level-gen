@@ -1,8 +1,3 @@
-using System.Threading;
-using LostInLimbo.LevelGen.Data.Config;
-using LostInLimbo.LevelGen.Data.Prepass;
-using LostInLimbo.LevelGen.Data.Result.Graph;
-
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 
 /// <summary>
@@ -17,10 +12,10 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 /// to the algorithm phase.
 /// NOTE: right now this is a placeholder; the real algorithm lands later.
 /// </remarks>
-internal sealed class LinearGraphBuilder : IGraphBuilder
+internal sealed class LinearGraphBuilder : AGraphBuilder
 {
   /// <inheritdoc/>
-  public void Build(CnfLevelGeneration config, PrepData prepData, LilGraph graph)
+  public override void Build()
   {
     // Placeholder: the real algorithm (complexity-driven chain with scenarios) lands later.
   }
