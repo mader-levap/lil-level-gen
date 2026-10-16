@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using LostInLimbo.LevelGen.Data.Result.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
 using LostInLimbo.LevelGen.Internal.Utils;
 
-namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
+namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
 /// <summary>
 /// <para>
@@ -26,15 +27,14 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 /// All configuration values are soft constraints: the builder never fails, it only shrinks
 /// what it cannot satisfy (see <see cref="AGraphBuilder"/>).
 /// </para>
-/// <para>
-/// The graph is built in three passes: (1) a minimal connected skeleton - a randomly chosen
-/// scenario that in fact comes from one unified algorithm parameterized by the length of a
-/// linear prefix; remaining nodes attach to a central node and the central hands over to a
-/// new eligible node whenever it reaches <see cref="MaxDegreeStar"/>; (2) extra
-/// relationships between random nodes up to connectivity and <see cref="MaxDegree"/>;
-/// (3) start and exit POIs in two random nodes (the same node is allowed).
-/// Output is fully deterministic for the same <c>PrepData.SeedGraph</c> and config.
-/// </para>
+/// <para>The graph is built in four passes: </para>
+/// <list type="bullet">
+/// <item>A minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
+/// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxDegree"/>.</item>
+/// <item>Start and exit POIs in two random nodes (the same node is allowed).</item>
+/// <item>Relative sizes distributed over the finished nodes via <see cref="RelSizeDistributor"/>.</item>
+/// </list>
+/// <para>Output is fully deterministic for the same <c>PrepData.SeedGraph</c> and config.</para>
 /// </remarks>
 internal sealed class SimpleGraphBuilder : AGraphBuilder
 {
@@ -48,7 +48,10 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   /// <summary>Minimum size where scenarios differ.</summary>
   private const int ScenarioSize = 3;
 
-  /// <summary>Relative size of every node; baseline set by <c>OneNodeGraphBuilder</c>.</summary>
+  /// <summary>
+  /// Initial relative size of every node; replaced by the <see cref="RelSizeDistributor"/>
+  /// pass once the whole graph (relationships and POIs included) is known.
+  /// </summary>
   private const int NodeRelSize = 1;
 
   /// <summary>Salt for node identifiers.</summary>
@@ -91,6 +94,7 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
     CreateSkeleton(random, size, nodeIds, degrees, adjacency);
     AddExtraRelationships(random, connectivity, degrees, adjacency, nodeIds);
     PlacePois(random);
+    RelSizeDistributor.Distribute(Graph, RelSizeDistributionOptions.Default, PrepData.SeedGraph);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return true;

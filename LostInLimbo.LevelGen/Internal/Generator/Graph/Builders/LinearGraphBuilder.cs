@@ -1,4 +1,4 @@
-namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
+namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
 /// <summary>
 /// <para>Builds a linear graph: a chain of nodes where the first node holds the start POI, the

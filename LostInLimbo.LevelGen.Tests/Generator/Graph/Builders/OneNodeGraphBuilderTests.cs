@@ -1,7 +1,7 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 
-namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
+namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 
 /// <summary>
 /// Tests <see cref="OneNodeGraphBuilder"/>: graph shape, identifier validity and

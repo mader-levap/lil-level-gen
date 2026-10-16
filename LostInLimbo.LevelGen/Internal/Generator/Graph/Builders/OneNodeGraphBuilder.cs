@@ -1,7 +1,7 @@
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Utils;
 
-namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
+namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
 /// <summary>
 /// Builds the simplest possible level graph: a single node containing both the start and

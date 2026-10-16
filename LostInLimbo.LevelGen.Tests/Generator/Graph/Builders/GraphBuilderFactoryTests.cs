@@ -1,7 +1,7 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
-using LostInLimbo.LevelGen.Internal.Generator.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
-namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
+namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 
 /// <summary>
 /// Tests the dispatch rule that maps the configured builder kind to its implementation.

@@ -1,7 +1,7 @@
 using System;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 
-namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
+namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
 /// <summary>
 /// Creates the <see cref="AGraphBuilder"/> implementation selected by configuration.

@@ -1,8 +1,9 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result.Graph;
-using LostInLimbo.LevelGen.Internal.Generator.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
 
-namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
+namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 
 /// <summary>
 /// Tests <see cref="SimpleGraphBuilder"/>: graph shape per scenario, soft-constraint
@@ -241,12 +242,53 @@ public sealed class SimpleGraphBuilderTests
         Connectivity = connectivity,
       });
 
-      // Assert: Edges are well-formed, all passages open and every node uses the current
-      // relative size.
+      // Assert: Edges are well-formed, all passages open and every node uses one of the
+      // default relative-size steps.
       Assert.True(success);
       GraphTestSupport.AssertValidEdges(graph);
       GraphTestSupport.AssertOpenPassages(graph);
-      Assert.All(graph.Nodes, node => Assert.Equal(1, node.RelSize));
+      var stepValues = RelSizeDistributionOptions.Default.BuildStepValues();
+      Assert.All(graph.Nodes, node => Assert.Contains(node.RelSize, stepValues));
+    }
+  }
+
+  /// <summary>Tests for the relative-size distribution pass run at the end of the build.</summary>
+  public sealed class RelSizeTests
+  {
+    [Fact]
+    public void Build_WithDefaults_ProducesVaryingRelSizes()
+    {
+      // Act: Build moderately sized graphs across several seeds.
+      var varyingGraphs = 0;
+      for (var seed = 0; seed < 10; seed++)
+      {
+        var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+        {
+          Size = 15,
+          Connectivity = 3,
+        }, seed);
+        if (graph.Nodes.Select(node => node.RelSize).Distinct().Count() > 1) varyingGraphs++;
+      }
+
+      // Assert: Almost every graph uses more than one size - the pass must not collapse
+      // onto a single value in practice.
+      Assert.True(varyingGraphs >= 8, $"Only {varyingGraphs} of 10 graphs used more than one relative size.");
+    }
+
+    [Fact]
+    public void Build_WithSameSeed_ProducesSameRelSizes()
+    {
+      // Arrange: Same config and seed for two builds.
+      var config = new CnfGraph { Size = 20, Connectivity = 8 };
+
+      // Act: Build both graphs.
+      var first = GraphTestSupport.Build(EnGraphBuilder.Simple, config);
+      var second = GraphTestSupport.Build(EnGraphBuilder.Simple, config);
+
+      // Assert: The distribution is part of the deterministic output, node by node.
+      var firstSizes = first.Graph.Nodes.Select(node => node.RelSize).ToList();
+      var secondSizes = second.Graph.Nodes.Select(node => node.RelSize).ToList();
+      Assert.Equal(firstSizes, secondSizes);
     }
   }
 
