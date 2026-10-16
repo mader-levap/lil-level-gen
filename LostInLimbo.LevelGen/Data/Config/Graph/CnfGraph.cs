@@ -46,7 +46,7 @@ public sealed record CnfGraph
   public int Connectivity { get; init; } = DefaultConnectivity;
 
   /// <summary>
-  /// General complexity of graph. Usually number of obstacles.
+  /// General complexity of graph. Usually number of obstacles. Ignored by builders that do not make obstacles.
   /// </summary>
   public int Complexity { get; init; } = DefaultComplexity;
 

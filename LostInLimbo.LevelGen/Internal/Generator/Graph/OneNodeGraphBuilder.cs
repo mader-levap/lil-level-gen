@@ -10,8 +10,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 /// </summary>
 /// <remarks>
 /// <para>This is the only builder that always creates the same graph shape regardless of graph
-/// size, connectivity and complexity; those settings are deliberately ignored and no
-/// randomness is involved.</para>
+/// config; those settings are deliberately ignored and no randomness is involved.</para>
 /// <para>Identifier salts are fixed role constants (instead of a seed-driven sequence) because
 /// the shape never changes: one node, one start POI, one exit POI.</para>
 /// </remarks>

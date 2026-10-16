@@ -7,7 +7,12 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 /// </para>
 /// </summary>
 /// <remarks>
-/// <para>Ignores graph complexity.</para>
+/// <para>Rules:</para>
+/// <list type="bullet">
+/// <item>Graph size is followed.</item>
+/// <item>Graph connectivity means amount of relationships above minimum. But there is upper limit per node.</item>
+/// <item>Ignores graph complexity.</item>
+/// </list>
 /// <para>NOTE: right now this is a placeholder; the real algorithm lands later.</para>
 /// </remarks>
 internal sealed class SimpleGraphBuilder : AGraphBuilder
