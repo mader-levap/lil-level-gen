@@ -4,6 +4,7 @@ using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Tests.Generator.Graph;
+using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestSupport;
 
 namespace LostInLimbo.LevelGen.Tests.Api;
 
@@ -45,16 +46,14 @@ public sealed class LevelGraphValidationTests
   public void Validate_WorldWithDisconnectedGraph_ReportsReason()
   {
     // Arrange: World holding a graph with an orphan node (exit sits on the start node).
-    var startPoi = new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Start };
-    var exitPoi = new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Exit };
     var world = new LilWorld
     {
       Graph = new LilGraph
       {
         Nodes =
         [
-          new LilNode { Id = Guid.NewGuid(), RelSize = 1, Pois = [startPoi, exitPoi] },
-          new LilNode { Id = Guid.NewGuid(), RelSize = 1 },
+          Node(1, Poi(10, EnPoiType.Start), Poi(11, EnPoiType.Exit)),
+          Node(2),
         ],
       },
     };

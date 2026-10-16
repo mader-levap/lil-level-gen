@@ -1,5 +1,6 @@
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
+using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestSupport;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Distributor;
 
@@ -700,7 +701,7 @@ public sealed class RelSizeDistributorTests
     var graph = new LilGraph();
     for (var i = 0; i < nodeCount; i++)
     {
-      var node = new LilNode { Id = CreateNodeId(i), RelSize = 1 };
+      var node = new LilNode { Id = Id(i), RelSize = 1 };
       if (i == poiNodeIndex)
       {
         for (var poi = 0; poi < poiCount; poi++)
@@ -729,19 +730,9 @@ public sealed class RelSizeDistributorTests
     return new LilEdge
     {
       Id = Guid.Parse($"00000000-0000-0000-0001-{low:D6}{high:D6}"),
-      From = CreateNodeId(fromIndex),
-      To = CreateNodeId(toIndex),
+      From = Id(fromIndex),
+      To = Id(toIndex),
     };
-  }
-
-  /// <summary>
-  /// Creates a deterministic node identifier from a node index.
-  /// </summary>
-  /// <param name="index">Node index.</param>
-  /// <returns>A distinct, non-empty identifier.</returns>
-  private static Guid CreateNodeId(int index)
-  {
-    return Guid.Parse($"00000000-0000-0000-0000-{index:D12}");
   }
 
   /// <summary>
@@ -757,18 +748,5 @@ public sealed class RelSizeDistributorTests
       Id = Guid.Parse($"00000000-0000-0000-0002-{nodeIndex:D6}{slot:D6}"),
       Type = EnPoiType.Start,
     };
-  }
-
-  /// <summary>
-  /// Reads the current size assignment of a graph in a stable order.
-  /// </summary>
-  /// <param name="graph">Graph to read.</param>
-  /// <returns>Identifier and size pairs sorted by identifier.</returns>
-  private static List<(Guid Id, int RelSize)> GetAssignments(LilGraph graph)
-  {
-    return graph.Nodes
-      .OrderBy(node => node.Id)
-      .Select(node => (node.Id, node.RelSize))
-      .ToList();
   }
 }

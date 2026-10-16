@@ -154,6 +154,19 @@ internal static class GraphTestSupport
     return degrees;
   }
 
+  /// <summary>
+  /// Reads the current size assignment of a graph in a stable order.
+  /// </summary>
+  /// <param name="graph">Graph to read.</param>
+  /// <returns>Identifier and size pairs sorted by identifier.</returns>
+  public static List<(Guid Id, int RelSize)> GetAssignments(LilGraph graph)
+  {
+    return graph.Nodes
+      .OrderBy(node => node.Id)
+      .Select(node => (node.Id, node.RelSize))
+      .ToList();
+  }
+
   //
   // Assertions
   //
