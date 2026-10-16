@@ -15,7 +15,6 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
 public sealed class GraphGeneratorTests
 {
   [Theory]
-  [InlineData(EnGraphBuilder.Simple)]
   [InlineData(EnGraphBuilder.Linear)]
   public void Execute_WithPlaceholderBuilders_ReturnsTrueAndLeavesGraphEmpty(EnGraphBuilder builder)
   {
@@ -31,11 +30,33 @@ public sealed class GraphGeneratorTests
     // Act: Run graph generation.
     var success = generator.Execute();
 
-    // Assert: The placeholder always succeeds; builders emit nothing yet, so the graph
+    // Assert: The placeholder always succeeds and emits nothing, so the graph
     // stays empty. Phase advancement stays LevelGenerator's job.
     Assert.True(success);
     Assert.Empty(world.Graph.Nodes);
     Assert.Empty(world.Graph.Edges);
+  }
+
+  [Fact]
+  public void Execute_WithSimpleBuilder_ReturnsTrueAndProducesConfiguredGraph()
+  {
+    // Arrange: Generator for the Simple builder with a small configured graph.
+    var config = CnfLevelGeneration.Default with
+    {
+      Graph = new CnfGraph { Builder = EnGraphBuilder.Simple, Size = 5, Connectivity = 3 },
+    };
+    var prepass = new PrepData { SeedGraph = 42 };
+    var world = new LilWorld();
+    var generator = new GraphGenerator(config, prepass, world);
+
+    // Act: Run graph generation.
+    var success = generator.Execute();
+
+    // Assert: The graph holds the configured amount of nodes, a start and an exit POI.
+    Assert.True(success);
+    Assert.Equal(5, world.Graph.Nodes.Count);
+    Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Start));
+    Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Exit));
   }
 
   [Fact]

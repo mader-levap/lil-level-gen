@@ -4,11 +4,17 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 
 /// <summary>
 /// <para>Graph configuration data.</para>
+/// </summary>
+/// <remarks>
 /// <para>
-/// Note: Some builders can ignore some configuration variables. Also it is up to builder to interpret
+/// Many parameters here are soft constraints. Builders are allowed to stretch them a little to minimize
+/// amount of failed builds.
+/// </para>
+/// <para>
+/// Some builders can ignore some configuration variables. Also it is up to builder to interpret
 /// these variables, especially vaguer ones like Connectivity.
 /// </para>
-/// </summary>
+/// </remarks>
 public sealed record CnfGraph
 {
   /// <summary>Default builder - simplest possible.</summary>
@@ -23,6 +29,9 @@ public sealed record CnfGraph
   /// <summary>Default complexity - simplest possible.</summary>
   public const int DefaultComplexity = 0;
 
+  /// <summary>Maximum allowed size - keeps generation cost bounded.</summary>
+  public const int MaxSize = 100;
+
   //
 
   /// <summary>Default instance.</summary>
@@ -36,6 +45,7 @@ public sealed record CnfGraph
   /// <summary>
   /// Size of graph. Usually just number of nodes. Soft cap - builder is allowed to add more nodes
   /// if small number of nodes makes it impossible to make graph while fulfilling other settings.
+  /// Hard cap is <see cref="MaxSize"/>.
   /// </summary>
   public int Size { get; init; } = DefaultSize;
 
@@ -55,13 +65,15 @@ public sealed record CnfGraph
   /// <summary>
   /// Checks that this config can be used for generation.
   /// </summary>
-  /// <exception cref="ArgumentOutOfRangeException">The builder is not a defined enum value, or the complexity is out of range.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">The builder is not a defined enum value, or a value is out of range.</exception>
   public void Validate()
   {
     if (!Enum.IsDefined(typeof(EnGraphBuilder), Builder))
       throw new ArgumentOutOfRangeException(nameof(Builder), Builder, "Unknown graph builder.");
     if (Size < 1)
       throw new ArgumentOutOfRangeException(nameof(Size), Size, "Size must be at least 1.");
+    if (Size > MaxSize)
+      throw new ArgumentOutOfRangeException(nameof(Size), Size, $"Size must not exceed {MaxSize}.");
     if (Connectivity < 0)
       throw new ArgumentOutOfRangeException(nameof(Connectivity), Connectivity, "Connectivity must be at least 0.");
     if (Complexity < 0)

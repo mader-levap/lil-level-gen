@@ -14,7 +14,7 @@ Configuration must be (de)serializable to/from JSON.
   - `CnfGeneral`: General configuration data like `Seed` or `Corruption`.
   - `CnfGraph`: Graph configuration. Builders interpret these settings.
     - `Builder`: Which graph builder to use (`OneNode`, `Simple` or `Linear`; `OneNode` is the default). More builders will come.
-    - `Size`: Size of graph. Usually number of nodes. Soft cap - builder is allowed to add more nodes if small number of nodes makes it impossible to make graph while fulfilling other settings.
+    - `Size`: Size of graph. Usually number of nodes. Soft cap - builder is allowed to add more nodes if small number of nodes makes it impossible to make graph while fulfilling other settings. Hard cap is 100 (`CnfGraph.MaxSize`).
     - `Connectivity`: General connectivity of graph. It is not amount of relationships between nodes, at least not directly.
     - `Complexity`: General complexity of graph. Usually number of obstacles..
   - `CnfDebug`: Debug configuration data.
@@ -56,12 +56,12 @@ Configuration must be (de)serializable to/from JSON.
 The graph phase runs as a single step: `GraphGenerator` creates the `AGraphBuilder` implementation selected by `CnfGraph.Builder` (via `GraphBuilderFactory`), hands it the run's inputs with `Setup(config, prepData, graph)`, and calls the parameterless `Build()` to fill `LilGraph` in place.
 
 - `OneNodeGraphBuilder`: Single node containing both start and exit POI, no edges, conditions or obstacles. Player can beeline to exit immediately. Ignores size, connectivity and complexity - always produces the same shape. Useful for tests, debug and special scenarios.
-- `SimpleGraphBuilder`: One or more nodes without obstacles. Start and exit may or may not be in the same node. Any node can connect to any other node, but no node has more than 4 outgoing relationships. Ignores complexity.
+- `SimpleGraphBuilder`: One or more nodes without obstacles. Size sets the node count. First builds a minimal connected skeleton (a tree) from one randomly rolled scenario: a plain chain, a star, or a chain with the remaining nodes hanging off one of its interior nodes - all three come from the same algorithm, parameterized by the length of a linear prefix. Then adds extra random relationships on top until `Connectivity` is spent or no eligible node pair remains under the limit of 4 relationships per node; the skeleton itself may exceed that limit (a large star has one central node). Start and exit land in two random nodes, which may be the same node. Ignores complexity, never fails - unsatisfiable settings are stretched silently.
 - `LinearGraphBuilder`: Chain of nodes - first holds start, last holds exit, in-between nodes link to previous and next node. Amount of nodes and obstacles is determined by `Complexity`. Even this simple shape allows different scenarios, e.g. every node has a solution for the conditional passage to the next node, or every passage but the last is unconditional and the last one requires all solutions.
 
 All builders share the `AGraphBuilder` abstract base class, which stores the setup inputs in protected fields (`Config`, `PrepData`, `Graph`). Every builder must be deterministic for the same configuration (IDs derived from the seed, never random GUIDs) and must produce a solvable graph (no softlock).
 
-NOTE: `OneNodeGraphBuilder` is implemented; `SimpleGraphBuilder` and `LinearGraphBuilder` are placeholders right now, their real algorithms land later.
+NOTE: `OneNodeGraphBuilder` and `SimpleGraphBuilder` are implemented; `LinearGraphBuilder` is still a placeholder, its real algorithm lands later.
 
 ### Map.
 

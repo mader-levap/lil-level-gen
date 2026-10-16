@@ -43,6 +43,27 @@ public sealed class CnfGraphTests
   }
 
   [Fact]
+  public void Validate_WithSizeAtMaximum_DoesNotThrow()
+  {
+    // Arrange: Graph config using the highest allowed size.
+    var graph = new CnfGraph { Size = CnfGraph.MaxSize };
+
+    // Assert: The boundary value is inside the allowed range.
+    graph.Validate();
+  }
+
+  [Fact]
+  public void Validate_WithSizeAboveMaximum_ThrowsArgumentOutOfRangeException()
+  {
+    // Arrange: Graph config one above the size cap.
+    var graph = new CnfGraph { Size = CnfGraph.MaxSize + 1 };
+
+    // Act/Assert: The oversized value is rejected naming the offending property.
+    var exception = Assert.Throws<ArgumentOutOfRangeException>(() => graph.Validate());
+    Assert.Equal("Size", exception.ParamName);
+  }
+
+  [Fact]
   public void Validate_WithDefaultInstance_DoesNotThrow()
   {
     // Arrange/Act: The default instance uses the default builder and complexity.
