@@ -1,5 +1,6 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Graph;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
 
@@ -13,8 +14,11 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
 /// </remarks>
 public sealed class SimpleGraphBuilderTests
 {
-  /// <summary>Relationships touching one node may not exceed this amount.</summary>
-  private const int MaxDegree = 4;
+  /// <summary>Mirrors <c>SimpleGraphBuilder.MaxDegree</c>: cap of the random-relationships phase.</summary>
+  private const int MaxDegree = SimpleGraphBuilder.MaxDegree;
+
+  /// <summary>Mirrors <c>SimpleGraphBuilder.MaxDegreeStar</c>: cap of the skeleton phase.</summary>
+  private const int MaxDegreeStar = SimpleGraphBuilder.MaxDegreeStar;
 
   /// <summary>Tests for the skeleton shape: node count, minimality, connectivity, scenarios.</summary>
   public sealed class ShapeTests
@@ -148,8 +152,9 @@ public sealed class SimpleGraphBuilderTests
         Connectivity = 10000,
       });
 
-      // Assert: The build succeeds, no node exceeds the degree cap (at size five even
-      // the skeleton cannot exceed it) and the complete graph bound is respected.
+      // Assert: The build succeeds, no node exceeds the plain degree cap (at size five
+      // even a skeleton central collects at most four nodes) and the complete graph
+      // bound is respected.
       Assert.True(success);
       GraphTestSupport.AssertDegreeCap(graph, MaxDegree);
       Assert.True(graph.Edges.Count <= 10, "Five nodes cannot hold more than ten relationships.");
@@ -168,14 +173,57 @@ public sealed class SimpleGraphBuilderTests
         Connectivity = 10000,
       });
 
-      // Assert: The build succeeds, keeps at least the skeleton and stays structurally
-      // valid. (Skeleton scenarios may exceed the degree cap, so it is not asserted here.)
+      // Assert: The build succeeds, keeps at least the skeleton, stays structurally
+      // valid and never exceeds the skeleton degree cap - central handover keeps even
+      // star-shaped skeletons bounded.
       Assert.True(success);
       Assert.True(graph.Edges.Count >= 19, "The skeleton alone already holds 19 relationships.");
       Assert.True(graph.Edges.Count <= 190, "Twenty nodes cannot hold more than 190 relationships.");
+      GraphTestSupport.AssertDegreeCap(graph, MaxDegreeStar);
       GraphTestSupport.AssertValidEdges(graph);
       GraphTestSupport.AssertOpenPassages(graph);
       GraphTestSupport.AssertConnected(graph);
+    }
+
+    [Theory]
+    [InlineData(6)]
+    [InlineData(8)]
+    [InlineData(10)]
+    [InlineData(50)]
+    [InlineData(100)]
+    public void Build_WithAnySeed_ProducesBoundedConnectedSkeleton(int size)
+    {
+      // Act: Build minimal skeletons across many seeds; every scenario must respect the
+      // skeleton degree cap and stay a connected tree.
+      for (var seed = 0; seed < 30; seed++)
+      {
+        var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size }, seed);
+
+        // Assert: Success, exactly size minus one relationships, connectivity and the
+        // cap hold no matter which scenario was rolled.
+        Assert.True(success);
+        Assert.Equal(size - 1, graph.Edges.Count);
+        GraphTestSupport.AssertConnected(graph, $"Skeleton graph must be connected (size {size}, seed {seed}).");
+        GraphTestSupport.AssertDegreeCap(graph, MaxDegreeStar);
+      }
+    }
+
+    [Fact]
+    public void Build_WithLargeSizeAcrossSeeds_SkeletonCentralHandsOverAtCap()
+    {
+      // Act: Build 100-node skeletons across many seeds; star and mixed rolls fill a
+      // central node to the cap and must hand over instead of growing beyond it.
+      var maxDegrees = new List<int>();
+      for (var seed = 0; seed < 30; seed++)
+      {
+        var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = 100 }, seed);
+        maxDegrees.Add(GraphTestSupport.GetDegrees(graph).Values.Max());
+      }
+
+      // Assert: At least one seed reached the cap exactly - proving the handover path
+      // was exercised - and no seed ever went beyond it.
+      Assert.Contains(maxDegrees, maxDegree => maxDegree == MaxDegreeStar);
+      Assert.All(maxDegrees, maxDegree => Assert.True(maxDegree <= MaxDegreeStar, $"Max degree {maxDegree} exceeds cap {MaxDegreeStar}."));
     }
 
     [Theory]

@@ -8,9 +8,9 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 /// <summary>
 /// <para>
 /// Builds the simple level graph: one or more nodes without obstacles. Start and exit may or
-/// may not be in the same node. Connectivity-driven relationships may not exceed
-/// <see cref="MaxDegree"/> per node; the minimal skeleton itself is exempt (a large star has
-/// one central node with many relationships).
+/// may not be in the same node. Skeleton relationships may not exceed
+/// <see cref="MaxDegreeStar"/> per node; connectivity-driven relationships on top of the
+/// skeleton may not exceed <see cref="MaxDegree"/> per node.
 /// </para>
 /// </summary>
 /// <remarks>
@@ -29,15 +29,22 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 /// <para>
 /// The graph is built in three passes: (1) a minimal connected skeleton - a randomly chosen
 /// scenario that in fact comes from one unified algorithm parameterized by the length of a
-/// linear prefix; (2) extra relationships between random nodes up to connectivity and the
-/// degree cap; (3) start and exit POIs in two random nodes (the same node is allowed).
+/// linear prefix; remaining nodes attach to a central node and the central hands over to a
+/// new eligible node whenever it reaches <see cref="MaxDegreeStar"/>; (2) extra
+/// relationships between random nodes up to connectivity and <see cref="MaxDegree"/>;
+/// (3) start and exit POIs in two random nodes (the same node is allowed).
 /// Output is fully deterministic for the same <c>PrepData.SeedGraph</c> and config.
 /// </para>
 /// </remarks>
 internal sealed class SimpleGraphBuilder : AGraphBuilder
 {
-  /// <summary>Maximum amount of relationships connectivity may add to a node (inclusive).</summary>
-  private const int MaxDegree = 4;
+  /// <summary>Maximum amount of relationships a node may gain in the random-relationships phase (inclusive).</summary>
+  internal const int MaxDegree = 4;
+  /// <summary>
+  /// Maximum amount of relationships a node may gain in the skeleton phase (inclusive). A
+  /// central node that reaches this cap hands its remaining nodes over to a new central.
+  /// </summary>
+  internal const int MaxDegreeStar = 7;
   /// <summary>Minimum size where scenarios differ.</summary>
   private const int ScenarioSize = 3;
 
@@ -46,19 +53,17 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
 
   /// <summary>Salt for node identifiers.</summary>
   private const long SaltNode = 0x6E6F6465; // "node"
-
   /// <summary>Salt for edge identifiers.</summary>
   private const long SaltEdge = 0x65646765; // "edge"
-
   /// <summary>Salt for the start POI identifier.</summary>
   private const long SaltStartPoi = 0x7374617274; // "start"
-
   /// <summary>Salt for the exit POI identifier.</summary>
   private const long SaltExitPoi = 0x65786974; // "exit"
 
   /// <summary>
   /// Skeleton scenario for the minimal spanning structure. All three come from the same
-  /// algorithm: create a linear prefix of nodes, then attach the rest to a central node.
+  /// algorithm: create a linear prefix of nodes, then attach the rest to a central node,
+  /// handing over to a new central when the current one reaches <see cref="MaxDegreeStar"/>.
   /// </summary>
   private enum EnSkeletonScenario
   {
@@ -114,10 +119,11 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
 
   /// <summary>
   /// Creates the minimal connected skeleton: a chain over a linear prefix of nodes, with
-  /// every remaining node attached to one central node of the prefix. Uses exactly
-  /// <c>size - 1</c> relationships - the minimum for a connected graph.
+  /// every remaining node attached to the current central node. When a central node reaches
+  /// <see cref="MaxDegreeStar"/>, a new central takes over so no node exceeds the skeleton
+  /// cap. Uses exactly <c>size - 1</c> relationships - the minimum for a connected graph.
   /// </summary>
-  /// <param name="random">Seeded generator driving scenario selection.</param>
+  /// <param name="random">Seeded generator driving scenario selection and central handover.</param>
   /// <param name="size">Total amount of nodes, from <c>CnfGraph.Size</c>.</param>
   /// <param name="nodeIds">Node identifiers in index order.</param>
   /// <param name="degrees">Per-node relationship count, updated in place.</param>
@@ -141,12 +147,16 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
     for (var i = 0; i + 1 < linearCount; i++)
       AddEdge(i, i + 1, nodeIds, degrees, adjacency);
 
-    // Attach every remaining node to the central node of the prefix.
+    // Attach every remaining node to the central node; hand over to a new central as soon
+    // as the current one is full, so the skeleton never exceeds its degree cap.
     if (linearCount < size)
     {
       var central = PickCentral(random, linearCount);
       for (var i = linearCount; i < size; i++)
+      {
+        if (degrees[central] >= MaxDegreeStar) central = PickNextCentral(random, degrees);
         AddEdge(central, i, nodeIds, degrees, adjacency);
+      }
     }
   }
 
@@ -165,21 +175,50 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   }
 
   /// <summary>
-  /// Picks the node of the linear prefix that the remaining nodes attach to.
+  /// Picks the initial node of the linear prefix that the remaining nodes attach to.
   /// </summary>
   /// <param name="random">Seeded generator.</param>
   /// <param name="linearCount">Length of the linear prefix; at least 1.</param>
   /// <returns>
-  /// An interior node when the prefix has one, otherwise a random end of the prefix
-  /// (the only node when the prefix is a single node).
+  /// Any node of the prefix, chosen uniformly - including the first and the last node;
+  /// the only node when the prefix is a single node.
   /// </returns>
   private static int PickCentral(SeededRandom random, int linearCount)
   {
-    if (linearCount >= 3)
-      return random.NextInt(1, linearCount - 1); // Never first or last.
-    if (linearCount == 2)
-      return random.NextInt(2); // No interior node; random end.
-    return 0;
+    return random.NextInt(linearCount);
+  }
+
+  /// <summary>
+  /// Picks a replacement central node once the previous one reached
+  /// <see cref="MaxDegreeStar"/>. Only already attached nodes (degree at least one) below
+  /// the cap are eligible - an unattached node would split the skeleton into components.
+  /// </summary>
+  /// <remarks>
+  /// Candidates are enumerated in index order, so the choice is deterministic for the same
+  /// generator state. The eligible set is never empty while unattached nodes remain: the
+  /// attached part is a tree with n nodes, its degree sum is 2(n - 1), and that sum can
+  /// never cover all n nodes at a cap of at least two.
+  /// </remarks>
+  /// <param name="random">Seeded generator.</param>
+  /// <param name="degrees">Per-node relationship count.</param>
+  /// <returns>Index of the chosen central node.</returns>
+  /// <exception cref="InvalidOperationException">
+  /// No eligible node remains; unreachable as long as <see cref="MaxDegreeStar"/> is at least two.
+  /// </exception>
+  private static int PickNextCentral(SeededRandom random, int[] degrees)
+  {
+    // Find all eligible nodes.
+    var eligible = new List<int>();
+    for (var i = 0; i < degrees.Length; i++)
+    {
+      if (degrees[i] >= 1 && degrees[i] < MaxDegreeStar) eligible.Add(i);
+    }
+
+    if (eligible.Count == 0)
+      throw new InvalidOperationException("Skeleton central reached its cap but no eligible node remains.");
+
+    // Pick new central node from eligible nodes.
+    return eligible[random.NextInt(eligible.Count)];
   }
 
   /// <summary>

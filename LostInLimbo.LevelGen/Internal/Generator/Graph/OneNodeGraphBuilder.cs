@@ -16,15 +16,13 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 /// </remarks>
 internal sealed class OneNodeGraphBuilder : AGraphBuilder
 {
-  /// <summary>Salt for the single node identifier.</summary>
-  private const long SaltNode = 0x6E6F6465; // "node"
-
   /// <summary>Relative size of the single node; baseline against which other nodes are compared.</summary>
   private const int NodeRelSize = 1;
 
+  /// <summary>Salt for the single node identifier.</summary>
+  private const long SaltNode = 0x6E6F6465; // "node"
   /// <summary>Salt for the start POI identifier.</summary>
   private const long SaltStartPoi = 0x7374617274; // "start"
-
   /// <summary>Salt for the exit POI identifier.</summary>
   private const long SaltExitPoi = 0x65786974; // "exit"
 
