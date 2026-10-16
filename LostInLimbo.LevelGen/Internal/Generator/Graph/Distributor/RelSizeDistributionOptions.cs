@@ -118,14 +118,12 @@ internal sealed record RelSizeDistributionOptions
     var raw = ComputeRawStepValues();
     for (var i = 0; i < raw.Length; i++)
     {
-      // Rejects both non-finite results (overflow) and values that rounding would push
-      // out of Int32 range.
+      // Rejects both non-finite results (overflow) and values that rounding would push out of Int32 range.
       if (!float.IsFinite(raw[i]) || raw[i] > MaxStepValue)
         throw new ArgumentOutOfRangeException(nameof(Growth), Growth, "Growth produces step values outside the Int32 range.");
     }
 
-    // Rounding can collapse or reverse nearby values, so strictly increasing is checked
-    // on the final integers, not the raw floats.
+    // Rounding can collapse or reverse nearby values, so strictly increasing is checked on the final integers, not the raw floats.
     var values = ComputeStepValues();
     for (var i = 1; i < values.Length; i++)
     {

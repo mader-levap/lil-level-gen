@@ -20,6 +20,69 @@ internal static class GraphTestSupport
   /// <summary>Default graph sub-seed used by tests unless a test needs another one.</summary>
   public const long DefaultSeedGraph = 42;
 
+  /// <summary>Relative size used by hand-built test nodes; only satisfies <see cref="LilNode.RelSize"/>.</summary>
+  public const int DefaultNodeRelSize = 1;
+
+  //
+  // Graph construction
+  //
+
+  /// <summary>
+  /// Derives a stable, readable test identifier from a small integer.
+  /// </summary>
+  /// <remarks>Produces <c>00000000-0000-0000-0000-000000000042</c> for <paramref name="value"/> 42,
+  /// so hand-built graphs stay readable in failure messages.</remarks>
+  /// <param name="value">Small integer encoding the identifier's identity.</param>
+  /// <returns>A deterministic identifier derived from <paramref name="value"/>.</returns>
+  public static Guid Id(int value) => Guid.Parse($"00000000-0000-0000-0000-{value:D12}");
+
+  /// <summary>Creates a node with the given identifier and POIs.</summary>
+  /// <param name="id">Small integer identifier of the node.</param>
+  /// <param name="pois">POIs contained in the node; none when omitted.</param>
+  /// <returns>A node with <see cref="DefaultNodeRelSize"/> relative size.</returns>
+  public static LilNode Node(int id, params LilPoi[] pois) => new()
+  {
+    Id = Id(id),
+    RelSize = DefaultNodeRelSize,
+    Pois = [.. pois],
+  };
+
+  /// <summary>Creates a POI with the given identifier and type.</summary>
+  /// <param name="id">Small integer identifier of the POI.</param>
+  /// <param name="type">Type of the POI.</param>
+  /// <returns>A POI without a name.</returns>
+  public static LilPoi Poi(int id, EnPoiType type) => new() { Id = Id(id), Type = type };
+
+  /// <summary>Creates an edge; defaults to an open bidirectional passage.</summary>
+  /// <param name="id">Small integer identifier of the edge.</param>
+  /// <param name="from">Small integer identifier of the source node.</param>
+  /// <param name="to">Small integer identifier of the destination node.</param>
+  /// <param name="direction">Passage direction; open bidirectional unless set otherwise.</param>
+  /// <param name="conditions">Passage requirements; open passage when null or empty.</param>
+  /// <returns>An edge with the given shape.</returns>
+  public static LilEdge Edge(
+    int id,
+    int from,
+    int to,
+    EnPassageDirection direction = EnPassageDirection.Bidirectional,
+    LilCondition[]? conditions = null) => new()
+  {
+    Id = Id(id),
+    From = Id(from),
+    To = Id(to),
+    Direction = direction,
+    Conditions = conditions is null ? new List<LilCondition>() : [.. conditions],
+  };
+
+  /// <summary>Creates a solution requirement pointing at the given POI.</summary>
+  /// <param name="poiId">Small integer identifier of the required POI.</param>
+  /// <returns>A condition of type <see cref="EnConditionType.RequiresSolution"/>.</returns>
+  public static LilCondition Requires(int poiId) => new()
+  {
+    Type = EnConditionType.RequiresSolution,
+    RequiresPoi = Id(poiId),
+  };
+
   //
   // Build runner
   //
