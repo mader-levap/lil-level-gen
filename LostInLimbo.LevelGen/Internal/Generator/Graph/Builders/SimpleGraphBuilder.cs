@@ -19,26 +19,21 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <list type="bullet">
 /// <item>Node count follows <c>CnfGraph.Size</c>.</item>
 /// <item><c>CnfGraph.Connectivity</c> is the amount of relationships above the minimum
-/// (the spanning structure); it is stretched down silently if the degree cap makes the full
-/// amount unreachable.</item>
-/// <item>Complexity is ignored (no obstacles, conditions always empty).</item>
+/// (the spanning structure). Builder can ignore excess Connectivity if it cannot make more
+/// relationships.</item>
+/// <item><c>CnfGraph.Complexity</c> is ignored (no obstacles, conditions always empty).</item>
 /// </list>
-/// <para>
-/// All configuration values are soft constraints: the builder never fails, it only shrinks
-/// what it cannot satisfy (see <see cref="AGraphBuilder"/>).
-/// </para>
-/// <para>The graph is built in four passes: </para>
+/// <para>The graph is built in four passes:</para>
 /// <list type="bullet">
 /// <item>A minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
-/// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxDegree"/>.</item>
 /// <item>Start and exit POIs in two random nodes (the same node is allowed).</item>
+/// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxDegree"/>.</item>
 /// <item>Relative sizes distributed over the finished nodes via <see cref="RelSizeDistributor"/>.</item>
 /// </list>
-/// <para>Output is fully deterministic for the same <c>PrepData.SeedGraph</c> and config.</para>
 /// </remarks>
 internal sealed class SimpleGraphBuilder : AGraphBuilder
 {
-  /// <summary>Maximum amount of relationships a node may gain in the random-relationships phase (inclusive).</summary>
+  /// <summary>Maximum amount of relationships a node may gain in the extra-relationships phase (inclusive).</summary>
   internal const int MaxDegree = 4;
   /// <summary>
   /// Maximum amount of relationships a node may gain in the skeleton phase (inclusive). A
@@ -81,19 +76,18 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   }
 
   /// <inheritdoc/>
-  public override bool Build()
+  protected override bool Build()
   {
     var size = Config.Graph.Size;
     var connectivity = Config.Graph.Connectivity;
-    var random = new SeededRandom(PrepData.SeedGraph);
 
     var nodeIds = CreateNodes(size);
     var degrees = new int[size];
     var adjacency = new bool[size, size];
 
-    CreateSkeleton(random, size, nodeIds, degrees, adjacency);
-    AddExtraRelationships(random, connectivity, degrees, adjacency, nodeIds);
-    PlacePois(random);
+    CreateSkeleton(size, nodeIds, degrees, adjacency);
+    PlacePois();
+    AddExtraRelationships(connectivity, degrees, adjacency, nodeIds);
     RelSizeDistributor.Distribute(Graph, RelSizeDistributionOptions.Default, PrepData.SeedGraph);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
@@ -127,23 +121,21 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   /// <see cref="MaxDegreeStar"/>, a new central takes over so no node exceeds the skeleton
   /// cap. Uses exactly <c>size - 1</c> relationships - the minimum for a connected graph.
   /// </summary>
-  /// <param name="random">Seeded generator driving scenario selection and central handover.</param>
   /// <param name="size">Total amount of nodes, from <c>CnfGraph.Size</c>.</param>
   /// <param name="nodeIds">Node identifiers in index order.</param>
   /// <param name="degrees">Per-node relationship count, updated in place.</param>
   /// <param name="adjacency">Per-node-pair adjacency flags, updated in place.</param>
   private void CreateSkeleton(
-    SeededRandom random,
     int size,
     Guid[] nodeIds,
     int[] degrees,
     bool[,] adjacency)
   {
-    var scenario = PickScenario(random, size);
+    var scenario = PickScenario(size);
     var linearCount = scenario switch
     {
       EnSkeletonScenario.Star => 1,
-      EnSkeletonScenario.Mixed => random.NextInt(2, size), // [2, size - 1]; size >= 3 checked in PickScenario
+      EnSkeletonScenario.Mixed => Random.NextInt(2, size), // [2, size - 1]; size >= 3 checked in PickScenario
       _ => size,
     };
 
@@ -155,10 +147,10 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
     // as the current one is full, so the skeleton never exceeds its degree cap.
     if (linearCount < size)
     {
-      var central = PickCentral(random, linearCount);
+      var central = PickCentral(linearCount);
       for (var i = linearCount; i < size; i++)
       {
-        if (degrees[central] >= MaxDegreeStar) central = PickNextCentral(random, degrees);
+        if (degrees[central] >= MaxDegreeStar) central = PickNextCentral(degrees);
         AddEdge(central, i, nodeIds, degrees, adjacency);
       }
     }
@@ -168,28 +160,26 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   /// Rolls the skeleton scenario with equal chance each. Mixed degenerates to a chain when
   /// there are too few nodes to tell the scenarios apart.
   /// </summary>
-  /// <param name="random">Seeded generator providing the roll.</param>
   /// <param name="size">Total amount of nodes, from <c>CnfGraph.Size</c>.</param>
   /// <returns>The scenario to build the skeleton from. Deterministic for the same generator state.</returns>
-  private static EnSkeletonScenario PickScenario(SeededRandom random, int size)
+  private EnSkeletonScenario PickScenario(int size)
   {
     if (size < ScenarioSize) return EnSkeletonScenario.Linear;
-    var roll = random.NextInt(3);
+    var roll = Random.NextInt(3);
     return (EnSkeletonScenario)roll;
   }
 
   /// <summary>
   /// Picks the initial node of the linear prefix that the remaining nodes attach to.
   /// </summary>
-  /// <param name="random">Seeded generator.</param>
   /// <param name="linearCount">Length of the linear prefix; at least 1.</param>
   /// <returns>
   /// Any node of the prefix, chosen uniformly - including the first and the last node;
   /// the only node when the prefix is a single node.
   /// </returns>
-  private static int PickCentral(SeededRandom random, int linearCount)
+  private int PickCentral(int linearCount)
   {
-    return random.NextInt(linearCount);
+    return Random.NextInt(linearCount);
   }
 
   /// <summary>
@@ -203,13 +193,12 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   /// attached part is a tree with n nodes, its degree sum is 2(n - 1), and that sum can
   /// never cover all n nodes at a cap of at least two.
   /// </remarks>
-  /// <param name="random">Seeded generator.</param>
   /// <param name="degrees">Per-node relationship count.</param>
   /// <returns>Index of the chosen central node.</returns>
   /// <exception cref="InvalidOperationException">
   /// No eligible node remains; unreachable as long as <see cref="MaxDegreeStar"/> is at least two.
   /// </exception>
-  private static int PickNextCentral(SeededRandom random, int[] degrees)
+  private int PickNextCentral(int[] degrees)
   {
     // Find all eligible nodes.
     var eligible = new List<int>();
@@ -222,7 +211,7 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
       throw new InvalidOperationException("Skeleton central reached its cap but no eligible node remains.");
 
     // Pick new central node from eligible nodes.
-    return eligible[random.NextInt(eligible.Count)];
+    return eligible[Random.NextInt(eligible.Count)];
   }
 
   /// <summary>
@@ -235,13 +224,11 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   /// silently when no eligible pair remains - connectivity is a soft constraint.
   /// No self-loops or duplicate pairs can occur by construction.
   /// </remarks>
-  /// <param name="random">Seeded generator driving the candidate shuffle.</param>
   /// <param name="connectivity">Requested amount of extra relationships, from <c>CnfGraph.Connectivity</c>.</param>
   /// <param name="degrees">Per-node relationship count, updated in place.</param>
   /// <param name="adjacency">Per-node-pair adjacency flags, updated in place.</param>
   /// <param name="nodeIds">Node identifiers in index order.</param>
   private void AddExtraRelationships(
-    SeededRandom random,
     int connectivity,
     int[] degrees,
     bool[,] adjacency,
@@ -259,7 +246,7 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
       }
     }
 
-    random.Shuffle(candidates);
+    Random.Shuffle(candidates);
 
     var added = 0;
     foreach (var (from, to) in candidates)
@@ -275,11 +262,10 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   /// <summary>
   /// Places the start and exit POIs into two random nodes; both may be the same node.
   /// </summary>
-  /// <param name="random">Seeded generator picking the node indices.</param>
-  private void PlacePois(SeededRandom random)
+  private void PlacePois()
   {
-    var startIndex = random.NextInt(Graph.Nodes.Count);
-    var exitIndex = random.NextInt(Graph.Nodes.Count);
+    var startIndex = Random.NextInt(Graph.Nodes.Count);
+    var exitIndex = Random.NextInt(Graph.Nodes.Count);
 
     // Nodes were added in index order by CreateNodes, so index lookup is exact.
     Graph.Nodes[startIndex].Pois.Add(new LilPoi

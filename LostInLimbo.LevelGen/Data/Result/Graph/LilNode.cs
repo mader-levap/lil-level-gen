@@ -9,7 +9,8 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// <remarks>
 /// <para>
 /// Nodes represent places. Note "places" is deliberately vague; it can be a small 1x1 room
-/// or multiple wide areas. Player has access to everything within given place.
+/// or multiple large areas. It is all up to map generator and config specific for map.
+/// Player has access to everything within given place.
 /// </para>
 /// <para>
 /// Immutable once created and added to <see cref="LilGraph.Nodes"/>. Invariant (documented,

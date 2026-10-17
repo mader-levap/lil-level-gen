@@ -114,8 +114,7 @@ internal static class GraphTestSupport
     var graph = new LilGraph();
 
     // Act: Hand over the inputs, then build.
-    graphBuilder.Setup(config, prepData, graph);
-    var success = graphBuilder.Build();
+    var success = graphBuilder.Run(config, prepData, graph);
 
     // Assert-adjacent: Outcome and shape assertions live in the tests.
     return (success, graph);

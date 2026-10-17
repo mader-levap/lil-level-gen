@@ -41,7 +41,6 @@ internal sealed class GraphGenerator
   public bool Execute()
   {
     AGraphBuilder builder = GraphBuilderFactory.Create(_config.Graph.Builder);
-    builder.Setup(_config, _prepData, _world.Graph);
-    return builder.Build();
+    return builder.Run(_config, _prepData, _world.Graph);
   }
 }

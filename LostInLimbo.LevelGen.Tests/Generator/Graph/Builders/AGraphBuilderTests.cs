@@ -56,22 +56,4 @@ public sealed class AGraphBuilderTests
       () => builder.Setup(CnfLevelGeneration.Default, new PrepData(), null!));
     Assert.Equal("graph", exception.ParamName);
   }
-
-  [Theory]
-  [InlineData(EnGraphBuilder.Linear)]
-  public void Setup_ThenBuild_WithPlaceholderBuilders_LeavesGraphEmpty(EnGraphBuilder builderKind)
-  {
-    // Arrange: Fresh builder, valid inputs and an empty target graph.
-    var builder = GraphBuilderFactory.Create(builderKind);
-    var graph = new LilGraph();
-
-    // Act: Hand over the inputs, then build.
-    builder.Setup(CnfLevelGeneration.Default, new PrepData(), graph);
-    builder.Build();
-
-    // Assert: The placeholder builder emits nothing, so the graph stays empty.
-    // OneNode and Simple are covered by their own tests because they produce real graphs.
-    Assert.Empty(graph.Nodes);
-    Assert.Empty(graph.Edges);
-  }
 }

@@ -27,7 +27,7 @@ internal sealed class OneNodeGraphBuilder : AGraphBuilder
   private const long SaltExitPoi = 0x65786974; // "exit"
 
   /// <inheritdoc/>
-  public override bool Build()
+  protected override bool Build()
   {
     // Identifiers are derived from the graph sub-seed; deterministic, no RNG.
     var nodeId = IdDerivation.Derive(PrepData.SeedGraph, SaltNode);
