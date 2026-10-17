@@ -1,9 +1,9 @@
 using System;
 
-namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
+namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 
 /// <summary>
-/// Parameters of <see cref="RelSizeDistributor"/>: how many relative-size steps exist,
+/// Parameters of <see cref="NodeRelSizer"/>: how many relative-size steps exist,
 /// how their values progress, how strongly one step dominates the base distribution and
 /// how strongly relationships and POIs push nodes toward larger steps.
 /// </summary>
@@ -20,13 +20,13 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
 /// off. <see cref="Growth"/> is only relevant when <see cref="Steps"/> is greater than 1.
 /// </para>
 /// </remarks>
-internal sealed record RelSizeDistributionOptions
+internal sealed record NodeRelSizerOptions
 {
   /// <summary>
   /// Default instance used by builders that do not pass custom options: three geometric
   /// steps (1, 2, 4), mild skew and mild bias toward well-connected POI carriers.
   /// </summary>
-  public static RelSizeDistributionOptions Default { get; } = new()
+  public static NodeRelSizerOptions Default { get; } = new()
   {
     Steps = 3,
     Skew = 0.3f,

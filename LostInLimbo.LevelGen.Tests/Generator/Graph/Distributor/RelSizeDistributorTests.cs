@@ -1,11 +1,11 @@
 using LostInLimbo.LevelGen.Data.Result.Graph;
-using LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestSupport;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Distributor;
 
 /// <summary>
-/// Tests <see cref="RelSizeDistributor"/>: option validation, step assignment rules,
+/// Tests <see cref="NodeRelSizer"/>: option validation, step assignment rules,
 /// relationship/POI bias behavior and determinism of the assignment.
 /// </summary>
 /// <remarks>
@@ -27,11 +27,11 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithStepsBelowOne_ThrowsArgumentOutOfRangeException(int steps)
     {
       // Arrange: Options demanding a forbidden step count.
-      var options = RelSizeDistributionOptions.Default with { Steps = steps };
+      var options = NodeRelSizerOptions.Default with { Steps = steps };
 
       // Act & Assert: The distributor rejects the options before touching the graph.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("Steps", exception.ParamName);
     }
 
@@ -42,11 +42,11 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithSkewOutOfRange_ThrowsArgumentOutOfRangeException(float skew)
     {
       // Arrange: Options with a skew outside [0, 1] (NaN included).
-      var options = RelSizeDistributionOptions.Default with { Skew = skew };
+      var options = NodeRelSizerOptions.Default with { Skew = skew };
 
       // Act & Assert: Skew is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("Skew", exception.ParamName);
     }
 
@@ -56,11 +56,11 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithMinSizeBelowOne_ThrowsArgumentOutOfRangeException(int minSize)
     {
       // Arrange: Options asking for an impossible smallest size.
-      var options = RelSizeDistributionOptions.Default with { MinSize = minSize };
+      var options = NodeRelSizerOptions.Default with { MinSize = minSize };
 
       // Act & Assert: MinSize is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("MinSize", exception.ParamName);
     }
 
@@ -71,11 +71,11 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithInvalidRelationshipBias_ThrowsArgumentOutOfRangeException(float bias)
     {
       // Arrange: Options with a negative or non-finite relationship bias.
-      var options = RelSizeDistributionOptions.Default with { BiasRelationships = bias };
+      var options = NodeRelSizerOptions.Default with { BiasRelationships = bias };
 
       // Act & Assert: The relationship bias is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("BiasRelationships", exception.ParamName);
     }
 
@@ -86,11 +86,11 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithInvalidPoiBias_ThrowsArgumentOutOfRangeException(float bias)
     {
       // Arrange: Options with a negative or non-finite POI bias.
-      var options = RelSizeDistributionOptions.Default with { BiasPois = bias };
+      var options = NodeRelSizerOptions.Default with { BiasPois = bias };
 
       // Act & Assert: The POI bias is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("BiasPois", exception.ParamName);
     }
 
@@ -98,7 +98,7 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithSingleStepAndRelationshipBias_ThrowsArgumentException()
     {
       // Arrange: One step value forbids variation while the bias demands it.
-      var options = RelSizeDistributionOptions.Default with
+      var options = NodeRelSizerOptions.Default with
       {
         Steps = 1,
         BiasRelationships = 0.5f,
@@ -106,7 +106,7 @@ public sealed class RelSizeDistributorTests
 
       // Act & Assert: The contradiction is reported as an argument error.
       var exception = Assert.Throws<ArgumentException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("Steps", exception.ParamName);
     }
 
@@ -114,7 +114,7 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithSingleStepAndPoiBias_ThrowsArgumentException()
     {
       // Arrange: One step value forbids variation while the POI bias demands it.
-      var options = RelSizeDistributionOptions.Default with
+      var options = NodeRelSizerOptions.Default with
       {
         Steps = 1,
         BiasRelationships = 0f,
@@ -123,7 +123,7 @@ public sealed class RelSizeDistributorTests
 
       // Act & Assert: The contradiction is reported as an argument error.
       var exception = Assert.Throws<ArgumentException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("Steps", exception.ParamName);
     }
 
@@ -131,11 +131,11 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithUndefinedCurve_ThrowsArgumentOutOfRangeException()
     {
       // Arrange: Options with a curve value outside the enum.
-      var options = RelSizeDistributionOptions.Default with { Curve = (EnRelSizeCurve)42 };
+      var options = NodeRelSizerOptions.Default with { Curve = (EnRelSizeCurve)42 };
 
       // Act & Assert: The unknown curve is rejected.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("Curve", exception.ParamName);
     }
 
@@ -146,7 +146,7 @@ public sealed class RelSizeDistributorTests
     {
       // Arrange: Linear options whose growth cannot separate the steps (0 keeps them
       // equal, negative reverses them).
-      var options = RelSizeDistributionOptions.Default with
+      var options = NodeRelSizerOptions.Default with
       {
         Curve = EnRelSizeCurve.Linear,
         Growth = growth,
@@ -154,7 +154,7 @@ public sealed class RelSizeDistributorTests
 
       // Act & Assert: The collapsed step values are rejected as a contradiction.
       var exception = Assert.Throws<ArgumentException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("Growth", exception.ParamName);
     }
 
@@ -165,11 +165,11 @@ public sealed class RelSizeDistributorTests
     {
       // Arrange: Geometric options whose growth cannot separate the steps (1 keeps them
       // equal, below 1 shrinks them).
-      var options = RelSizeDistributionOptions.Default with { Growth = growth };
+      var options = NodeRelSizerOptions.Default with { Growth = growth };
 
       // Act & Assert: The collapsed step values are rejected as a contradiction.
       var exception = Assert.Throws<ArgumentException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("Growth", exception.ParamName);
     }
 
@@ -180,11 +180,11 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithNonFiniteOrOverflowingGrowth_ThrowsArgumentOutOfRangeException(float growth)
     {
       // Arrange: Growth that either is not finite or pushes step values out of Int32 range.
-      var options = RelSizeDistributionOptions.Default with { Growth = growth };
+      var options = NodeRelSizerOptions.Default with { Growth = growth };
 
       // Act & Assert: Growth is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("Growth", exception.ParamName);
     }
 
@@ -192,11 +192,11 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithTooManySteps_ThrowsArgumentOutOfRangeException()
     {
       // Arrange: Sixty geometric doublings reach 2^59, far beyond Int32.
-      var options = RelSizeDistributionOptions.Default with { Steps = 60 };
+      var options = NodeRelSizerOptions.Default with { Steps = 60 };
 
       // Act & Assert: The overflowing step values are rejected.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => RelSizeDistributor.Distribute(CreateChainGraph(4), options, Seed));
+        () => NodeRelSizer.Execute(CreateChainGraph(4), options, Seed));
       Assert.Equal("Growth", exception.ParamName);
     }
 
@@ -205,11 +205,11 @@ public sealed class RelSizeDistributorTests
     {
       // Arrange: Empty graph, so only validation can produce an error here.
       var graph = new LilGraph();
-      var options = RelSizeDistributionOptions.Default with { Steps = 0 };
+      var options = NodeRelSizerOptions.Default with { Steps = 0 };
 
       // Act & Assert: Options are validated before the early exit for empty graphs.
       Assert.Throws<ArgumentOutOfRangeException>(
-        () => RelSizeDistributor.Distribute(graph, options, Seed));
+        () => NodeRelSizer.Execute(graph, options, Seed));
     }
   }
 
@@ -220,7 +220,7 @@ public sealed class RelSizeDistributorTests
     public void BuildStepValues_WithDefaults_ReturnsGeometricSteps()
     {
       // Act: Build the step values of the default options.
-      var values = RelSizeDistributionOptions.Default.BuildStepValues();
+      var values = NodeRelSizerOptions.Default.BuildStepValues();
 
       // Assert: Three doublings from 1: 1, 2, 4.
       Assert.Equal(new[] { 1, 2, 4 }, values);
@@ -230,7 +230,7 @@ public sealed class RelSizeDistributorTests
     public void BuildStepValues_WithLinearCurve_AppearsAdditively()
     {
       // Arrange: Four linear steps from 2 with an increment of 3.
-      var options = RelSizeDistributionOptions.Default with
+      var options = NodeRelSizerOptions.Default with
       {
         Steps = 4,
         Curve = EnRelSizeCurve.Linear,
@@ -249,11 +249,11 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithSingleStep_AssignsMinSizeToEveryNode()
     {
       // Arrange: One allowed step value - the only configuration without variation.
-      var options = new RelSizeDistributionOptions { Steps = 1, MinSize = 5 };
+      var options = new NodeRelSizerOptions { Steps = 1, MinSize = 5 };
       var graph = CreateChainGraph(10);
 
       // Act: Distribute with a bias-free single-step setup.
-      RelSizeDistributor.Distribute(graph, options, Seed);
+      NodeRelSizer.Execute(graph, options, Seed);
 
       // Assert: Every node uses the single step value, whatever the seed rolled.
       Assert.All(graph.Nodes, node => Assert.Equal(5, node.RelSize));
@@ -263,7 +263,7 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithFullSkewAndNoBias_AssignsOneSharedValue()
     {
       // Arrange: All probability mass sits on the dominant step and no bias tilts away.
-      var options = RelSizeDistributionOptions.Default with
+      var options = NodeRelSizerOptions.Default with
       {
         Skew = 1f,
         BiasRelationships = 0f,
@@ -274,7 +274,7 @@ public sealed class RelSizeDistributorTests
       for (var seed = 0; seed < 10; seed++)
       {
         var graph = CreateStarGraph(15);
-        RelSizeDistributor.Distribute(graph, options, seed);
+        NodeRelSizer.Execute(graph, options, seed);
         Assert.Single(graph.Nodes.Select(node => node.RelSize).Distinct());
       }
     }
@@ -287,13 +287,13 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithDefaults_UsesOnlyStepValues(int nodeCount)
     {
       // Arrange: The default options define the set of allowed values.
-      var expected = RelSizeDistributionOptions.Default.BuildStepValues();
+      var expected = NodeRelSizerOptions.Default.BuildStepValues();
 
       // Act & Assert: Across many seeds only step values are ever assigned.
       for (var seed = 0; seed < 20; seed++)
       {
         var graph = CreateChainGraph(nodeCount);
-        RelSizeDistributor.Distribute(graph, RelSizeDistributionOptions.Default, seed);
+        NodeRelSizer.Execute(graph, NodeRelSizerOptions.Default, seed);
         Assert.All(graph.Nodes, node => Assert.Contains(node.RelSize, expected));
       }
     }
@@ -302,7 +302,7 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithZeroSkew_OverSeeds_ObservesEveryStepValue()
     {
       // Arrange: Flat base distribution without any bias to starve the extremes.
-      var options = RelSizeDistributionOptions.Default with
+      var options = NodeRelSizerOptions.Default with
       {
         Skew = 0f,
         BiasRelationships = 0f,
@@ -315,7 +315,7 @@ public sealed class RelSizeDistributorTests
       for (var seed = 0; seed < 20; seed++)
       {
         var graph = CreateChainGraph(30);
-        RelSizeDistributor.Distribute(graph, options, seed);
+        NodeRelSizer.Execute(graph, options, seed);
         foreach (var node in graph.Nodes)
         {
           seen.Add(node.RelSize);
@@ -334,7 +334,7 @@ public sealed class RelSizeDistributorTests
       for (var seed = 0; seed < 10; seed++)
       {
         var graph = CreateStarGraph(20);
-        RelSizeDistributor.Distribute(graph, RelSizeDistributionOptions.Default, seed);
+        NodeRelSizer.Execute(graph, NodeRelSizerOptions.Default, seed);
         if (graph.Nodes.Select(node => node.RelSize).Distinct().Count() > 1) varyingGraphs++;
       }
 
@@ -350,7 +350,7 @@ public sealed class RelSizeDistributorTests
       var graph = new LilGraph();
 
       // Act: Distribute over the empty graph.
-      RelSizeDistributor.Distribute(graph, RelSizeDistributionOptions.Default, Seed);
+      NodeRelSizer.Execute(graph, NodeRelSizerOptions.Default, Seed);
 
       // Assert: Nothing appeared out of nowhere.
       Assert.Empty(graph.Nodes);
@@ -368,7 +368,7 @@ public sealed class RelSizeDistributorTests
     {
       // Arrange: Star graph - one hub with the maximum degree, many leaves, no POIs, so
       // only the relationship bias can act.
-      var options = RelSizeDistributionOptions.Default with
+      var options = NodeRelSizerOptions.Default with
       {
         Skew = 0f,
         BiasRelationships = 1f,
@@ -382,7 +382,7 @@ public sealed class RelSizeDistributorTests
       for (var seed = 0; seed < 100; seed++)
       {
         var graph = CreateStarGraph(12);
-        RelSizeDistributor.Distribute(graph, options, seed);
+        NodeRelSizer.Execute(graph, options, seed);
         hubTotal += graph.Nodes[0].RelSize;
         for (var i = 1; i < graph.Nodes.Count; i++)
         {
@@ -402,7 +402,7 @@ public sealed class RelSizeDistributorTests
     {
       // Arrange: Star graph with a single POI on the hub; relationship bias off, so
       // only the POI bias can act.
-      var options = RelSizeDistributionOptions.Default with
+      var options = NodeRelSizerOptions.Default with
       {
         Skew = 0f,
         BiasRelationships = 0f,
@@ -416,7 +416,7 @@ public sealed class RelSizeDistributorTests
       for (var seed = 0; seed < 100; seed++)
       {
         var graph = CreateStarGraph(12, poiNodeIndex: 0, poiCount: 1);
-        RelSizeDistributor.Distribute(graph, options, seed);
+        NodeRelSizer.Execute(graph, options, seed);
         poiTotal += graph.Nodes[0].RelSize;
         for (var i = 1; i < graph.Nodes.Count; i++)
         {
@@ -436,7 +436,7 @@ public sealed class RelSizeDistributorTests
     {
       // Arrange: Two POIs on the first node, one on the second, none elsewhere; only two
       // steps, so the comparison is a simple bigger/smaller likelihood.
-      var options = RelSizeDistributionOptions.Default with
+      var options = NodeRelSizerOptions.Default with
       {
         Steps = 2,
         Skew = 0f,
@@ -453,7 +453,7 @@ public sealed class RelSizeDistributorTests
         graph.Nodes[0].Pois.Add(CreatePoi(0, 0));
         graph.Nodes[0].Pois.Add(CreatePoi(0, 1));
         graph.Nodes[1].Pois.Add(CreatePoi(1, 0));
-        RelSizeDistributor.Distribute(graph, options, seed);
+        NodeRelSizer.Execute(graph, options, seed);
         doublePoiTotal += graph.Nodes[0].RelSize;
         singlePoiTotal += graph.Nodes[1].RelSize;
       }
@@ -468,7 +468,7 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithBias_StillAllowsAnyNodeAnySize()
     {
       // Arrange: Strong POI bias on one node of the graph.
-      var options = RelSizeDistributionOptions.Default with
+      var options = NodeRelSizerOptions.Default with
       {
         Skew = 0f,
         BiasRelationships = 0f,
@@ -482,7 +482,7 @@ public sealed class RelSizeDistributorTests
       for (var seed = 0; seed < 50; seed++)
       {
         var graph = CreateStarGraph(10, poiNodeIndex: 0, poiCount: 1);
-        RelSizeDistributor.Distribute(graph, options, seed);
+        NodeRelSizer.Execute(graph, options, seed);
         if (graph.Nodes[0].RelSize == stepValues[0]) sawSmallPoiNode = true;
         for (var i = 1; i < graph.Nodes.Count; i++)
         {
@@ -499,7 +499,7 @@ public sealed class RelSizeDistributorTests
     public void Distribute_WithEqualPoiCounts_BiasChangesNothing()
     {
       // Arrange: No POIs anywhere, so the POI normalization has nothing to distinguish.
-      var biased = RelSizeDistributionOptions.Default with
+      var biased = NodeRelSizerOptions.Default with
       {
         Skew = 0.4f,
         BiasRelationships = 0f,
@@ -512,8 +512,8 @@ public sealed class RelSizeDistributorTests
       {
         var biasedGraph = CreateChainGraph(10);
         var plainGraph = CreateChainGraph(10);
-        RelSizeDistributor.Distribute(biasedGraph, biased, seed);
-        RelSizeDistributor.Distribute(plainGraph, plain, seed);
+        NodeRelSizer.Execute(biasedGraph, biased, seed);
+        NodeRelSizer.Execute(plainGraph, plain, seed);
         Assert.Equal(GetAssignments(biasedGraph), GetAssignments(plainGraph));
       }
     }
@@ -523,7 +523,7 @@ public sealed class RelSizeDistributorTests
     {
       // Arrange: Cycle graph - every node has the same degree, so relationship
       // normalization has nothing to distinguish.
-      var biased = RelSizeDistributionOptions.Default with
+      var biased = NodeRelSizerOptions.Default with
       {
         Skew = 0.4f,
         BiasRelationships = 1f,
@@ -536,8 +536,8 @@ public sealed class RelSizeDistributorTests
       {
         var biasedGraph = CreateCycleGraph(10);
         var plainGraph = CreateCycleGraph(10);
-        RelSizeDistributor.Distribute(biasedGraph, biased, seed);
-        RelSizeDistributor.Distribute(plainGraph, plain, seed);
+        NodeRelSizer.Execute(biasedGraph, biased, seed);
+        NodeRelSizer.Execute(plainGraph, plain, seed);
         Assert.Equal(GetAssignments(biasedGraph), GetAssignments(plainGraph));
       }
     }
@@ -554,8 +554,8 @@ public sealed class RelSizeDistributorTests
       var second = CreateStarGraph(12, poiNodeIndex: 3, poiCount: 2);
 
       // Act: Distribute both with the same seed.
-      RelSizeDistributor.Distribute(first, RelSizeDistributionOptions.Default, Seed);
-      RelSizeDistributor.Distribute(second, RelSizeDistributionOptions.Default, Seed);
+      NodeRelSizer.Execute(first, NodeRelSizerOptions.Default, Seed);
+      NodeRelSizer.Execute(second, NodeRelSizerOptions.Default, Seed);
 
       // Assert: Same identifiers with the same sizes, in any comparison order.
       GraphTestSupport.AssertEqualGraphs(first, second);
@@ -570,8 +570,8 @@ public sealed class RelSizeDistributorTests
       var second = CreateStarGraph(30);
 
       // Act: Distribute both graphs.
-      RelSizeDistributor.Distribute(first, RelSizeDistributionOptions.Default, seedGraph: 1);
-      RelSizeDistributor.Distribute(second, RelSizeDistributionOptions.Default, seedGraph: 2);
+      NodeRelSizer.Execute(first, NodeRelSizerOptions.Default, seedGraph: 1);
+      NodeRelSizer.Execute(second, NodeRelSizerOptions.Default, seedGraph: 2);
 
       // Assert: The size sequences differ - the dominant step and draws are seed-driven.
       var firstSizes = first.Nodes.Select(node => node.RelSize).ToList();
@@ -589,8 +589,8 @@ public sealed class RelSizeDistributorTests
       reversed.Edges.Reverse();
 
       // Act: Distribute both with the same seed.
-      RelSizeDistributor.Distribute(original, RelSizeDistributionOptions.Default, Seed);
-      RelSizeDistributor.Distribute(reversed, RelSizeDistributionOptions.Default, Seed);
+      NodeRelSizer.Execute(original, NodeRelSizerOptions.Default, Seed);
+      NodeRelSizer.Execute(reversed, NodeRelSizerOptions.Default, Seed);
 
       // Assert: Every identifier keeps the size it got regardless of list order.
       Assert.Equal(GetAssignments(original), GetAssignments(reversed));
@@ -609,7 +609,7 @@ public sealed class RelSizeDistributorTests
         .ToList();
 
       // Act: Distribute.
-      RelSizeDistributor.Distribute(graph, RelSizeDistributionOptions.Default, Seed);
+      NodeRelSizer.Execute(graph, NodeRelSizerOptions.Default, Seed);
 
       // Assert: Node order, edges and POIs are untouched; only sizes were rewritten.
       Assert.Equal(nodeIdsBefore, graph.Nodes.Select(node => node.Id).ToList());
@@ -622,11 +622,11 @@ public sealed class RelSizeDistributorTests
     {
       // Arrange: One graph distributed once.
       var graph = CreateStarGraph(12, poiNodeIndex: 4, poiCount: 1);
-      RelSizeDistributor.Distribute(graph, RelSizeDistributionOptions.Default, Seed);
+      NodeRelSizer.Execute(graph, NodeRelSizerOptions.Default, Seed);
       var firstRun = GetAssignments(graph);
 
       // Act: Distribute the very same graph again with the same inputs.
-      RelSizeDistributor.Distribute(graph, RelSizeDistributionOptions.Default, Seed);
+      NodeRelSizer.Execute(graph, NodeRelSizerOptions.Default, Seed);
 
       // Assert: Sizes do not feed back into the draws, so the second run is a no-op.
       Assert.Equal(firstRun, GetAssignments(graph));

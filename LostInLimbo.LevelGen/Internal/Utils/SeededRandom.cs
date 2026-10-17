@@ -37,6 +37,8 @@ internal sealed class SeededRandom
     _state = unchecked((ulong)seed);
   }
 
+  //
+
   /// <summary>
   /// Produces the next raw 64-bit value of the sequence.
   /// </summary>
@@ -89,6 +91,23 @@ internal sealed class SeededRandom
 
     return minInclusive + NextInt(maxExclusive - minInclusive);
   }
+
+  /// <summary>
+  /// Randomly returns true or false.
+  /// </summary>
+  /// <param name="Chance">Chance for returning true.</param>
+  /// <returns>True or false.</returns>
+  public bool NextBool(float Chance)
+  {
+    Chance = Math.Clamp(Chance, 0.0f, 1.0f);
+    if (Chance == 0.0f) return false;
+    if (Chance == 1.0f) return true;
+
+    // PLACEHOLDER: actually get random chance for true/false
+    return true;
+  }
+
+  //
 
   /// <summary>
   /// Rearranges the list into a uniformly random order using the Fisher-Yates algorithm.

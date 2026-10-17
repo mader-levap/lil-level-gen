@@ -7,12 +7,9 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Many parameters here are soft constraints. Builders are allowed to stretch them a little to minimize
-/// amount of failed builds.
-/// </para>
-/// <para>
-/// Some builders can ignore some configuration variables. Also it is up to builder to interpret
-/// these variables, especially vaguer ones like Connectivity.
+/// Many parameters here are soft constraints. Builders are allowed to reject them to a degree to minimize
+/// amount of failed builds. Also it is up to builder to interpret these variables, especially vaguer ones
+/// like Connectivity.
 /// </para>
 /// </remarks>
 public sealed record CnfGraph
@@ -43,9 +40,7 @@ public sealed record CnfGraph
   public EnGraphBuilder Builder { get; init; } = DefaultBuilder;
 
   /// <summary>
-  /// Size of graph. Usually just number of nodes. Soft cap - builder is allowed to add more nodes
-  /// if small number of nodes makes it impossible to make graph while fulfilling other settings.
-  /// Hard cap is <see cref="MaxSize"/>.
+  /// Size of graph. Usually just number of nodes. Hard cap is <see cref="MaxSize"/>.
   /// </summary>
   public int Size { get; init; } = DefaultSize;
 

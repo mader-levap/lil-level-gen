@@ -48,11 +48,28 @@ internal static class GraphTestSupport
     Pois = [.. pois],
   };
 
+  /// <summary>Creates a node with the given identifier and POIs.</summary>
+  /// <param name="id">Small integer identifier of the node.</param>
+  /// <param name="group">Group where this node belongs.</param>
+  /// <param name="pois">POIs contained in the node; none when omitted.</param>
+  /// <returns>A node with <see cref="DefaultNodeRelSize"/> relative size.</returns>
+  public static LilNode Node(int id, string? group, params LilPoi[] pois) => new()
+  {
+    Id = Id(id),
+    RelSize = DefaultNodeRelSize,
+    Group = group,
+    Pois = [.. pois],
+  };
+
   /// <summary>Creates a POI with the given identifier and type.</summary>
   /// <param name="id">Small integer identifier of the POI.</param>
   /// <param name="type">Type of the POI.</param>
   /// <returns>A POI without a name.</returns>
-  public static LilPoi Poi(int id, EnPoiType type) => new() { Id = Id(id), Type = type };
+  public static LilPoi Poi(int id, EnPoiType type, string? name = null) => new() {
+    Id = Id(id),
+    Type = type,
+    Name = name,
+  };
 
   /// <summary>Creates an edge; defaults to an open bidirectional passage.</summary>
   /// <param name="id">Small integer identifier of the edge.</param>
@@ -78,7 +95,7 @@ internal static class GraphTestSupport
   /// <summary>Creates a solution requirement pointing at the given POI.</summary>
   /// <param name="poiId">Small integer identifier of the required POI.</param>
   /// <returns>A condition of type <see cref="EnConditionType.RequiresSolution"/>.</returns>
-  public static LilCondition Requires(int poiId) => new()
+  public static LilCondition Condition(int poiId) => new()
   {
     Type = EnConditionType.RequiresSolution,
     RequiresPoi = Id(poiId),
@@ -233,6 +250,8 @@ internal static class GraphTestSupport
     }
   }
 
+  //
+
   /// <summary>
   /// Asserts that two builds produced structurally identical graphs, in order.
   /// </summary>
@@ -244,31 +263,87 @@ internal static class GraphTestSupport
   /// </remarks>
   public static void AssertEqualGraphs(LilGraph expected, LilGraph actual)
   {
+    // Assert: Two given graphs are same.
     Assert.Equal(expected.Nodes.Count, actual.Nodes.Count);
     for (var i = 0; i < expected.Nodes.Count; i++)
     {
-      // Assert: Same node identity, relative size and POI contents in the same order.
-      Assert.Equal(expected.Nodes[i].Id, actual.Nodes[i].Id);
-      Assert.Equal(expected.Nodes[i].RelSize, actual.Nodes[i].RelSize);
-      Assert.Equal(expected.Nodes[i].Pois.Count, actual.Nodes[i].Pois.Count);
-      for (var j = 0; j < expected.Nodes[i].Pois.Count; j++)
-      {
-        Assert.Equal(expected.Nodes[i].Pois[j].Id, actual.Nodes[i].Pois[j].Id);
-        Assert.Equal(expected.Nodes[i].Pois[j].Type, actual.Nodes[i].Pois[j].Type);
-      }
+      AssertEqualNode(expected.Nodes[i], actual.Nodes[i]);
     }
 
     Assert.Equal(expected.Edges.Count, actual.Edges.Count);
     for (var i = 0; i < expected.Edges.Count; i++)
     {
-      // Assert: Same edge identity, endpoints, direction and conditions in the same order.
-      Assert.Equal(expected.Edges[i].Id, actual.Edges[i].Id);
-      Assert.Equal(expected.Edges[i].From, actual.Edges[i].From);
-      Assert.Equal(expected.Edges[i].To, actual.Edges[i].To);
-      Assert.Equal(expected.Edges[i].Direction, actual.Edges[i].Direction);
-      Assert.Equal(expected.Edges[i].Conditions, actual.Edges[i].Conditions);
+      AssertEqualEdge(expected.Edges[i], actual.Edges[i]);
     }
   }
+
+  /// <summary>
+  /// Asserts two provided nodes are identical.
+  /// </summary>
+  /// <param name="expected">Reference node.</param>
+  /// <param name="actual">Node under test.</param>
+  private static void AssertEqualNode(LilNode expected, LilNode actual)
+  {
+    // Assert: Same node properties and POI contents in the same order.
+    Assert.Equal(expected.Id, actual.Id);
+    Assert.Equal(expected.RelSize, actual.RelSize);
+    Assert.Equal(expected.Group, actual.Group);
+
+    Assert.Equal(expected.Pois.Count, actual.Pois.Count);
+    for (var i = 0; i < expected.Pois.Count; i++)
+    {
+      AssertEqualPoi(expected.Pois[i], actual.Pois[i]);
+    }
+  }
+
+  /// <summary>
+  /// Asserts two provided PoIs are identical.
+  /// </summary>
+  /// <param name="expected">Reference PoI.</param>
+  /// <param name="actual">PoI under test.</param>
+  private static void AssertEqualPoi(LilPoi expected, LilPoi actual)
+  {
+    // Assert: Same PoI properties.
+    Assert.Equal(expected.Id, actual.Id);
+    Assert.Equal(expected.Type, actual.Type);
+    Assert.Equal(expected.Name, actual.Name);
+  }
+
+  /// <summary>
+  /// Asserts two provided relationships are identical.
+  /// </summary>
+  /// <param name="expected">Reference relationship.</param>
+  /// <param name="actual">Relationship under test.</param>
+  private static void AssertEqualEdge(LilEdge expected, LilEdge actual)
+  {
+    // Assert: Same edge properties and conditions in the same order.
+    Assert.Equal(expected.Id, actual.Id);
+    Assert.Equal(expected.From, actual.From);
+    Assert.Equal(expected.To, actual.To);
+    Assert.Equal(expected.Direction, actual.Direction);
+    Assert.Equal(expected.Chokepoint, actual.Chokepoint);
+    Assert.Equal(expected.Secret, actual.Secret);
+
+    Assert.Equal(expected.Conditions.Count, actual.Conditions.Count);
+    for (var i = 0; i < expected.Conditions.Count; i++)
+    {
+      AssertEqualCondition(expected.Conditions[i], actual.Conditions[i]);
+    }  
+  }
+
+  /// <summary>
+  /// Asserts two provided conditions are identical.
+  /// </summary>
+  /// <param name="expected">Reference condition.</param>
+  /// <param name="actual">Condition under test.</param>
+  private static void AssertEqualCondition(LilCondition expected, LilCondition actual)
+  {
+    // Assert: Same condition properties.
+    Assert.Equal(expected.Type, actual.Type);
+    Assert.Equal(expected.RequiresPoi, actual.RequiresPoi);
+  }
+
+  //
 
   /// <summary>
   /// Asserts that the graph passes the beatability simulation - start reaches exit,
@@ -280,6 +355,7 @@ internal static class GraphTestSupport
     var result = new GraphValidator(graph).Validate();
 
     // Assert: The validation reports success; otherwise its reason explains the failure.
-    Assert.True(result.Success, failMsg + "\n" + result.FailureReason);
+    if (failMsg != "") failMsg += "\n";
+    Assert.True(result.Success, failMsg + result.FailureReason);
   }
 }

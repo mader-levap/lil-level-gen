@@ -3,27 +3,26 @@ using System.Collections.Generic;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Utils;
 
-namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
+namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 
 /// <summary>
 /// <para>
-/// Final graph pass that assigns <see cref="LilNode.RelSize"/> to every node. It runs
-/// after nodes, relationships and POIs are known, so relationship and POI counts can bias
-/// the outcome toward larger nodes.
-/// </para>
-/// <para>
-/// Sizes are sampled from a fixed set of step values (see
-/// <see cref="RelSizeDistributionOptions.BuildStepValues"/>): the options decide how many
-/// steps exist, how large they grow, how strongly one step dominates and how hard
-/// relationships and POIs pull nodes upward. Bias only changes likelihood - a large node
-/// without POIs and with a single relationship stays possible, just less likely.
+/// Graph pass that assigns <see cref="LilNode.RelSize"/> to every node. It runs
+/// after nodes, relationships and POIs are known.
 /// </para>
 /// </summary>
 /// <remarks>
 /// <para>
+/// Sizes are sampled from a fixed set of step values (see
+/// <see cref="NodeRelSizerOptions.BuildStepValues"/>): the options decide how many
+/// steps exist, how large they grow, how strongly one step dominates and how hard
+/// relationships and POIs pull nodes upward. Bias only changes likelihood - a large node
+/// without POIs and with a single relationship stays possible, just less likely.
+/// </para>
+/// <para>
 /// Algorithm: roll one dominant step per graph, then visit every node in Id order and
 /// sample its step independently. The base weight mixes a flat share (controlled by
-/// <see cref="RelSizeDistributionOptions.Skew"/>) with the dominant step; a linear tilt
+/// <see cref="NodeRelSizerOptions.Skew"/>) with the dominant step; a linear tilt
 /// proportional to the node's bias score adds weight to higher steps. The bias score sums
 /// the min-max normalized relationship count and POI count of the node - min-max keeps the
 /// bias relative: when all nodes look the same, there is nothing to distinguish and the
@@ -36,7 +35,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
 /// <see cref="LilNode.RelSize"/> is modified; identifiers, edges and POIs stay untouched.
 /// </para>
 /// </remarks>
-internal static class RelSizeDistributor
+internal static class NodeRelSizer
 {
   /// <summary>Salt for the distribution sub-seed; keeps this pass off other passes' streams.</summary>
   private const long SaltRelSize = 0x72656C73697A65; // "relsize"
@@ -55,10 +54,10 @@ internal static class RelSizeDistributor
   /// <param name="options">Distribution parameters; validated before use.</param>
   /// <param name="seedGraph">Graph sub-seed the distribution stream is derived from.</param>
   /// <exception cref="ArgumentNullException"><paramref name="graph"/> or <paramref name="options"/> is null.</exception>
-  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="RelSizeDistributionOptions.Validate"/>.</exception>
-  /// <exception cref="ArgumentException">Options contradict each other; see <see cref="RelSizeDistributionOptions.Validate"/>.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="NodeRelSizerOptions.Validate"/>.</exception>
+  /// <exception cref="ArgumentException">Options contradict each other; see <see cref="NodeRelSizerOptions.Validate"/>.</exception>
   /// <exception cref="InvalidOperationException">An edge references a node missing from the graph, or two nodes share an identifier.</exception>
-  public static void Distribute(LilGraph graph, RelSizeDistributionOptions options, long seedGraph)
+  public static void Execute(LilGraph graph, NodeRelSizerOptions options, long seedGraph)
   {
     if (graph is null) throw new ArgumentNullException(nameof(graph));
     if (options is null) throw new ArgumentNullException(nameof(options));

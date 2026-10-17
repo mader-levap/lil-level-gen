@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using LostInLimbo.LevelGen.Data.Result.Graph;
-using LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using LostInLimbo.LevelGen.Internal.Utils;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
@@ -28,7 +28,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <item>A minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
 /// <item>Start and exit POIs in two random nodes (the same node is allowed).</item>
 /// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxDegree"/>.</item>
-/// <item>Relative sizes distributed over the finished nodes via <see cref="RelSizeDistributor"/>.</item>
+/// <item>Finalisation: node relative size and grouping.</item>
 /// </list>
 /// </remarks>
 internal sealed class SimpleGraphBuilder : AGraphBuilder
@@ -44,7 +44,7 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   private const int ScenarioSize = 3;
 
   /// <summary>
-  /// Initial relative size of every node; replaced by the <see cref="RelSizeDistributor"/>
+  /// Initial relative size of every node; replaced by the <see cref="NodeRelSizer"/>
   /// pass once the whole graph (relationships and POIs included) is known.
   /// </summary>
   private const int NodeRelSize = 1;
@@ -87,7 +87,10 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
     CreateSkeleton(size, nodeIds, degrees, adjacency);
     PlacePois();
     AddExtraRelationships(connectivity, degrees, adjacency, nodeIds);
-    RelSizeDistributor.Distribute(Graph, RelSizeDistributionOptions.Default, PrepData.SeedGraph);
+
+    // Finalisation.
+    NodeRelSizer.Execute(Graph, NodeRelSizerOptions.Default, PrepData.SeedGraph);
+    NodeGrouper.Execute(Graph, NodeGrouperOptions.Default, PrepData.SeedGraph);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return true;
@@ -312,6 +315,7 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
       Id = DeriveEdgeId(from, to),
       From = nodeIds[from],
       To = nodeIds[to],
+      Chokepoint = Random.NextBool(0.5f),
     });
   }
 
@@ -326,6 +330,7 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   {
     var low = Math.Min(fromIndex, toIndex);
     var high = Math.Max(fromIndex, toIndex);
+    // Pack pair into one sub-channel.
     var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltEdge, ((long)low << 32) | (uint)high);
     return IdDerivation.Derive(subSeed, SaltEdge);
   }

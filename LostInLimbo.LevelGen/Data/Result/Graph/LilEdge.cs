@@ -31,12 +31,18 @@ public sealed record LilEdge
 
   /// <summary>Identifier of the source node.</summary>
   public required Guid From { get; init; }
-
   /// <summary>Identifier of the destination node.</summary>
   public required Guid To { get; init; }
 
   /// <summary>Direction of this passage.</summary>
   public EnPassageDirection Direction { get; init; } = EnPassageDirection.Bidirectional;
+
+  /// <summary>If true, this relationship can represent only one physical passage.
+  /// False means multiple passages can exist (though it is up to map generator).</summary>
+  public bool Chokepoint { get; init; } = false;
+
+  /// <summary>If true, this is secret passage.</summary>
+  public bool Secret { get; init; } = false;
 
   /// <summary>
   /// Requirements that must be met before this passage can be used. Empty list means an open

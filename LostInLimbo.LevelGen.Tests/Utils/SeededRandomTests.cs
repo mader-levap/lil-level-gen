@@ -158,6 +158,64 @@ public sealed class SeededRandomTests
     }
   }
 
+  /// <summary>Sub-suite covering bounded integer draws.</summary>
+  public sealed class NextBoolTests
+  {
+    [Fact]
+    public void NextBool_WithSeed_AlwaysTrue()
+    {
+      // Arrange: Generator with a known seed.
+      var random = new SeededRandom(42);
+
+      // Act: Draw ten bounded values. True has 100% chance.
+      var draws = Enumerable.Range(0, 10).Select(_ => random.NextBool(1.0f)).ToArray();
+
+      // Assert: All draws are true.
+      CountBools(draws, 10);
+    }
+
+    [Fact]
+    public void NextBool_WithSeed_AlwaysFalse()
+    {
+      // Arrange: Generator with a known seed.
+      var random = new SeededRandom(42);
+
+      // Act: Draw ten bounded values. True has 0% chance.
+      var draws = Enumerable.Range(0, 10).Select(_ => random.NextBool(0.0f)).ToArray();
+
+      // Assert: All draws are false.
+      CountBools(draws, 0);
+    }
+
+    [Fact]
+    public void NextBool_WithSeed_RoughlyHalfTrue()
+    {
+      // Arrange: Generator with a known seed. We choose seed that will give exactly 5 true and 5 false.
+      var random = new SeededRandom(42);
+
+      // Act: Draw ten bounded values. True has 50% chance.
+      var draws = Enumerable.Range(0, 10).Select(_ => random.NextBool(0.5f)).ToArray();
+
+      // Assert: Roughly half of results is true.
+      CountBools(draws, 5);
+    }
+
+    /// <summary>
+    /// Counts true values.
+    /// </summary>
+    /// <param name="result">Array of boolean values.</param>
+    /// <param name="expectedTrueCount">How many true values is expected.</param>
+    private void CountBools(bool[] result, int expectedTrueCount)
+    {
+      int actualTrueCount = 0;
+      for (int i=0; i<result.Length; i++)
+      {
+        if (result[i] == true) actualTrueCount++;
+      }
+      Assert.Equal(expectedTrueCount, actualTrueCount);
+    }
+  }
+
   /// <summary>Sub-suite covering in-place shuffling.</summary>
   public sealed class ShuffleTests
   {

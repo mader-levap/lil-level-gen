@@ -187,7 +187,7 @@ public sealed class GraphValidatorTests
           Node(1, Poi(10, EnPoiType.Start)),
           Node(2, Poi(11, EnPoiType.Exit)),
         ],
-        Edges = [Edge(100, from: 1, to: 2, conditions: [Requires(999)])],
+        Edges = [Edge(100, from: 1, to: 2, conditions: [Condition(999)])],
       };
 
       // Act: Validate the graph with a dangling requirement.
@@ -369,7 +369,7 @@ public sealed class GraphValidatorTests
           Node(1, Poi(10, EnPoiType.Start), Poi(12, EnPoiType.Solution)),
           Node(2, Poi(11, EnPoiType.Exit)),
         ],
-        Edges = [Edge(100, from: 1, to: 2, conditions: [Requires(12)])],
+        Edges = [Edge(100, from: 1, to: 2, conditions: [Condition(12)])],
       };
 
       // Act: Validate the trivially solvable graph.
@@ -395,7 +395,7 @@ public sealed class GraphValidatorTests
         Edges =
         [
           Edge(100, from: 1, to: 2),
-          Edge(101, from: 2, to: 3, conditions: [Requires(12)]),
+          Edge(101, from: 2, to: 3, conditions: [Condition(12)]),
         ],
       };
 
@@ -422,7 +422,7 @@ public sealed class GraphValidatorTests
         Edges =
         [
           Edge(100, from: 1, to: 2),
-          Edge(101, from: 2, to: 3, conditions: [Requires(12)]),
+          Edge(101, from: 2, to: 3, conditions: [Condition(12)]),
         ],
       };
 
@@ -451,7 +451,7 @@ public sealed class GraphValidatorTests
         [
           Edge(100, from: 1, to: 2),
           Edge(101, from: 1, to: 3),
-          Edge(102, from: 2, to: 4, conditions: [Requires(12), Requires(13)]),
+          Edge(102, from: 2, to: 4, conditions: [Condition(12), Condition(13)]),
         ],
       };
 
@@ -478,7 +478,7 @@ public sealed class GraphValidatorTests
         Edges =
         [
           Edge(100, from: 1, to: 2),
-          Edge(101, from: 2, to: 3, conditions: [Requires(12), Requires(13)]),
+          Edge(101, from: 2, to: 3, conditions: [Condition(12), Condition(13)]),
         ],
       };
 
@@ -507,7 +507,7 @@ public sealed class GraphValidatorTests
         [
           Edge(100, from: 1, to: 2),
           Edge(101, from: 2, to: 3),
-          Edge(102, from: 1, to: 3, conditions: [Requires(12)]),
+          Edge(102, from: 1, to: 3, conditions: [Condition(12)]),
         ],
       };
 

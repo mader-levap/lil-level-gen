@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using LostInLimbo.LevelGen.Data.Result.Graph;
-using LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using LostInLimbo.LevelGen.Internal.Utils;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
@@ -38,7 +38,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <see cref="MaxConditionPerRel"/>: one shared solution condition per chosen node's
 /// incoming relationships, solution most likely near its guarded passage within
 /// <see cref="MaxConditionDistance"/>.</item>
-/// <item>Relative sizes distributed over the finished nodes via <see cref="RelSizeDistributor"/>.</item>
+/// <item>Finalisation: node relative size and grouping.</item>
 /// </list>
 /// </remarks>
 internal sealed class LinearGraphBuilder : AGraphBuilder
@@ -56,7 +56,7 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
   internal const int MaxSkipDistance = 2;
 
   /// <summary>
-  /// Initial relative size of every node; replaced by the <see cref="RelSizeDistributor"/>
+  /// Initial relative size of every node; replaced by the <see cref="NodeRelSizer"/>
   /// pass once the whole graph (relationships and POIs included) is known.
   /// </summary>
   private const int NodeRelSize = 1;
@@ -92,7 +92,10 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
     PlacePois();
     AddExtraRelationships(connectivity, nodeIds, extraOutDegrees, extraInDegrees, extraPairs);
     AddObstacles(complexity, nodeIds);
-    RelSizeDistributor.Distribute(Graph, RelSizeDistributionOptions.Default, PrepData.SeedGraph);
+
+    // Finalisation.
+    NodeRelSizer.Execute(Graph, NodeRelSizerOptions.Default, PrepData.SeedGraph);
+    NodeGrouper.Execute(Graph, NodeGrouperOptions.Default, PrepData.SeedGraph);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return true;
@@ -117,7 +120,10 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
       var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltNode, index);
       var id = IdDerivation.Derive(subSeed, SaltNode);
       nodeIds[index] = id;
-      Graph.Nodes.Add(new LilNode { Id = id, RelSize = NodeRelSize });
+      Graph.Nodes.Add(new LilNode { 
+        Id = id,
+        RelSize = NodeRelSize,
+      });
     }
 
     return nodeIds;
@@ -287,7 +293,7 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
   }
 
   /// <summary>
-  /// Adds one bidirectional edge between the two nodes in chain order.
+  /// Adds one bidirectional edge between the two nodes in chain order. It is always chokepoint.
   /// </summary>
   /// <param name="from">Index of the source node; must be earlier in the chain than <paramref name="to"/>.</param>
   /// <param name="to">Index of the target node; must differ from <paramref name="from"/>.</param>
@@ -300,6 +306,7 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
       Id = DeriveEdgeId(from, to, passage),
       From = nodeIds[from],
       To = nodeIds[to],
+      Chokepoint = true,
     });
   }
 
@@ -319,7 +326,7 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
 
     // Pack pair and passage into one sub-channel; 8 bits each leave room for up to
     // 255 nodes (CnfGraph.MaxSize is 100) and 255 passages per pair.
-    var pairAndPassage = (long)(uint)low | ((long)(uint)high << 8) | ((long)(uint)passage << 16);
+    var pairAndPassage = (uint)low | ((long)(uint)high << 8) | ((long)(uint)passage << 16);
     var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltEdge, pairAndPassage);
     return IdDerivation.Derive(subSeed, SaltEdge);
   }

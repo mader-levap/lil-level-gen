@@ -31,6 +31,11 @@ public sealed record LilNode
   public required int RelSize { get; init; }
 
   /// <summary>
+  /// Group identifier. If null, node do not belong to any group.
+  /// </summary>
+  public string? Group { get; init; }
+
+  /// <summary>
   /// Points of interest contained in this place. May be empty (plain pass-through place).
   /// A node can contain multiple POIs, e.g. two keys in the same room.
   /// </summary>

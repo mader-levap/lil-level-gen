@@ -1,7 +1,7 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
-using LostInLimbo.LevelGen.Internal.Generator.Graph.Distributor;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 
@@ -247,7 +247,7 @@ public sealed class SimpleGraphBuilderTests
       Assert.True(success);
       GraphTestSupport.AssertValidEdges(graph);
       GraphTestSupport.AssertOpenPassages(graph);
-      var stepValues = RelSizeDistributionOptions.Default.BuildStepValues();
+      var stepValues = NodeRelSizerOptions.Default.BuildStepValues();
       Assert.All(graph.Nodes, node => Assert.Contains(node.RelSize, stepValues));
     }
   }
