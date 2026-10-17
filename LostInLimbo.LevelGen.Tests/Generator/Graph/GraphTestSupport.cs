@@ -3,6 +3,7 @@ using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Prepass;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
 
@@ -171,22 +172,16 @@ internal static class GraphTestSupport
   //
 
   /// <summary>
-  /// Asserts that every node is reachable from the first node. Ignores conditions.
-  /// </summary>
-  /// <param name="graph">Graph to check; graphs with at most one node are connected by definition.</param>
-  /// <param name="message">Optional failure message.</param>
-  public static void AssertConnected(LilGraph graph, string? message = null)
-  {
-    Assert.True(IsConnected(graph), message ?? "Graph must be connected.");
-  }
-
-  /// <summary>
-  /// Asserts structural invariants of the edge list: endpoints exist and differ, and no
-  /// node pair is connected twice. Direction and conditions are builder expectations, see
-  /// <see cref="AssertOpenPassages"/>.
+  /// Asserts structural invariants of the edge list: endpoints exist and differ, and -
+  /// unless <paramref name="allowDuplicates"/> is set - no node pair is connected twice.
+  /// Direction and conditions are builder expectations, see <see cref="AssertOpenPassages"/>.
   /// </summary>
   /// <param name="graph">Graph to check.</param>
-  public static void AssertValidEdges(LilGraph graph)
+  /// <param name="allowDuplicates">
+  /// When true, multiple passages between the same node pair are accepted (e.g. the
+  /// parallel passages of <c>LinearGraphBuilder</c>); otherwise the pair must be unique.
+  /// </param>
+  public static void AssertValidEdges(LilGraph graph, bool allowDuplicates = false)
   {
     var nodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
     var pairs = new HashSet<(Guid From, Guid To)>();
@@ -197,9 +192,11 @@ internal static class GraphTestSupport
       Assert.Contains(edge.From, nodeIds);
       Assert.Contains(edge.To, nodeIds);
 
-      // Assert: The unordered node pair appears only once.
+      if (allowDuplicates) continue;
+
       var low = edge.From.CompareTo(edge.To) < 0 ? edge.From : edge.To;
       var high = edge.From.CompareTo(edge.To) < 0 ? edge.To : edge.From;
+      // Assert: The unordered node pair appears only once.
       Assert.True(pairs.Add((low, high)), $"Duplicate edge between {low} and {high}.");
     }
   }
@@ -273,52 +270,16 @@ internal static class GraphTestSupport
     }
   }
 
-  //
-  // Internals
-  //
-
   /// <summary>
-  /// <para>Verifies that every node is reachable from the first node.</para>
-  /// <para>Note: this specific method ignores conditions.</para>
+  /// Asserts that the graph passes the beatability simulation - start reaches exit,
+  /// every node is reachable and no condition can dangle.
   /// </summary>
   /// <param name="graph">Graph to check.</param>
-  /// <returns>True when every node is reachable from the first node.</returns>
-  private static bool IsConnected(LilGraph graph)
+  public static void AssertBeatable(LilGraph graph, string failMsg = "")
   {
-    if (graph.Nodes.Count <= 1) return true;
+    var result = new GraphValidator(graph).Validate();
 
-    // Build index-based adjacency: edge endpoints reference existing nodes.
-    var indexById = graph.Nodes.Select((node, index) => (node.Id, index))
-      .ToDictionary(pair => pair.Id, pair => pair.index);
-    var adjacency = new List<int>[graph.Nodes.Count];
-
-    for (var i = 0; i < adjacency.Length; i++)
-      adjacency[i] = new List<int>();
-
-    foreach (var edge in graph.Edges)
-    {
-      var from = indexById[edge.From];
-      var to = indexById[edge.To];
-      adjacency[from].Add(to);
-      adjacency[to].Add(from);
-    }
-
-    // Breadth-first search from node 0.
-    var visited = new bool[graph.Nodes.Count];
-    var queue = new Queue<int>();
-    queue.Enqueue(0);
-    visited[0] = true;
-
-    while (queue.Count > 0)
-    {
-      foreach (var neighbor in adjacency[queue.Dequeue()])
-      {
-        if (visited[neighbor]) continue;
-        visited[neighbor] = true;
-        queue.Enqueue(neighbor);
-      }
-    }
-
-    return visited.All(wasVisited => wasVisited);
+    // Assert: The validation reports success; otherwise its reason explains the failure.
+    Assert.True(result.Success, failMsg + "\n" + result.FailureReason);
   }
 }

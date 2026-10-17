@@ -9,32 +9,32 @@ using LostInLimbo.LevelGen.Internal.Status;
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
 
 /// <summary>
-/// Tests graph generation dispatch: builder contract, placeholder boundary and the
-/// single-node builder result.
+/// Tests graph generation dispatch: builder contract and the built graph shapes per builder.
 /// </summary>
 public sealed class GraphGeneratorTests
 {
-  [Theory]
-  [InlineData(EnGraphBuilder.Linear)]
-  public void Execute_WithPlaceholderBuilders_ReturnsTrueAndLeavesGraphEmpty(EnGraphBuilder builder)
+  [Fact]
+  public void Execute_WithLinearBuilder_ReturnsTrueAndProducesChainGraph()
   {
-    // Arrange: Generator for the given builder kind over a fresh world.
+    // Arrange: Generator for the Linear builder with a small configured graph.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { Builder = builder },
+      Graph = new CnfGraph { Builder = EnGraphBuilder.Linear, Size = 4, Connectivity = 2 },
     };
-    var prepass = new PrepData();
+    var prepass = new PrepData { SeedGraph = 42 };
     var world = new LilWorld();
     var generator = new GraphGenerator(config, prepass, world);
 
     // Act: Run graph generation.
     var success = generator.Execute();
 
-    // Assert: The placeholder always succeeds and emits nothing, so the graph
-    // stays empty. Phase advancement stays LevelGenerator's job.
+    // Assert: The graph holds the configured amount of nodes, the chain skeleton on top of
+    // which every requested extra relationship was placed, and start/exit POIs.
     Assert.True(success);
-    Assert.Empty(world.Graph.Nodes);
-    Assert.Empty(world.Graph.Edges);
+    Assert.Equal(4, world.Graph.Nodes.Count);
+    Assert.Equal(3 + 2, world.Graph.Edges.Count);
+    Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Start));
+    Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Exit));
   }
 
   [Fact]

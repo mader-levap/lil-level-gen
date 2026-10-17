@@ -56,7 +56,7 @@ public sealed class SimpleGraphBuilderTests
       // no matter which scenario was rolled.
       Assert.True(success);
       Assert.Equal(Math.Max(0, size - 1), graph.Edges.Count);
-      GraphTestSupport.AssertConnected(graph, "Skeleton graph must be connected.");
+      GraphTestSupport.AssertBeatable(graph);
     }
 
     [Theory]
@@ -77,7 +77,7 @@ public sealed class SimpleGraphBuilderTests
       // graph stays connected.
       Assert.True(success);
       Assert.Equal(size - 1 + connectivity, graph.Edges.Count);
-      GraphTestSupport.AssertConnected(graph, "Graph must stay connected.");
+      GraphTestSupport.AssertBeatable(graph);
     }
 
     [Fact]
@@ -161,7 +161,7 @@ public sealed class SimpleGraphBuilderTests
       Assert.True(graph.Edges.Count <= 10, "Five nodes cannot hold more than ten relationships.");
       GraphTestSupport.AssertValidEdges(graph);
       GraphTestSupport.AssertOpenPassages(graph);
-      GraphTestSupport.AssertConnected(graph);
+      GraphTestSupport.AssertBeatable(graph);
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public sealed class SimpleGraphBuilderTests
       GraphTestSupport.AssertDegreeCap(graph, MaxDegreeStar);
       GraphTestSupport.AssertValidEdges(graph);
       GraphTestSupport.AssertOpenPassages(graph);
-      GraphTestSupport.AssertConnected(graph);
+      GraphTestSupport.AssertBeatable(graph);
     }
 
     [Theory]
@@ -204,8 +204,8 @@ public sealed class SimpleGraphBuilderTests
         // cap hold no matter which scenario was rolled.
         Assert.True(success);
         Assert.Equal(size - 1, graph.Edges.Count);
-        GraphTestSupport.AssertConnected(graph, $"Skeleton graph must be connected (size {size}, seed {seed}).");
         GraphTestSupport.AssertDegreeCap(graph, MaxDegreeStar);
+        GraphTestSupport.AssertBeatable(graph, $"Skeleton graph must be connected (size {size}, seed {seed}).");
       }
     }
 
