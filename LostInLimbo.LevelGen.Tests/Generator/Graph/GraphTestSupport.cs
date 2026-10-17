@@ -266,7 +266,7 @@ internal static class GraphTestSupport
       Assert.Equal(expected.Edges[i].From, actual.Edges[i].From);
       Assert.Equal(expected.Edges[i].To, actual.Edges[i].To);
       Assert.Equal(expected.Edges[i].Direction, actual.Edges[i].Direction);
-      Assert.Equal(expected.Edges[i].Conditions.Count, actual.Edges[i].Conditions.Count);
+      Assert.Equal(expected.Edges[i].Conditions, actual.Edges[i].Conditions);
     }
   }
 

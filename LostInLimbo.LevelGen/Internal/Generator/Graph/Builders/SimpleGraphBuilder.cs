@@ -80,11 +80,10 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   {
     var size = Config.Graph.Size;
     var connectivity = Config.Graph.Connectivity;
-
-    var nodeIds = CreateNodes(size);
     var degrees = new int[size];
     var adjacency = new bool[size, size];
 
+    var nodeIds = CreateNodes(size);
     CreateSkeleton(size, nodeIds, degrees, adjacency);
     PlacePois();
     AddExtraRelationships(connectivity, degrees, adjacency, nodeIds);
@@ -93,6 +92,10 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return true;
   }
+
+  //
+  // Skeleton pass.
+  //
 
   /// <summary>
   /// Creates all nodes in index order with deterministic identifiers.
@@ -214,6 +217,35 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
     return eligible[Random.NextInt(eligible.Count)];
   }
 
+  //
+  // PoI pass.
+  //
+
+  /// <summary>
+  /// Places the start and exit POIs into two random nodes; both may be the same node.
+  /// </summary>
+  private void PlacePois()
+  {
+    var startIndex = Random.NextInt(Graph.Nodes.Count);
+    var exitIndex = Random.NextInt(Graph.Nodes.Count);
+
+    // Nodes were added in index order by CreateNodes, so index lookup is exact.
+    Graph.Nodes[startIndex].Pois.Add(new LilPoi
+    {
+      Id = IdDerivation.Derive(PrepData.SeedGraph, SaltStartPoi),
+      Type = EnPoiType.Start,
+    });
+    Graph.Nodes[exitIndex].Pois.Add(new LilPoi
+    {
+      Id = IdDerivation.Derive(PrepData.SeedGraph, SaltExitPoi),
+      Type = EnPoiType.Exit,
+    });
+  }
+
+  //
+  // Extra relationship pass.
+  //
+
   /// <summary>
   /// Adds random extra relationships on top of the skeleton until connectivity is spent or
   /// every node pair is exhausted under the degree cap.
@@ -257,27 +289,6 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
       AddEdge(from, to, nodeIds, degrees, adjacency);
       added++;
     }
-  }
-
-  /// <summary>
-  /// Places the start and exit POIs into two random nodes; both may be the same node.
-  /// </summary>
-  private void PlacePois()
-  {
-    var startIndex = Random.NextInt(Graph.Nodes.Count);
-    var exitIndex = Random.NextInt(Graph.Nodes.Count);
-
-    // Nodes were added in index order by CreateNodes, so index lookup is exact.
-    Graph.Nodes[startIndex].Pois.Add(new LilPoi
-    {
-      Id = IdDerivation.Derive(PrepData.SeedGraph, SaltStartPoi),
-      Type = EnPoiType.Start,
-    });
-    Graph.Nodes[exitIndex].Pois.Add(new LilPoi
-    {
-      Id = IdDerivation.Derive(PrepData.SeedGraph, SaltExitPoi),
-      Type = EnPoiType.Exit,
-    });
   }
 
   /// <summary>

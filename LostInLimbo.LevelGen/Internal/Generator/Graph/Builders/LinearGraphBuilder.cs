@@ -34,7 +34,10 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <item>A linearly connected skeleton.</item>
 /// <item>Start and exit POIs always at beginning and end node respectively.</item>
 /// <item>Extra relationships between nodes up to connectivity and <see cref="MaxExtraDegree"/>.</item>
-/// <item>Create obstacles for relationships up to complexity and <see cref="MaxConditionPerRel"/>.</item>
+/// <item>Create obstacles for relationships up to complexity and
+/// <see cref="MaxConditionPerRel"/>: one shared solution condition per chosen node's
+/// incoming relationships, solution most likely near its guarded passage within
+/// <see cref="MaxConditionDistance"/>.</item>
 /// <item>Relative sizes distributed over the finished nodes via <see cref="RelSizeDistributor"/>.</item>
 /// </list>
 /// </remarks>
@@ -71,6 +74,8 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
   private const long SaltStartPoi = 0x7374617274; // "start"
   /// <summary>Salt for the exit POI identifier.</summary>
   private const long SaltExitPoi = 0x65786974; // "exit"
+  /// <summary>Salt for solution POI identifiers; one sub-channel per obstacle.</summary>
+  private const long SaltSolutionPoi = 0x736F6C7574696F6E; // "solution"
 
   /// <inheritdoc/>
   protected override bool Build()
@@ -78,21 +83,24 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
     var size = Config.Graph.Size;
     var connectivity = Config.Graph.Connectivity;
     var complexity = Config.Graph.Complexity;
-
-    var nodeIds = CreateNodes(size);
     var extraOutDegrees = new int[size];
     var extraInDegrees = new int[size];
     var extraPairs = new bool[size, size];
 
+    var nodeIds = CreateNodes(size);
     CreateSkeleton(size, nodeIds);
     PlacePois();
     AddExtraRelationships(connectivity, nodeIds, extraOutDegrees, extraInDegrees, extraPairs);
-    AddObstacles(complexity);
+    AddObstacles(complexity, nodeIds);
     RelSizeDistributor.Distribute(Graph, RelSizeDistributionOptions.Default, PrepData.SeedGraph);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return true;
   }
+
+  //
+  // Skeleton pass.
+  //
 
   /// <summary>
   /// Creates all nodes in chain order with deterministic identifiers.
@@ -127,6 +135,10 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
       AddEdge(i, i + 1, nodeIds, SkeletonPassage);
   }
 
+  //
+  // PoI pass.
+  //
+
   /// <summary>
   /// Places the start POI into the first node and the exit POI into the last node; both land
   /// on the single node when the graph has size one.
@@ -145,6 +157,10 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
       Type = EnPoiType.Exit,
     });
   }
+
+  //
+  // Extra relationship pass.
+  //
 
   /// <summary>
   /// Adds extra relationships on top of the skeleton until connectivity is spent or no
@@ -271,19 +287,6 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
   }
 
   /// <summary>
-  /// Placeholder for the obstacle pass: creates no obstacles and no conditions yet, so every
-  /// passage stays open and <c>CnfGraph.Complexity</c> is ignored.
-  /// </summary>
-  /// <remarks>Obstacles and conditions land together with the scenario selection: up to
-  /// <see cref="MaxConditionPerRel"/> conditions per relationship, keeping every solution
-  /// within <see cref="MaxConditionDistance"/> of the node that needs it.</remarks>
-  /// <param name="complexity">Requested obstacle amount, from <c>CnfGraph.Complexity</c>; ignored for now.</param>
-  private void AddObstacles(int complexity)
-  {
-    // Placeholder: the obstacle and condition pass lands later.
-  }
-
-  /// <summary>
   /// Adds one bidirectional edge between the two nodes in chain order.
   /// </summary>
   /// <param name="from">Index of the source node; must be earlier in the chain than <paramref name="to"/>.</param>
@@ -319,5 +322,139 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
     var pairAndPassage = (long)(uint)low | ((long)(uint)high << 8) | ((long)(uint)passage << 16);
     var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltEdge, pairAndPassage);
     return IdDerivation.Derive(subSeed, SaltEdge);
+  }
+
+  //
+  // Obstacle pass.
+  //
+
+  /// <summary>
+  /// Obstacle pass: guards node entries with solution-locked passages until complexity is
+  /// spent or every relationship is saturated.
+  /// </summary>
+  /// <remarks>
+  /// <para>One obstacle per iteration, up to <paramref name="complexity"/> iterations:</para>
+  /// <list type="number">
+  /// <item>Among all nodes but the first that still have capacity (see
+  /// <see cref="FindObstacleTargets"/>), one target is picked uniformly.</item>
+  /// <item>A new solution POI is created and placed by <see cref="PickSolutionNode"/>, so it
+  /// is most likely right before the guarded passage and falls off with distance up to
+  /// <see cref="MaxConditionDistance"/>.</item>
+  /// <item>Every relationship going into the target node gains the same new condition
+  /// (<see cref="EnConditionType.RequiresSolution"/> pointing at that POI).</item>
+  /// </list>
+  /// <para>Conditions only ever enter a node's relationships all at once, so all of them
+  /// stay identical and saturate together at <see cref="MaxConditionPerRel"/>. Once no
+  /// target with capacity remains, excess complexity is discarded silently - complexity is a
+  /// soft constraint, just like connectivity. Guaranteed solvable: a solution always lands
+  /// at or before the chain predecessor of its guarded node, so the chain reaches it before
+  /// any guarded passage is needed.</para>
+  /// </remarks>
+  /// <param name="complexity">Requested obstacle amount, from <c>CnfGraph.Complexity</c>.</param>
+  /// <param name="nodeIds">Node identifiers in chain order.</param>
+  private void AddObstacles(int complexity, Guid[] nodeIds)
+  {
+    var size = nodeIds.Length;
+    var added = 0;
+    while (added < complexity)
+    {
+      var targets = FindObstacleTargets(size, nodeIds);
+      if (targets.Count == 0) break;
+
+      var target = targets[Random.NextInt(targets.Count)];
+
+      // One new solution per obstacle, placed before the guarded node's chain predecessor.
+      var solutionPoi = new LilPoi
+      {
+        Id = DeriveSolutionId(added),
+        Type = EnPoiType.Solution,
+      };
+      Graph.Nodes[PickSolutionNode(target - 1)].Pois.Add(solutionPoi);
+
+      // Every relationship into the target gets the same condition.
+      var condition = new LilCondition
+      {
+        Type = EnConditionType.RequiresSolution,
+        RequiresPoi = solutionPoi.Id,
+      };
+      foreach (var edge in Graph.Edges)
+      {
+        if (edge.To == nodeIds[target]) edge.Conditions.Add(condition);
+      }
+
+      added++;
+    }
+  }
+
+  /// <summary>
+  /// Collects all nodes but the first whose relationships all still have room for one more
+  /// condition under <see cref="MaxConditionPerRel"/>.
+  /// </summary>
+  /// <remarks>Because <see cref="AddObstacles"/> always conditions a node's relationships
+  /// together, they saturate together - a node either has full capacity on all of them or on
+  /// none, and the check never splits a set of parallel passages.</remarks>
+  /// <param name="size">Total amount of nodes.</param>
+  /// <param name="nodeIds">Node identifiers in chain order.</param>
+  /// <returns>Target node indices in ascending chain order; empty when everything is saturated.</returns>
+  private List<int> FindObstacleTargets(int size, Guid[] nodeIds)
+  {
+    var targets = new List<int>(size - 1);
+    for (var target = 1; target < size; target++)
+    {
+      var eligible = true;
+      foreach (var edge in Graph.Edges)
+      {
+        if (edge.To != nodeIds[target]) continue;
+        if (edge.Conditions.Count >= MaxConditionPerRel)
+        {
+          eligible = false;
+          break;
+        }
+      }
+
+      if (eligible) targets.Add(target);
+    }
+
+    return targets;
+  }
+
+  /// <summary>
+  /// Picks the node holding the solution for a passage guarded at the given source node,
+  /// weighted linearly by distance: the source node itself counts
+  /// <see cref="MaxConditionDistance"/> + 1, each node further back one less, so the node
+  /// facing the guarded passage is the most likely and likelihood falls with distance.
+  /// </summary>
+  /// <remarks>Deterministic for the same generator state; candidates are enumerated backwards
+  /// in chain order. The walk stops at the first node, so small chains simply lose the far
+  /// candidates.</remarks>
+  /// <param name="nearestSource">Index of the guarded passage's chain predecessor.</param>
+  /// <returns>Index of the chosen solution node.</returns>
+  private int PickSolutionNode(int nearestSource)
+  {
+    var totalWeight = 0;
+    for (var distance = 0; nearestSource - distance >= 0 && distance <= MaxConditionDistance; distance++)
+      totalWeight += MaxConditionDistance + 1 - distance;
+
+    // Roll once on the cumulative weights and walk the candidates to the picked one.
+    var roll = Random.NextInt(totalWeight);
+    for (var distance = 0; nearestSource - distance >= 0 && distance <= MaxConditionDistance; distance++)
+    {
+      roll -= MaxConditionDistance + 1 - distance;
+      if (roll < 0) return nearestSource - distance;
+    }
+
+    throw new InvalidOperationException("Solution weight roll landed outside the candidate list.");
+  }
+
+  /// <summary>
+  /// Derives a solution POI identifier unique per obstacle, from the graph sub-seed and the
+  /// obstacle index as sub-channel.
+  /// </summary>
+  /// <param name="obstacleIndex">Zero-based obstacle ordinal within the pass.</param>
+  /// <returns>Identifier unique for the run. Not <see cref="Guid.Empty"/>.</returns>
+  private Guid DeriveSolutionId(int obstacleIndex)
+  {
+    var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltSolutionPoi, obstacleIndex);
+    return IdDerivation.Derive(subSeed, SaltSolutionPoi);
   }
 }
