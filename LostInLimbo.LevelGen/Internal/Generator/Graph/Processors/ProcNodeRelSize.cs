@@ -14,7 +14,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// <remarks>
 /// <para>
 /// Sizes are sampled from a fixed set of step values (see
-/// <see cref="NodeRelSizerOpt.BuildStepValues"/>): the options decide how many
+/// <see cref="ProcNodeRelSizeOpt.BuildStepValues"/>): the options decide how many
 /// steps exist, how large they grow, how strongly one step dominates and how hard
 /// relationships and POIs pull nodes upward. Bias only changes likelihood - a large node
 /// without POIs and with a single relationship stays possible, just less likely.
@@ -22,7 +22,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// <para>
 /// Algorithm: roll one dominant step per graph, then visit every node in Id order and
 /// sample its step independently. The base weight mixes a flat share (controlled by
-/// <see cref="NodeRelSizerOpt.Skew"/>) with the dominant step; a linear tilt
+/// <see cref="ProcNodeRelSizeOpt.Skew"/>) with the dominant step; a linear tilt
 /// proportional to the node's bias score adds weight to higher steps. The bias score sums
 /// the min-max normalized relationship count and POI count of the node - min-max keeps the
 /// bias relative: when all nodes look the same, there is nothing to distinguish and the
@@ -35,7 +35,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// <see cref="LilNode.RelSize"/> is modified; identifiers, edges and POIs stay untouched.
 /// </para>
 /// </remarks>
-internal static class NodeRelSizer
+internal static class ProcNodeRelSize
 {
   /// <summary>Salt for the distribution sub-seed; keeps this pass off other passes' streams.</summary>
   private const long SaltRelSize = 0x72656C73697A65; // "relsize"
@@ -54,10 +54,10 @@ internal static class NodeRelSizer
   /// <param name="options">Distribution parameters; validated before use.</param>
   /// <param name="seedGraph">Graph sub-seed the distribution stream is derived from.</param>
   /// <exception cref="ArgumentNullException"><paramref name="graph"/> or <paramref name="options"/> is null.</exception>
-  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="NodeRelSizerOpt.Validate"/>.</exception>
-  /// <exception cref="ArgumentException">Options contradict each other; see <see cref="NodeRelSizerOpt.Validate"/>.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="ProcNodeRelSizeOpt.Validate"/>.</exception>
+  /// <exception cref="ArgumentException">Options contradict each other; see <see cref="ProcNodeRelSizeOpt.Validate"/>.</exception>
   /// <exception cref="InvalidOperationException">An edge references a node missing from the graph, or two nodes share an identifier.</exception>
-  public static void Execute(LilGraph graph, NodeRelSizerOpt options, long seedGraph)
+  public static void Execute(LilGraph graph, ProcNodeRelSizeOpt options, long seedGraph)
   {
     if (graph is null) throw new ArgumentNullException(nameof(graph));
     if (options is null) throw new ArgumentNullException(nameof(options));

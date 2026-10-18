@@ -16,7 +16,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// <para>
 /// Every node ends up in exactly one group. Groups are named <c>g1</c>, <c>g2</c>, ...
 /// zero-padded to the width of the actual group count (e.g. <c>g01</c> for 12 groups).
-/// <see cref="NodeStylerOpt.GroupCount"/> is a soft target: a graph with fewer nodes
+/// <see cref="ProcNodeStyleOpt.GroupCount"/> is a soft target: a graph with fewer nodes
 /// than requested groups simply drops the excess and uses one group per node.
 /// </para>
 /// <para>
@@ -42,7 +42,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// untouched.
 /// </para>
 /// </remarks>
-internal static class NodeStyler
+internal static class ProcNodeStyle
 {
   /// <summary>Salt for the distribution sub-seed; keeps this pass off other passes' streams.</summary>
   private const long SaltStyle = 0x32658C73697A65; // "style"
@@ -55,9 +55,9 @@ internal static class NodeStyler
   /// <param name="options">Node styling parameters; validated before use.</param>
   /// <param name="seedGraph">Graph sub-seed the distribution stream is derived from.</param>
   /// <exception cref="ArgumentNullException"><paramref name="graph"/> or <paramref name="options"/> is null.</exception>
-  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="NodeStylerOpt.Validate"/>.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="ProcNodeStyleOpt.Validate"/>.</exception>
   /// <exception cref="InvalidOperationException">An edge references a node missing from the graph, or two nodes share an identifier.</exception>
-  public static void Execute(LilGraph graph, NodeStylerOpt options, long seedGraph)
+  public static void Execute(LilGraph graph, ProcNodeStyleOpt options, long seedGraph)
   {
     if (graph is null) throw new ArgumentNullException(nameof(graph));
     if (options is null) throw new ArgumentNullException(nameof(options));

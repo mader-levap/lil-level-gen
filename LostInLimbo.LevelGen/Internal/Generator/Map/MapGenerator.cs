@@ -1,10 +1,8 @@
 using System;
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
-using LostInLimbo.LevelGen.Data.Other;
-using LostInLimbo.LevelGen.Data.Prepass;
 using LostInLimbo.LevelGen.Data.Result;
-using LostInLimbo.LevelGen.Internal.Status;
+using LostInLimbo.LevelGen.Internal.Generator.Prepass;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Map;
 

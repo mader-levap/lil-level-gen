@@ -9,9 +9,9 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 public sealed class GraphBuilderFactoryTests
 {
   [Theory]
-  [InlineData(EnGraphBuilder.OneNode, typeof(OneNodeGraphBuilder))]
-  [InlineData(EnGraphBuilder.Simple, typeof(SimpleGraphBuilder))]
-  [InlineData(EnGraphBuilder.Linear, typeof(LinearGraphBuilder))]
+  [InlineData(EnGraphBuilder.OneNode, typeof(GraphBuilderOneNode))]
+  [InlineData(EnGraphBuilder.Simple, typeof(GraphBuilderSimple))]
+  [InlineData(EnGraphBuilder.Linear, typeof(GraphBuilderLinear))]
   public void Create_WithDefinedBuilder_ReturnsMatchingBuilder(EnGraphBuilder builder, Type expectedType)
   {
     // Act: Create the implementation for the configured kind.

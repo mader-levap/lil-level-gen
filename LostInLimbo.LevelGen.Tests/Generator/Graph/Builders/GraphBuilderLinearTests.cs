@@ -5,7 +5,7 @@ using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 
 /// <summary>
-/// Tests <see cref="LinearGraphBuilder"/>: chain shape, start/exit placement, the
+/// Tests <see cref="GraphBuilderLinear"/>: chain shape, start/exit placement, the
 /// extra-relationships pass (caps, skip window, weighting), the obstacle pass (conditions,
 /// solution placement, saturation), soft-constraint behavior, determinism and beatability.
 /// </summary>
@@ -15,19 +15,19 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 /// passages (skeleton plus one extra between an adjacent pair) are legal here, so edge
 /// assertions pass <c>allowDuplicates: true</c> and apply pair-count rules of their own.
 /// </remarks>
-public sealed class LinearGraphBuilderTests
+public sealed class GraphBuilderLinearTests
 {
   /// <summary>Cap of the extra-relationships phase per direction.</summary>
-  private const int MaxExtraDegree = LinearGraphBuilder.MaxExtraDegree;
+  private const int MaxExtraDegree = GraphBuilderLinear.MaxExtraDegree;
 
   /// <summary>Nodes an extra relationship may skip.</summary>
-  private const int MaxSkipDistance = LinearGraphBuilder.MaxSkipDistance;
+  private const int MaxSkipDistance = GraphBuilderLinear.MaxSkipDistance;
 
   /// <summary>Conditions one relationship can carry.</summary>
-  private const int MaxConditionPerRel = LinearGraphBuilder.MaxConditionPerRel;
+  private const int MaxConditionPerRel = GraphBuilderLinear.MaxConditionPerRel;
 
   /// <summary>Nodes a solution may sit away from its guarded passage.</summary>
-  private const int MaxConditionDistance = LinearGraphBuilder.MaxConditionDistance;
+  private const int MaxConditionDistance = GraphBuilderLinear.MaxConditionDistance;
 
   /// <summary>Tests for the skeleton shape: node count, minimality and exact chain form.</summary>
   public sealed class ShapeTests

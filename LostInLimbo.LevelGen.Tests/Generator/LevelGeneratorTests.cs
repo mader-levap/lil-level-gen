@@ -1,11 +1,11 @@
 using System.Diagnostics;
 
 using LostInLimbo.LevelGen.Data.Config;
-using LostInLimbo.LevelGen.Data.Other;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Data.Result.Stats;
 using LostInLimbo.LevelGen.Internal.Generator;
 using LostInLimbo.LevelGen.Internal.Status;
+using LostInLimbo.LevelGen.Internal.Status.Data;
 
 namespace LostInLimbo.LevelGen.Tests.Generator;
 

@@ -1,4 +1,4 @@
-namespace LostInLimbo.LevelGen.Data.Prepass;
+namespace LostInLimbo.LevelGen.Internal.Generator.Prepass;
 
 /// <summary>
 /// Holds data derived from config before actual generation.

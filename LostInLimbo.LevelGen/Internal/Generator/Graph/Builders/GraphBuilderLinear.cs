@@ -31,8 +31,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// </list>
 /// <para>The graph is built in five passes:</para>
 /// <list type="bullet">
-/// <item>A linearly connected skeleton.</item>
-/// <item>Start and exit POIs always at beginning and end node respectively.</item>
+/// <item>Create linearly connected skeleton.</item>
+/// <item>Add PoIs. Start and exit are at ends of linear graph.</item>
 /// <item>Extra relationships between nodes up to connectivity and <see cref="MaxExtraDegree"/>.</item>
 /// <item>Create obstacles for relationships up to complexity and
 /// <see cref="MaxConditionPerRel"/>: one shared solution condition per chosen node's
@@ -41,7 +41,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <item>Finalisation: node relative size and grouping.</item>
 /// </list>
 /// </remarks>
-internal sealed class LinearGraphBuilder : AGraphBuilder
+internal sealed class GraphBuilderLinear : AGraphBuilder
 {
   /// <summary>
   /// Maximum amount of extra relationships a node may gain in the extra-relationships phase (inclusive).
@@ -56,7 +56,7 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
   internal const int MaxSkipDistance = 2;
 
   /// <summary>
-  /// Initial relative size of every node; replaced by the <see cref="NodeRelSizer"/>
+  /// Initial relative size of every node; replaced by the <see cref="ProcNodeRelSize"/>
   /// pass once the whole graph (relationships and POIs included) is known.
   /// </summary>
   private const int NodeRelSize = 1;
@@ -94,8 +94,8 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
     AddObstacles(complexity, nodeIds);
 
     // Finalisation.
-    NodeRelSizer.Execute(Graph, NodeRelSizerOpt.Default, PrepData.SeedGraph);
-    NodeStyler.Execute(Graph, NodeStylerOpt.Default, PrepData.SeedGraph);
+    ProcNodeRelSize.Execute(Graph, ProcNodeRelSizeOpt.Default, PrepData.SeedGraph);
+    ProcNodeStyle.Execute(Graph, ProcNodeStyleOpt.Default, PrepData.SeedGraph);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return true;

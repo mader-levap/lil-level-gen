@@ -1,6 +1,6 @@
 using System;
 
-namespace LostInLimbo.LevelGen.Data.Other;
+namespace LostInLimbo.LevelGen.Internal.Status.Data;
 
 /// <summary>
 /// Provides current status of generation and other related data that allow tracking progress.

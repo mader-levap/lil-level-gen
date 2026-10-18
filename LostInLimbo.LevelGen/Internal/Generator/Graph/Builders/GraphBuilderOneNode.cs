@@ -14,7 +14,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <para>Identifier salts are fixed role constants (instead of a seed-driven sequence) because
 /// the shape never changes: one node, one start POI, one exit POI.</para>
 /// </remarks>
-internal sealed class OneNodeGraphBuilder : AGraphBuilder
+internal sealed class GraphBuilderOneNode : AGraphBuilder
 {
   /// <summary>Relative size of the single node; baseline against which other nodes are compared.</summary>
   private const int NodeRelSize = 1;

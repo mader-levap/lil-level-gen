@@ -25,13 +25,13 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// </list>
 /// <para>The graph is built in four passes:</para>
 /// <list type="bullet">
-/// <item>A minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
-/// <item>Start and exit POIs in two random nodes (the same node is allowed).</item>
+/// <item>Create minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
+/// <item>Add PoIs. Start and exit are random and same node is allowed.</item>
 /// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxDegree"/>.</item>
 /// <item>Finalisation: node relative size and grouping.</item>
 /// </list>
 /// </remarks>
-internal sealed class SimpleGraphBuilder : AGraphBuilder
+internal sealed class GraphBuilderSimple : AGraphBuilder
 {
   /// <summary>Maximum amount of relationships a node may gain in the extra-relationships phase (inclusive).</summary>
   internal const int MaxDegree = 4;
@@ -44,7 +44,7 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
   private const int ScenarioSize = 3;
 
   /// <summary>
-  /// Initial relative size of every node; replaced by the <see cref="NodeRelSizer"/>
+  /// Initial relative size of every node; replaced by the <see cref="ProcNodeRelSize"/>
   /// pass once the whole graph (relationships and POIs included) is known.
   /// </summary>
   private const int NodeRelSize = 1;
@@ -89,8 +89,8 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
     AddExtraRelationships(connectivity, degrees, adjacency, nodeIds);
 
     // Finalisation.
-    NodeRelSizer.Execute(Graph, NodeRelSizerOpt.Default, PrepData.SeedGraph);
-    NodeStyler.Execute(Graph, NodeStylerOpt.Default, PrepData.SeedGraph);
+    ProcNodeRelSize.Execute(Graph, ProcNodeRelSizeOpt.Default, PrepData.SeedGraph);
+    ProcNodeStyle.Execute(Graph, ProcNodeStyleOpt.Default, PrepData.SeedGraph);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return true;

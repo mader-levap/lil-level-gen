@@ -6,20 +6,20 @@ using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 
 /// <summary>
-/// Tests <see cref="SimpleGraphBuilder"/>: graph shape per scenario, soft-constraint
+/// Tests <see cref="GraphBuilderSimple"/>: graph shape per scenario, soft-constraint
 /// behavior, edge validity, determinism and POI placement.
 /// </summary>
 /// <remarks>
 /// The builder must succeed for any validated config: size, connectivity and complexity are
 /// soft constraints, so most tests assert shape outcomes rather than failure modes.
 /// </remarks>
-public sealed class SimpleGraphBuilderTests
+public sealed class GraphBuilderSimpleTests
 {
   /// <summary>Mirrors <c>SimpleGraphBuilder.MaxDegree</c>: cap of the random-relationships phase.</summary>
-  private const int MaxDegree = SimpleGraphBuilder.MaxDegree;
+  private const int MaxDegree = GraphBuilderSimple.MaxDegree;
 
   /// <summary>Mirrors <c>SimpleGraphBuilder.MaxDegreeStar</c>: cap of the skeleton phase.</summary>
-  private const int MaxDegreeStar = SimpleGraphBuilder.MaxDegreeStar;
+  private const int MaxDegreeStar = GraphBuilderSimple.MaxDegreeStar;
 
   /// <summary>Tests for the skeleton shape: node count, minimality, connectivity, scenarios.</summary>
   public sealed class ShapeTests
@@ -247,7 +247,7 @@ public sealed class SimpleGraphBuilderTests
       Assert.True(success);
       GraphTestSupport.AssertValidEdges(graph);
       GraphTestSupport.AssertOpenPassages(graph);
-      var stepValues = NodeRelSizerOpt.Default.BuildStepValues();
+      var stepValues = ProcNodeRelSizeOpt.Default.BuildStepValues();
       Assert.All(graph.Nodes, node => Assert.Contains(node.RelSize, stepValues));
     }
   }

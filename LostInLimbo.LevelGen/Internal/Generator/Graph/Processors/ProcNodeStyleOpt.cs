@@ -3,14 +3,14 @@ using System;
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 
 /// <summary>
-/// Parameters of <see cref="NodeStyler"/>.
+/// Parameters of <see cref="ProcNodeStyle"/>.
 /// </summary>
-internal sealed record NodeStylerOpt
+internal sealed record ProcNodeStyleOpt
 {
   /// <summary>
   /// Default instance used by builders that do not pass custom options.
   /// </summary>
-  public static NodeStylerOpt Default { get; } = new()
+  public static ProcNodeStyleOpt Default { get; } = new()
   {
     GroupCount = 3,
   };

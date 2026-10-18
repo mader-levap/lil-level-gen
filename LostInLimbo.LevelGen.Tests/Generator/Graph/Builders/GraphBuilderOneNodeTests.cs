@@ -8,7 +8,7 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 /// determinism. The builder must ignore all graph config and never use randomness.
 /// </summary>
 /// <remarks>Shared build runner and POI queries live in <see cref="GraphTestSupport"/>.</remarks>
-public sealed class OneNodeGraphBuilderTests
+public sealed class GraphBuilderOneNodeTests
 {
   [Fact]
   public void Build_WithDefaultConfig_ProducesSingleNodeWithStartAndExitAndNoEdges()

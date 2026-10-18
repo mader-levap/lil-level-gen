@@ -1,8 +1,8 @@
 using System;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
-using LostInLimbo.LevelGen.Data.Prepass;
 using LostInLimbo.LevelGen.Data.Result.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Prepass;
 using LostInLimbo.LevelGen.Internal.Utils;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
