@@ -6,21 +6,42 @@ Generator will create the world. This is finite world, though generator is desig
 
 Smallest unit of work is step. If you finished step, state of data must be consistent and correct (meaning editor/game can generate level geometry and objects just fine). Only exception: all steps except last one can have map not being consistent with graph and map might not be beatable.
 
+## Data
+
+Generator needs two datasets to work:
+- Theming data: provide knowledge about level theming. It is essentially information about available game assets so graph and map generator can use them properly. Later editor/game will have AssetTranslator that will translate generated data (including style) into actual assets put in 3D world with correct rotation, orientation etc.
+- Configuration data: provide config for generating level with specific properties.
+
+## Structure of theme
+
+Generator engine has some concepts related to themes:
+- **Theme**: Content within area with particular consistent look and feel, both visually and architecturally. For example, `home` theme focuses on what you can see in your own home.
+  Note that it is allowed for same asset to appear in multiple themes. 
+- **Subtheme**: Different versions of same theme. For example, `home` can be studio apartment, flat in a block housing estate or entire mansion.
+- **Zone**: You can think of zones as biomes of same theme. For example, `home` can have differently decorated rooms like Bathroom, Living Room, etc.
+- **Style**: Chosen theme-related settings.
+
+Theme data must be (de)serializable to/from JSON.
+
+- `ThmThemes`: Root of level themes. Contains map of themes: key is identifier of theme, value is `ThmTheme`.
+  - `ThmTheme`: Single theme.
+
 ## Structure of config
 
 Configuration must be (de)serializable to/from JSON.
 
-- `CnfLevelGeneration`: Root of configuration.
+- `CnfLevelGeneration`: Root of level configuration.
   - `CnfGeneral`: General configuration data like `Seed` or `Corruption`.
+  - `CnfStyle`: Style configuration. Currently placeholder.
   - `CnfGraph`: Graph configuration. Builders interpret these settings.
     - `Builder`: Which graph builder to use (`OneNode`, `Simple` or `Linear`; `OneNode` is the default). More builders will come.
     - `Size`: Size of graph. Usually number of nodes. Soft cap - builder is allowed to add more nodes if small number of nodes makes it impossible to make graph while fulfilling other settings. Hard cap is 100 (`CnfGraph.MaxSize`).
     - `Connectivity`: General connectivity of graph. It is not amount of relationships between nodes, at least not directly.
-    - `Complexity`: General complexity of graph. Usually number of obstacles..
+    - `Complexity`: General complexity of graph. Usually number of obstacles.
+  - `CnfMap`: Map configuration. Currently placeholder.
   - `CnfDebug`: Debug configuration data.
-  - TODO more
 
-## Structure of map data
+## Structure of resulting map data
 
 - `LilWorld`: All data.
   - Contains `LilGraph`. This is abstract representation of level. Graph is generated first based on config, then `LilMap` is created based on config and graph.
@@ -53,7 +74,7 @@ Configuration must be (de)serializable to/from JSON.
 
 ### Graph builders.
 
-The graph phase runs as a single step: `GraphGenerator` creates the `AGraphBuilder` implementation selected by `CnfGraph.Builder` (via `GraphBuilderFactory`), hands it the run's inputs with `Setup(config, prepData, graph)`, and calls the parameterless `Build()` to fill `LilGraph` in place.
+`GraphGenerator` creates the `AGraphBuilder` implementation selected by `CnfGraph.Builder` (via `GraphBuilderFactory`), hands it the run's inputs with `Setup(config, prepData, graph)`, and calls the parameterless `Build()` to fill `LilGraph` in place. This is considered single step.
 
 - `OneNodeGraphBuilder`: Single node containing both start and exit POI, no edges, conditions or obstacles. Player can beeline to exit immediately. Ignores size, connectivity and complexity - always produces the same shape. Useful for tests, debug and special scenarios.
 - `SimpleGraphBuilder`: One or more nodes without obstacles. Size sets the node count. First builds a minimal connected skeleton (a tree) from one randomly rolled scenario: a plain chain, a star, or a chain with the remaining nodes hanging off any of its nodes - all three come from the same algorithm, parameterized by the length of a linear prefix; remaining nodes attach to a central node, and when that central reaches its skeleton cap of 7 relationships per node, a new eligible node takes over, so no node ever exceeds the cap. Then adds extra random relationships on top until `Connectivity` is spent or no eligible node pair remains under the limit of 4 relationships per node (nodes already above 4 from the skeleton get none). Start and exit land in two random nodes, which may be the same node. Ignores complexity, never fails - unsatisfiable settings are stretched silently.
@@ -89,15 +110,18 @@ Tests and map validator will have to ensure that walls on each side of main cell
 **Very important concept**: While cells are on 3d grid, not all cells are same, though each set of cells repeats on grid.
 This allows thin walls, thin floor/ceiling between storeys and other effects.
 
-## Structure of theme.
+### Map builders.
 
-TODO: add theme/style config.
-TODO: define and determine what theme, style etc means here.
+`MapGenerator` creates the `AMapBuilder` implementation selected by `CnfMap.Builder` (via `MapBuilderFactory`), hands it the run's inputs with `Setup(config, prepData, graph)`, and calls the parameterless `Build()` to fill `LilMap` in place. Map is built step by step.
+
+Each builder handles single theme.
+
+TODO
 
 ## Cancellation
 
 Runs are cancellable through `LevelGeneration.Cancel()` or an optional token passed to `Start`/`Resume`. Convention for generator passes:
 
 - Every pass takes a `CancellationToken` parameter (never a stored field) and calls `ThrowIfCancellationRequested()` at pass boundaries.
-- Hot loops (cells, rooms, walls) check only every N iterations, not per element, to keep the cost negligible.
+- Inside pass cancellation happens at step boundary. Note some passes are fast enough that they are considered single step.
 - Cancellation must never change the output of a run that is not cancelled: it only truncates it. The cancelled run reports `EnGenResult.Cancelled` and its partial data is discarded.

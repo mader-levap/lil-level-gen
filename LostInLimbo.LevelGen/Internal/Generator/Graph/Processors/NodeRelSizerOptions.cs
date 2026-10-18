@@ -80,18 +80,13 @@ internal sealed record NodeRelSizerOptions
   public float BiasPois { get; init; }
 
   /// <summary>
-  /// Checks that these options can drive a distribution run: every value is in range and
-  /// the configured curve really produces distinct, ascending step values.
+  /// Checks that these options are valid.
   /// </summary>
   /// <exception cref="ArgumentOutOfRangeException">
-  /// <see cref="Curve"/> is not a defined value, or <see cref="Steps"/>, <see cref="Skew"/>,
-  /// <see cref="MinSize"/>, <see cref="Growth"/>, <see cref="BiasRelationships"/> or
-  /// <see cref="BiasPois"/> is out of range (non-finite counts as out of range).
+  /// Some parameter has invalid value.
   /// </exception>
   /// <exception cref="ArgumentException">
-  /// The parameters contradict each other: <see cref="Steps"/> is 1 while a bias greater
-  /// than 0 demands variation, or the curve settings do not yield strictly increasing
-  /// integer step values (too small or too large <see cref="Growth"/>).
+  /// The parameters contradict each other.
   /// </exception>
   public void Validate()
   {

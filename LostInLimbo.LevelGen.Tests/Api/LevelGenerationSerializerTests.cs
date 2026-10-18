@@ -47,7 +47,7 @@ public sealed class LevelGenerationSerializerTests
       // Arrange: Config violating its own invariants.
       var config = CnfLevelGeneration.Default with
       {
-        General = new CnfGeneral { Corruption = -1.0f },
+        General = new CnfGeneral { Degeneration = -1.0f },
       };
 
       // Act/Assert: Serialization validates before producing output.
@@ -93,7 +93,7 @@ public sealed class LevelGenerationSerializerTests
       // debug sleep field.
       var config = CnfLevelGeneration.Default with
       {
-        General = new CnfGeneral { Seed = 1234, Corruption = 0.5f },
+        General = new CnfGeneral { Seed = 1234, Degeneration = 0.5f },
         Graph = new CnfGraph { Builder = EnGraphBuilder.Linear, Complexity = 5 },
         Debug = new CnfDebug { PlaceholderSleep = 42 },
       };
@@ -162,7 +162,7 @@ public sealed class LevelGenerationSerializerTests
     public void Deserialize_WithInvalidValue_ThrowsAfterParsing()
     {
       // Arrange: Well-formed JSON carrying an out-of-range value.
-      var json = "{ \"general\": { \"corruption\": -1 } }";
+      var json = "{ \"general\": { \"degeneration\": -1 } }";
 
       // Act/Assert: Validation runs on the deserialized result.
       Assert.Throws<ArgumentOutOfRangeException>(() => LevelGenerationSerializer.DeserializeConfig(json));
@@ -248,7 +248,7 @@ public sealed class LevelGenerationSerializerTests
       // Assert: Missing properties keep their defaults; missing version counts as current.
       Assert.Equal(CnfLevelGeneration.CurrentConfigVersion, config.ConfigVersion);
       Assert.Equal(42, config.General.Seed);
-      Assert.Equal(CnfGeneral.DefaultCorruption, config.General.Corruption);
+      Assert.Equal(CnfGeneral.DefaultDegeneration, config.General.Degeneration);
       Assert.Equal(CnfGraph.Default, config.Graph);
       Assert.Null(config.Debug);
     }

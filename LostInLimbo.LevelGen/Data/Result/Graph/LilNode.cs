@@ -31,9 +31,9 @@ public sealed record LilNode
   public required int RelSize { get; init; }
 
   /// <summary>
-  /// Group identifier. If null, node do not belong to any group.
+  /// Styling data.
   /// </summary>
-  public string? Group { get; init; }
+  public LilStyle Style { get; init; } = new();
 
   /// <summary>
   /// Points of interest contained in this place. May be empty (plain pass-through place).

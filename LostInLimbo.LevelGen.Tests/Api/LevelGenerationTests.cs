@@ -145,7 +145,7 @@ public sealed class LevelGenerationTests
       // Arrange: Idle state and a config violating its own invariants.
       var invalid = CnfLevelGeneration.Default with
       {
-        General = new CnfGeneral { Corruption = -1.0f },
+        General = new CnfGeneral { Degeneration = -1.0f },
       };
 
       // Act/Assert: Start validates the config before claiming the run.

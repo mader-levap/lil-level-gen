@@ -12,24 +12,24 @@ public sealed class CnfGeneralTests
   [InlineData(float.NaN)]
   [InlineData(float.PositiveInfinity)]
   [InlineData(float.NegativeInfinity)]
-  public void Validate_WithCorruptionOutsideValidRange_ThrowsNamingCorruption(float corruption)
+  public void Validate_WithCorruptionOutsideValidRange_ThrowsNamingDegeneration(float degeneration)
   {
-    // Arrange: General config with a corruption degree that is negative or not finite.
-    var general = new CnfGeneral { Corruption = corruption };
+    // Arrange: General config with a degeneration level that is negative or not finite.
+    var general = new CnfGeneral { Degeneration = degeneration };
 
     // Act/Assert: The out-of-range value is rejected naming the offending property.
     var exception = Assert.Throws<ArgumentOutOfRangeException>(() => general.Validate());
-    Assert.Equal("Corruption", exception.ParamName);
+    Assert.Equal("Degeneration", exception.ParamName);
   }
 
   [Theory]
   [InlineData(0.0f)]
   [InlineData(0.5f)]
   [InlineData(1.5f)]
-  public void Validate_WithFiniteNonNegativeCorruption_DoesNotThrow(float corruption)
+  public void Validate_WithFiniteNonNegativeDegeneration_DoesNotThrow(float degeneration)
   {
-    // Arrange: General config with a corruption degree inside the valid range.
-    var general = new CnfGeneral { Corruption = corruption };
+    // Arrange: General config with a degeneration level inside the valid range.
+    var general = new CnfGeneral { Degeneration = degeneration };
 
     // Assert: Validation completes normally for any finite value >= 0.
     general.Validate();

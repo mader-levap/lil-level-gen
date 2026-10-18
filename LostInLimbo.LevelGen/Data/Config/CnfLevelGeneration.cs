@@ -1,5 +1,7 @@
 using System;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Map;
+using LostInLimbo.LevelGen.Data.Config.Style;
 
 namespace LostInLimbo.LevelGen.Data.Config;
 
@@ -29,8 +31,14 @@ public sealed record CnfLevelGeneration
   /// <summary>General configuration.</summary>
   public CnfGeneral General { get; init; } = CnfGeneral.Default;
 
+  /// <summary>Style configuration.</summary>
+  public CnfStyle Style { get; init; } = CnfStyle.Default;
+
   /// <summary>Graph configuration.</summary>
   public CnfGraph Graph { get; init; } = CnfGraph.Default;
+
+  /// <summary>Map configuration.</summary>
+  public CnfMap Map { get; init; } = CnfMap.Default;
 
   /// <summary>Debug configuration. Ignored if null.</summary>
   public CnfDebug? Debug { get; init; } = null;

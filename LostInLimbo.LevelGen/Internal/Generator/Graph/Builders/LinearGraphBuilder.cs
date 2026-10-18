@@ -95,7 +95,7 @@ internal sealed class LinearGraphBuilder : AGraphBuilder
 
     // Finalisation.
     NodeRelSizer.Execute(Graph, NodeRelSizerOptions.Default, PrepData.SeedGraph);
-    NodeGrouper.Execute(Graph, NodeGrouperOptions.Default, PrepData.SeedGraph);
+    NodeStyler.Execute(Graph, NodeStylerOptions.Default, PrepData.SeedGraph);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return true;

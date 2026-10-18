@@ -13,8 +13,8 @@ public sealed record CnfGeneral
   /// <summary>Default seed.</summary>
   public const int DefaultSeed = 0;
 
-  /// <summary>Default corruption degree - no corruption at all.</summary>
-  public const float DefaultCorruption = 0.0f;
+  /// <summary>Default degeneration degree - no degeneration at all.</summary>
+  public const float DefaultDegeneration = 0.0f;
 
   //
 
@@ -28,10 +28,10 @@ public sealed record CnfGeneral
   public long Seed { get; init; } = DefaultSeed;
 
   /// <summary>
-  /// Corruption rate. The more world is corrupted, the worse are effects on map generation.
+  /// Level of degeneration. The more world is degenerated, the worse are effects on map generation.
   /// 0 means no corruption.
   /// </summary>
-  public float Corruption { get; init; } = DefaultCorruption;
+  public float Degeneration { get; init; } = DefaultDegeneration;
 
   //
 
@@ -41,7 +41,7 @@ public sealed record CnfGeneral
   /// <exception cref="ArgumentOutOfRangeException">Number is outside range.</exception>
   public void Validate()
   {
-    if (!float.IsFinite(Corruption) || Corruption < 0.0f)
-      throw new ArgumentOutOfRangeException(nameof(Corruption), Corruption, "Corruption degree must be a finite number >= 0.");
+    if (!float.IsFinite(Degeneration) || Degeneration < 0.0f)
+      throw new ArgumentOutOfRangeException(nameof(Degeneration), Degeneration, "Degeneration must be a finite number >= 0.");
   }
 }

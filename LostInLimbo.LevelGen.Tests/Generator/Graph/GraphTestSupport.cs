@@ -50,14 +50,14 @@ internal static class GraphTestSupport
 
   /// <summary>Creates a node with the given identifier and POIs.</summary>
   /// <param name="id">Small integer identifier of the node.</param>
-  /// <param name="group">Group where this node belongs.</param>
+  /// <param name="style">Styling of this node.</param>
   /// <param name="pois">POIs contained in the node; none when omitted.</param>
   /// <returns>A node with <see cref="DefaultNodeRelSize"/> relative size.</returns>
-  public static LilNode Node(int id, string? group, params LilPoi[] pois) => new()
+  public static LilNode Node(int id, LilStyle style, params LilPoi[] pois) => new()
   {
     Id = Id(id),
     RelSize = DefaultNodeRelSize,
-    Group = group,
+    Style = style,
     Pois = [.. pois],
   };
 
@@ -287,7 +287,7 @@ internal static class GraphTestSupport
     // Assert: Same node properties and POI contents in the same order.
     Assert.Equal(expected.Id, actual.Id);
     Assert.Equal(expected.RelSize, actual.RelSize);
-    Assert.Equal(expected.Group, actual.Group);
+    Assert.Equal(expected.Style, actual.Style);
 
     Assert.Equal(expected.Pois.Count, actual.Pois.Count);
     for (var i = 0; i < expected.Pois.Count; i++)
