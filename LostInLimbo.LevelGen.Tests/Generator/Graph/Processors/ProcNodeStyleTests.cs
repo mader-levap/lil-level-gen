@@ -28,17 +28,17 @@ public sealed class ProcNodeStyleTests
   public sealed class ValidationTests
   {
     [Fact]
-    public void Execute_WithNullGraph_ThrowsArgumentNullException()
+    public void Constructor_WithNullGraph_ThrowsArgumentNullException()
     {
       // Act & Assert: A missing graph is rejected.
-      Assert.Throws<ArgumentNullException>(() => ProcNodeStyle.Execute(null!, ProcNodeStyleOpt.Default, Seed));
+      Assert.Throws<ArgumentNullException>(() => new ProcNodeStyle(null!, ProcNodeStyleOpt.Default, Seed));
     }
 
     [Fact]
-    public void Execute_WithNullOptions_ThrowsArgumentNullException()
+    public void Constructor_WithNullOptions_ThrowsArgumentNullException()
     {
       // Act & Assert: Missing options are rejected.
-      Assert.Throws<ArgumentNullException>(() => ProcNodeStyle.Execute(CreateChainGraph(4), null!, Seed));
+      Assert.Throws<ArgumentNullException>(() => new ProcNodeStyle(CreateChainGraph(4), null!, Seed));
     }
 
     [Theory]
@@ -51,8 +51,19 @@ public sealed class ProcNodeStyleTests
 
       // Act & Assert: The styler rejects the options before touching the graph.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeStyle.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeStyle(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("GroupCount", exception.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_WithInvalidOptions_ThrowsBeforeExecute()
+    {
+      // Arrange: Options rejected by validation.
+      var options = ProcNodeStyleOpt.Default with { GroupCount = 0 };
+
+      // Act & Assert: Construction alone rejects the options, before Execute can run.
+      Assert.Throws<ArgumentOutOfRangeException>(
+        () => new ProcNodeStyle(CreateChainGraph(4), options, Seed));
     }
 
     [Fact]
@@ -63,7 +74,7 @@ public sealed class ProcNodeStyleTests
 
       // Act & Assert: Bad options never pass silently, even without nodes.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeStyle.Execute(new LilGraph(), options, Seed));
+        () => new ProcNodeStyle(new LilGraph(), options, Seed).Execute());
       Assert.Equal("GroupCount", exception.ParamName);
     }
 
@@ -76,7 +87,7 @@ public sealed class ProcNodeStyleTests
 
       // Act & Assert: The dangling reference is reported.
       var exception = Assert.Throws<InvalidOperationException>(
-        () => ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, Seed));
+        () => new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, Seed).Execute());
       Assert.Contains("unknown node", exception.Message);
     }
 
@@ -88,7 +99,7 @@ public sealed class ProcNodeStyleTests
       graph.Nodes.Add(graph.Nodes[0] with { });
 
       // Act & Assert: The duplicate identifier is rejected.
-      Assert.Throws<ArgumentException>(() => ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, Seed));
+      Assert.Throws<ArgumentException>(() => new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, Seed).Execute());
     }
 
     [Fact]
@@ -98,7 +109,7 @@ public sealed class ProcNodeStyleTests
       var graph = new LilGraph();
 
       // Act & Assert: Styling an empty graph is a no-op, not an error.
-      ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, Seed);
+      new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, Seed).Execute();
       Assert.Empty(graph.Nodes);
     }
   }
@@ -113,7 +124,7 @@ public sealed class ProcNodeStyleTests
       var graph = CreateChainGraph(10);
 
       // Act: Style the graph.
-      ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, Seed);
+      new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, Seed).Execute();
 
       // Assert: No node is left without a group.
       Assert.All(graph.Nodes, node => Assert.NotNull(node.Style.Group));
@@ -127,7 +138,7 @@ public sealed class ProcNodeStyleTests
       var options = ProcNodeStyleOpt.Default with { GroupCount = 3 };
 
       // Act: Style the graph.
-      ProcNodeStyle.Execute(graph, options, Seed);
+      new ProcNodeStyle(graph, options, Seed).Execute();
 
       // Assert: One group per node, named with the two-group width.
       var groups = graph.Nodes.Select(node => node.Style.Group).OrderBy(name => name).ToList();
@@ -142,7 +153,7 @@ public sealed class ProcNodeStyleTests
       var options = ProcNodeStyleOpt.Default with { GroupCount = 1 };
 
       // Act: Style the graph.
-      ProcNodeStyle.Execute(graph, options, Seed);
+      new ProcNodeStyle(graph, options, Seed).Execute();
 
       // Assert: Every node carries the only group name.
       Assert.All(graph.Nodes, node => Assert.Equal("g1", node.Style.Group));
@@ -162,7 +173,7 @@ public sealed class ProcNodeStyleTests
       var options = ProcNodeStyleOpt.Default with { GroupCount = groupCount };
 
       // Act: Style the graph.
-      ProcNodeStyle.Execute(graph, options, Seed);
+      new ProcNodeStyle(graph, options, Seed).Execute();
 
       // Assert: The group count is min(GroupCount, nodeCount); every group has a member.
       var counts = graph.Nodes
@@ -180,7 +191,7 @@ public sealed class ProcNodeStyleTests
       var options = ProcNodeStyleOpt.Default with { GroupCount = 12 };
 
       // Act: Style the graph.
-      ProcNodeStyle.Execute(graph, options, Seed);
+      new ProcNodeStyle(graph, options, Seed).Execute();
 
       // Assert: Names are padded to the width of the group count.
       var expected = Enumerable.Range(1, 12).Select(index => $"g{index:D2}").ToHashSet();
@@ -198,7 +209,7 @@ public sealed class ProcNodeStyleTests
         var graph = CreateChainGraph(12);
 
         // Act: Style with this seed.
-        ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, seed);
+        new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, seed).Execute();
 
         // Record the sorted group sizes for comparison.
         var sizes = graph.Nodes
@@ -240,7 +251,7 @@ public sealed class ProcNodeStyleTests
         var graph = CreateChainGraph(15);
 
         // Act: Style the graph with this seed.
-        ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, seed);
+        new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, seed).Execute();
 
         // Measure how much of each group forms its largest connected block.
         total += MeasureContiguity(graph);
@@ -268,7 +279,7 @@ public sealed class ProcNodeStyleTests
         var graph = CreateRestrictedChainGraph(15);
 
         // Act: Style the graph; strict growth has nothing to work with.
-        ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, seed);
+        new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, seed).Execute();
 
         // Assert: Every node is grouped and the requested group count is reached.
         Assert.All(graph.Nodes, node => Assert.NotNull(node.Style.Group));
@@ -287,7 +298,7 @@ public sealed class ProcNodeStyleTests
         var graph = CreateChainGraph(15, secretEdges: true);
 
         // Act: Style the graph with this seed.
-        ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, seed);
+        new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, seed).Execute();
 
         total += MeasureContiguity(graph);
       }
@@ -305,7 +316,7 @@ public sealed class ProcNodeStyleTests
       var graph = CreateChainGraph(15, oneWayEdges: true);
 
       // Act: Style the graph.
-      ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, Seed);
+      new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, Seed).Execute();
 
       // Assert: Backwards growth being impossible does not leave nodes ungrouped.
       Assert.All(graph.Nodes, node => Assert.NotNull(node.Style.Group));
@@ -324,8 +335,8 @@ public sealed class ProcNodeStyleTests
       var second = CreateRestrictedChainGraph(15);
 
       // Act: Style both with the same seed.
-      ProcNodeStyle.Execute(first, ProcNodeStyleOpt.Default, Seed);
-      ProcNodeStyle.Execute(second, ProcNodeStyleOpt.Default, Seed);
+      new ProcNodeStyle(first, ProcNodeStyleOpt.Default, Seed).Execute();
+      new ProcNodeStyle(second, ProcNodeStyleOpt.Default, Seed).Execute();
 
       // Assert: Same identifiers with the same groups.
       GraphTestSupport.AssertEqualGraphs(first, second);
@@ -340,8 +351,8 @@ public sealed class ProcNodeStyleTests
       var second = CreateChainGraph(30);
 
       // Act: Style both graphs.
-      ProcNodeStyle.Execute(first, ProcNodeStyleOpt.Default, seedGraph: 1);
-      ProcNodeStyle.Execute(second, ProcNodeStyleOpt.Default, seedGraph: 2);
+      new ProcNodeStyle(first, ProcNodeStyleOpt.Default, seedGraph: 1).Execute();
+      new ProcNodeStyle(second, ProcNodeStyleOpt.Default, seedGraph: 2).Execute();
 
       // Assert: The group sequences differ - counts, seeds and growth picks are seed-driven.
       Assert.NotEqual(GetGroupAssignments(first), GetGroupAssignments(second));
@@ -357,8 +368,8 @@ public sealed class ProcNodeStyleTests
       reversed.Edges.Reverse();
 
       // Act: Style both with the same seed.
-      ProcNodeStyle.Execute(original, ProcNodeStyleOpt.Default, Seed);
-      ProcNodeStyle.Execute(reversed, ProcNodeStyleOpt.Default, Seed);
+      new ProcNodeStyle(original, ProcNodeStyleOpt.Default, Seed).Execute();
+      new ProcNodeStyle(reversed, ProcNodeStyleOpt.Default, Seed).Execute();
 
       // Assert: Every identifier keeps the group it got regardless of list order.
       Assert.Equal(GetGroupAssignments(original), GetGroupAssignments(reversed));
@@ -378,7 +389,7 @@ public sealed class ProcNodeStyleTests
         .ToList();
 
       // Act: Style the graph.
-      ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, Seed);
+      new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, Seed).Execute();
 
       // Assert: Node order, sizes, edges and POIs are untouched; only groups were rewritten.
       Assert.Equal(nodeIdsBefore, graph.Nodes.Select(node => node.Id).ToList());
@@ -393,11 +404,11 @@ public sealed class ProcNodeStyleTests
     {
       // Arrange: One graph styled once.
       var graph = CreateChainGraph(12);
-      ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, Seed);
+      new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, Seed).Execute();
       var firstRun = GetGroupAssignments(graph);
 
       // Act: Style the very same graph again with the same inputs.
-      ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, Seed);
+      new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, Seed).Execute();
 
       // Assert: Existing groups do not feed back into the draws, so the second run is a no-op.
       Assert.Equal(firstRun, GetGroupAssignments(graph));
@@ -414,7 +425,7 @@ public sealed class ProcNodeStyleTests
       }
 
       // Act: Style the graph.
-      ProcNodeStyle.Execute(graph, ProcNodeStyleOpt.Default, Seed);
+      new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, Seed).Execute();
 
       // Assert: Stale groups are gone and the naming scheme took over.
       Assert.All(graph.Nodes, node => Assert.Matches("^g[0-9]+$", node.Style.Group));
@@ -431,8 +442,8 @@ public sealed class ProcNodeStyleTests
         var second = CreateRestrictedChainGraph(12);
 
         // Act: Style both with the same seed.
-        ProcNodeStyle.Execute(first, ProcNodeStyleOpt.Default, seed);
-        ProcNodeStyle.Execute(second, ProcNodeStyleOpt.Default, seed);
+        new ProcNodeStyle(first, ProcNodeStyleOpt.Default, seed).Execute();
+        new ProcNodeStyle(second, ProcNodeStyleOpt.Default, seed).Execute();
 
         // Assert: The restricted-relationship fallback stays deterministic too.
         GraphTestSupport.AssertEqualGraphs(first, second);

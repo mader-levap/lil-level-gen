@@ -42,38 +42,55 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// untouched.
 /// </para>
 /// </remarks>
-internal static class ProcNodeStyle
+internal sealed class ProcNodeStyle
 {
   /// <summary>Salt for the distribution sub-seed; keeps this pass off other passes' streams.</summary>
   private const long SaltStyle = 0x32658C73697A65; // "style"
 
+  /// <summary>Graph whose nodes are rewritten in place; may be empty.</summary>
+  private readonly LilGraph _graph;
+  /// <summary>Styling parameters; validated at construction.</summary>
+  private readonly ProcNodeStyleOpt _options;
+  /// <summary>Random for sub-seed.</summary>
+  private readonly SeededRandom _random;
+
   /// <summary>
-  /// Assigns <see cref="LilStyle.Group"/> in <see cref="LilNode.Style"/> to every node
-  /// of <paramref name="graph"/>.
+  /// Prepares the pass over <paramref name="graph"/>. Validates the options eagerly, so bad
+  /// options are rejected even when the graph is empty.
   /// </summary>
-  /// <param name="graph">Graph whose nodes are rewritten in place; may be empty.</param>
+  /// <param name="graph">Graph whose nodes are rewritten in place by <see cref="Execute"/>; may be empty.</param>
   /// <param name="options">Node styling parameters; validated before use.</param>
   /// <param name="seedGraph">Graph sub-seed the distribution stream is derived from.</param>
   /// <exception cref="ArgumentNullException"><paramref name="graph"/> or <paramref name="options"/> is null.</exception>
   /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="ProcNodeStyleOpt.Validate"/>.</exception>
-  /// <exception cref="InvalidOperationException">An edge references a node missing from the graph, or two nodes share an identifier.</exception>
-  public static void Execute(LilGraph graph, ProcNodeStyleOpt options, long seedGraph)
+  public ProcNodeStyle(LilGraph graph, ProcNodeStyleOpt options, long seedGraph)
   {
     if (graph is null) throw new ArgumentNullException(nameof(graph));
     if (options is null) throw new ArgumentNullException(nameof(options));
 
+    _graph = graph;
+    _options = options;
+    _random = new SeededRandom(SeedDerivation.Derive(seedGraph, SaltStyle));
     // Validation runs even for empty graphs, so bad options never pass silently.
     options.Validate();
-    if (graph.Nodes.Count == 0) return;
+  }
 
-    var random = new SeededRandom(SeedDerivation.Derive(seedGraph, SaltStyle));
-    var nodeCount = graph.Nodes.Count;
-    var groupCount = Math.Min(options.GroupCount, nodeCount);
+  /// <summary>
+  /// Assigns <see cref="LilStyle.Group"/> in <see cref="LilNode.Style"/> to every node
+  /// of the graph given to the constructor.
+  /// </summary>
+  /// <exception cref="InvalidOperationException">An edge references a node missing from the graph, or two nodes share an identifier.</exception>
+  public void Execute()
+  {
+    if (_graph.Nodes.Count == 0) return;
 
-    var adjacency = BuildAdjacency(graph);
-    var idOrder = BuildVisitOrder(graph);
+    var nodeCount = _graph.Nodes.Count;
+    var groupCount = Math.Min(_options.GroupCount, nodeCount);
+
+    var adjacency = BuildAdjacency();
+    var idOrder = BuildVisitOrder();
     var names = BuildGroupNames(groupCount);
-    var capacity = SampleGroupCounts(nodeCount, groupCount, random);
+    var capacity = SampleGroupCounts(nodeCount, groupCount);
     var groupOf = new string?[nodeCount];
 
     // Scratch buffers shared by all growth attempts, like the sizer's weight buffer.
@@ -82,7 +99,7 @@ internal static class ProcNodeStyle
 
     // Every group claims one random ungrouped node as its seed.
     var seedOrder = new List<int>(idOrder);
-    random.Shuffle(seedOrder);
+    _random.Shuffle(seedOrder);
     var ungrouped = nodeCount;
     for (var groupIndex = 0; groupIndex < groupCount; groupIndex++)
     {
@@ -96,11 +113,11 @@ internal static class ProcNodeStyle
     // iteration makes progress and the loop terminates after at most nodeCount rounds.
     while (ungrouped > 0)
     {
-      var grown = GrowCycle(graph, adjacency, idOrder, groupOf, capacity, names, sources, targets, random, strict: true);
+      var grown = GrowCycle(adjacency, idOrder, groupOf, capacity, names, sources, targets, strict: true);
       if (grown == 0)
-        grown = GrowCycle(graph, adjacency, idOrder, groupOf, capacity, names, sources, targets, random, strict: false);
+        grown = GrowCycle(adjacency, idOrder, groupOf, capacity, names, sources, targets, strict: false);
       if (grown == 0)
-        grown = AssignOneLeftover(idOrder, groupOf, capacity, names, random);
+        grown = AssignOneLeftover(idOrder, groupOf, capacity, names);
 
       ungrouped -= grown;
     }
@@ -110,9 +127,9 @@ internal static class ProcNodeStyle
     {
       var name = groupOf[i];
       if (name is null)
-        throw new InvalidOperationException($"Node {graph.Nodes[i].Id} was left without a group.");
+        throw new InvalidOperationException($"Node {_graph.Nodes[i].Id} was left without a group.");
 
-      graph.Nodes[i] = graph.Nodes[i] with { Style = graph.Nodes[i].Style with { Group = name } };
+      _graph.Nodes[i] = _graph.Nodes[i] with { Style = _graph.Nodes[i].Style with { Group = name } };
     }
   }
 
@@ -123,7 +140,6 @@ internal static class ProcNodeStyle
   /// <summary>
   /// Runs growth cycles until a full cycle over all groups produces no assignment.
   /// </summary>
-  /// <param name="graph">Graph whose edges are consulted for eligibility.</param>
   /// <param name="adjacency">Per-node traversal neighbours built by <see cref="BuildAdjacency"/>.</param>
   /// <param name="idOrder">Node indices in ascending Id order.</param>
   /// <param name="groupOf">Group name per node index; rewritten in place.</param>
@@ -131,11 +147,9 @@ internal static class ProcNodeStyle
   /// <param name="names">Group names indexed by group index.</param>
   /// <param name="sources">Scratch buffer for candidate source nodes.</param>
   /// <param name="targets">Scratch buffer for eligible growth targets.</param>
-  /// <param name="random">Seeded generator providing the draws.</param>
   /// <param name="strict">When true, secret, one-way and conditional relationships are skipped.</param>
   /// <returns>Amount of nodes grouped by this call.</returns>
-  private static int GrowCycle(
-    LilGraph graph,
+  private int GrowCycle(
     List<(int Target, int EdgeIndex)>[] adjacency,
     List<int> idOrder,
     string?[] groupOf,
@@ -143,7 +157,6 @@ internal static class ProcNodeStyle
     string[] names,
     List<int> sources,
     List<int> targets,
-    SeededRandom random,
     bool strict)
   {
     var grown = 0;
@@ -155,7 +168,7 @@ internal static class ProcNodeStyle
       for (var groupIndex = 0; groupIndex < names.Length; groupIndex++)
       {
         if (capacity[groupIndex] <= 0) continue;
-        if (!TryGrowOne(graph, adjacency, idOrder, groupOf, capacity, names[groupIndex], groupIndex, sources, targets, random, strict))
+        if (!TryGrowOne(adjacency, idOrder, groupOf, capacity, names[groupIndex], groupIndex, sources, targets, strict))
           continue;
 
         grewThisPass = true;
@@ -172,7 +185,6 @@ internal static class ProcNodeStyle
   /// Performs a single growth step for one group: picks a random member that still
   /// reaches an ungrouped node, then a random eligible relationship from it.
   /// </summary>
-  /// <param name="graph">Graph whose edges are consulted for eligibility.</param>
   /// <param name="adjacency">Per-node traversal neighbours.</param>
   /// <param name="idOrder">Node indices in ascending Id order.</param>
   /// <param name="groupOf">Group name per node index; rewritten in place.</param>
@@ -181,11 +193,9 @@ internal static class ProcNodeStyle
   /// <param name="groupIndex">Index of the growing group.</param>
   /// <param name="sources">Scratch buffer for candidate source nodes.</param>
   /// <param name="targets">Scratch buffer for eligible growth targets.</param>
-  /// <param name="random">Seeded generator providing the draws.</param>
   /// <param name="strict">When true, secret, one-way and conditional relationships are skipped.</param>
   /// <returns>True when a node was added to the group; false when no growth is possible.</returns>
-  private static bool TryGrowOne(
-    LilGraph graph,
+  private bool TryGrowOne(
     List<(int Target, int EdgeIndex)>[] adjacency,
     List<int> idOrder,
     string?[] groupOf,
@@ -194,7 +204,6 @@ internal static class ProcNodeStyle
     int groupIndex,
     List<int> sources,
     List<int> targets,
-    SeededRandom random,
     bool strict)
   {
     // Members in Id order that still reach an ungrouped node.
@@ -202,16 +211,16 @@ internal static class ProcNodeStyle
     foreach (var nodeIndex in idOrder)
     {
       if (groupOf[nodeIndex] != name) continue;
-      CollectTargets(graph, adjacency, nodeIndex, groupOf, strict, targets);
+      CollectTargets(adjacency, nodeIndex, groupOf, strict, targets);
       if (targets.Count > 0) sources.Add(nodeIndex);
     }
 
     if (sources.Count == 0) return false;
 
     // Pick one eligible member, then one of its eligible relationships.
-    var source = sources[random.NextInt(sources.Count)];
-    CollectTargets(graph, adjacency, source, groupOf, strict, targets);
-    var absorbed = targets[random.NextInt(targets.Count)];
+    var source = sources[_random.NextInt(sources.Count)];
+    CollectTargets(adjacency, source, groupOf, strict, targets);
+    var absorbed = targets[_random.NextInt(targets.Count)];
 
     groupOf[absorbed] = name;
     capacity[groupIndex]--;
@@ -221,14 +230,12 @@ internal static class ProcNodeStyle
   /// <summary>
   /// Collects the ungrouped nodes reachable from one node over eligible relationships.
   /// </summary>
-  /// <param name="graph">Graph whose edges are consulted for eligibility.</param>
   /// <param name="adjacency">Per-node traversal neighbours.</param>
   /// <param name="nodeIndex">Index of the node to expand from.</param>
   /// <param name="groupOf">Group name per node index.</param>
   /// <param name="strict">When true, secret, one-way and conditional relationships are skipped.</param>
   /// <param name="targets">Scratch buffer; cleared and refilled with target node indices.</param>
-  private static void CollectTargets(
-    LilGraph graph,
+  private void CollectTargets(
     List<(int Target, int EdgeIndex)>[] adjacency,
     int nodeIndex,
     string?[] groupOf,
@@ -239,7 +246,7 @@ internal static class ProcNodeStyle
     foreach (var (target, edgeIndex) in adjacency[nodeIndex])
     {
       if (groupOf[target] is not null) continue;
-      if (strict && IsRestricted(graph.Edges[edgeIndex])) continue;
+      if (strict && IsRestricted(_graph.Edges[edgeIndex])) continue;
       targets.Add(target);
     }
   }
@@ -249,7 +256,7 @@ internal static class ProcNodeStyle
   /// </summary>
   /// <param name="edge">Relationship to check.</param>
   /// <returns>True for secret, one-way or conditional relationships.</returns>
-  private static bool IsRestricted(LilEdge edge)
+  private bool IsRestricted(LilEdge edge)
   {
     return edge.Secret
         || edge.Direction == EnPassageDirection.OneWay
@@ -263,15 +270,13 @@ internal static class ProcNodeStyle
   /// <param name="groupOf">Group name per node index; rewritten in place.</param>
   /// <param name="capacity">Remaining nodes per group; decremented in place.</param>
   /// <param name="names">Group names indexed by group index.</param>
-  /// <param name="random">Seeded generator providing the draws.</param>
   /// <returns>Always 1 - one node was grouped.</returns>
   /// <exception cref="InvalidOperationException">An invariant of the capacity split was violated.</exception>
-  private static int AssignOneLeftover(
+  private int AssignOneLeftover(
     List<int> idOrder,
     string?[] groupOf,
     int[] capacity,
-    string[] names,
-    SeededRandom random)
+    string[] names)
   {
     var ungrouped = new List<int>();
     foreach (var nodeIndex in idOrder)
@@ -289,8 +294,8 @@ internal static class ProcNodeStyle
     if (ungrouped.Count == 0 || underCapacity.Count == 0)
       throw new InvalidOperationException("No group has spare capacity while nodes remain ungrouped.");
 
-    var node = ungrouped[random.NextInt(ungrouped.Count)];
-    var target = underCapacity[random.NextInt(underCapacity.Count)];
+    var node = ungrouped[_random.NextInt(ungrouped.Count)];
+    var target = underCapacity[_random.NextInt(underCapacity.Count)];
     groupOf[node] = names[target];
     capacity[target]--;
     return 1;
@@ -299,7 +304,6 @@ internal static class ProcNodeStyle
   /// <summary>
   /// Builds the per-node traversal neighbours and validates that every edge endpoint exists.
   /// </summary>
-  /// <param name="graph">Graph to inspect.</param>
   /// <returns>
   /// One list per node index holding <c>(target node index, edge index)</c> pairs in
   /// ascending edge-Id order. One-way relationships only appear at their source end, so
@@ -308,32 +312,32 @@ internal static class ProcNodeStyle
   /// </returns>
   /// <exception cref="InvalidOperationException">An edge references a missing node.</exception>
   /// <exception cref="ArgumentException">Two nodes share an identifier.</exception>
-  private static List<(int Target, int EdgeIndex)>[] BuildAdjacency(LilGraph graph)
+  private List<(int Target, int EdgeIndex)>[] BuildAdjacency()
   {
-    var indexById = new Dictionary<Guid, int>(graph.Nodes.Count);
-    for (var i = 0; i < graph.Nodes.Count; i++)
+    var indexById = new Dictionary<Guid, int>(_graph.Nodes.Count);
+    for (var i = 0; i < _graph.Nodes.Count; i++)
     {
-      indexById.Add(graph.Nodes[i].Id, i);
+      indexById.Add(_graph.Nodes[i].Id, i);
     }
 
-    var adjacency = new List<(int, int)>[graph.Nodes.Count];
+    var adjacency = new List<(int, int)>[_graph.Nodes.Count];
     for (var i = 0; i < adjacency.Length; i++)
     {
       adjacency[i] = new List<(int, int)>();
     }
 
     // Visit edges in Id order so every adjacency list has a stable order.
-    var edgeOrder = new List<int>(graph.Edges.Count);
-    for (var i = 0; i < graph.Edges.Count; i++)
+    var edgeOrder = new List<int>(_graph.Edges.Count);
+    for (var i = 0; i < _graph.Edges.Count; i++)
     {
       edgeOrder.Add(i);
     }
 
-    edgeOrder.Sort((left, right) => graph.Edges[left].Id.CompareTo(graph.Edges[right].Id));
+    edgeOrder.Sort((left, right) => _graph.Edges[left].Id.CompareTo(_graph.Edges[right].Id));
 
     foreach (var edgeIndex in edgeOrder)
     {
-      var edge = graph.Edges[edgeIndex];
+      var edge = _graph.Edges[edgeIndex];
       if (!indexById.TryGetValue(edge.From, out var from))
         throw new InvalidOperationException($"Edge {edge.Id} references unknown node {edge.From}.");
       if (!indexById.TryGetValue(edge.To, out var to))
@@ -354,17 +358,16 @@ internal static class ProcNodeStyle
   /// <summary>
   /// Produces the node indices in ascending Id order.
   /// </summary>
-  /// <param name="graph">Graph whose nodes are visited.</param>
   /// <returns>Node indices sorted by <see cref="LilNode.Id"/>.</returns>
-  private static List<int> BuildVisitOrder(LilGraph graph)
+  private List<int> BuildVisitOrder()
   {
-    var order = new List<int>(graph.Nodes.Count);
-    for (var i = 0; i < graph.Nodes.Count; i++)
+    var order = new List<int>(_graph.Nodes.Count);
+    for (var i = 0; i < _graph.Nodes.Count; i++)
     {
       order.Add(i);
     }
 
-    order.Sort((left, right) => graph.Nodes[left].Id.CompareTo(graph.Nodes[right].Id));
+    order.Sort((left, right) => _graph.Nodes[left].Id.CompareTo(_graph.Nodes[right].Id));
     return order;
   }
 
@@ -373,7 +376,7 @@ internal static class ProcNodeStyle
   /// </summary>
   /// <param name="groupCount">Actual amount of groups; at least 1.</param>
   /// <returns>One name per group index.</returns>
-  private static string[] BuildGroupNames(int groupCount)
+  private string[] BuildGroupNames(int groupCount)
   {
     var width = groupCount.ToString(CultureInfo.InvariantCulture).Length;
     var names = new string[groupCount];
@@ -391,9 +394,8 @@ internal static class ProcNodeStyle
   /// </summary>
   /// <param name="nodeCount">Amount of nodes to distribute; at least 1.</param>
   /// <param name="groupCount">Amount of groups; between 1 and <paramref name="nodeCount"/>.</param>
-  /// <param name="random">Seeded generator providing the draws.</param>
   /// <returns>One positive target per group, summing to <paramref name="nodeCount"/>.</returns>
-  private static int[] SampleGroupCounts(int nodeCount, int groupCount, SeededRandom random)
+  private int[] SampleGroupCounts(int nodeCount, int groupCount)
   {
     var counts = new int[groupCount];
     if (groupCount == 1)
@@ -411,7 +413,7 @@ internal static class ProcNodeStyle
       cuts.Add(position);
     }
 
-    random.Shuffle(cuts);
+    _random.Shuffle(cuts);
     cuts.RemoveRange(groupCount - 1, cuts.Count - (groupCount - 1));
     cuts.Sort();
 

@@ -80,8 +80,7 @@ internal sealed class ProcNodeRelSize
 
   /// <summary>
   /// Assigns one of the configured step values as <see cref="LilNode.RelSize"/> to every
-  /// node of the graph given to the constructor. Calling it twice is safe: the assignment
-  /// does not feed back into the draws.
+  /// node of the graph given to the constructor.
   /// </summary>
   /// <exception cref="InvalidOperationException">An edge references a node missing from the graph, or two nodes share an identifier.</exception>
   public void Execute()
