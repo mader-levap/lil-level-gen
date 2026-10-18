@@ -20,13 +20,13 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// off. <see cref="Growth"/> is only relevant when <see cref="Steps"/> is greater than 1.
 /// </para>
 /// </remarks>
-internal sealed record NodeRelSizerOptions
+internal sealed record NodeRelSizerOpt
 {
   /// <summary>
   /// Default instance used by builders that do not pass custom options: three geometric
   /// steps (1, 2, 4), mild skew and mild bias toward well-connected POI carriers.
   /// </summary>
-  public static NodeRelSizerOptions Default { get; } = new()
+  public static NodeRelSizerOpt Default { get; } = new()
   {
     Steps = 3,
     Skew = 0.3f,

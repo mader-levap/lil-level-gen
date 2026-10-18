@@ -184,6 +184,19 @@ internal static class GraphTestSupport
       .ToList();
   }
 
+  /// <summary>
+  /// Reads the current group assignment of a graph in a stable order.
+  /// </summary>
+  /// <param name="graph">Graph to read.</param>
+  /// <returns>Identifier and group pairs sorted by identifier.</returns>
+  public static List<(Guid Id, string? Group)> GetGroupAssignments(LilGraph graph)
+  {
+    return graph.Nodes
+      .OrderBy(node => node.Id)
+      .Select(node => (node.Id, node.Style.Group))
+      .ToList();
+  }
+
   //
   // Assertions
   //

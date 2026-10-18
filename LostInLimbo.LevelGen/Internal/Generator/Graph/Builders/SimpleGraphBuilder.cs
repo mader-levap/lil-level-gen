@@ -89,8 +89,8 @@ internal sealed class SimpleGraphBuilder : AGraphBuilder
     AddExtraRelationships(connectivity, degrees, adjacency, nodeIds);
 
     // Finalisation.
-    NodeRelSizer.Execute(Graph, NodeRelSizerOptions.Default, PrepData.SeedGraph);
-    NodeStyler.Execute(Graph, NodeStylerOptions.Default, PrepData.SeedGraph);
+    NodeRelSizer.Execute(Graph, NodeRelSizerOpt.Default, PrepData.SeedGraph);
+    NodeStyler.Execute(Graph, NodeStylerOpt.Default, PrepData.SeedGraph);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return true;

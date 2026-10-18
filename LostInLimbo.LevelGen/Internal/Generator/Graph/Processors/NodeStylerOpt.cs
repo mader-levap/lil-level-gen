@@ -5,20 +5,19 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// <summary>
 /// Parameters of <see cref="NodeStyler"/>.
 /// </summary>
-/// <remarks>
-/// Currently placeholder.
-/// </remarks>
-internal sealed record NodeStylerOptions
+internal sealed record NodeStylerOpt
 {
   /// <summary>
   /// Default instance used by builders that do not pass custom options.
   /// </summary>
-  public static NodeStylerOptions Default { get; } = new()
+  public static NodeStylerOpt Default { get; } = new()
   {
     GroupCount = 3,
   };
 
-  /// <summary>Count of groups.</summary>
+  /// <summary>
+  /// Requested amount of groups. Reduced to the node count when the graph is smaller.
+  /// </summary>
   public int GroupCount { get; init; } = 1;
 
   /// <summary>
