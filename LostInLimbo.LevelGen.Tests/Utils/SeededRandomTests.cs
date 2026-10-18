@@ -158,7 +158,7 @@ public sealed class SeededRandomTests
     }
   }
 
-  /// <summary>Sub-suite covering bounded integer draws.</summary>
+  /// <summary>Sub-suite covering probabilistic boolean draws.</summary>
   public sealed class NextBoolTests
   {
     [Fact]
@@ -190,14 +190,99 @@ public sealed class SeededRandomTests
     [Fact]
     public void NextBool_WithSeed_RoughlyHalfTrue()
     {
-      // Arrange: Generator with a known seed. We choose seed that will give exactly 5 true and 5 false.
-      var random = new SeededRandom(42);
+      // Arrange: Generator with a seed that rolls exactly 5 true and 5 false at even odds.
+      var random = new SeededRandom(2);
 
       // Act: Draw ten bounded values. True has 50% chance.
       var draws = Enumerable.Range(0, 10).Select(_ => random.NextBool(0.5f)).ToArray();
 
       // Assert: Roughly half of results is true.
       CountBools(draws, 5);
+    }
+
+    [Fact]
+    public void NextBool_WithSameSeed_ProducesIdenticalSequence()
+    {
+      // Arrange: Two generators seeded identically.
+      var first = new SeededRandom(42);
+      var second = new SeededRandom(42);
+
+      // Act: Draw a short sequence from both.
+      var firstSequence = Enumerable.Range(0, 50).Select(_ => first.NextBool(0.3f)).ToArray();
+      var secondSequence = Enumerable.Range(0, 50).Select(_ => second.NextBool(0.3f)).ToArray();
+
+      // Assert: The sequences match draw for draw.
+      Assert.Equal(firstSequence, secondSequence);
+    }
+
+    [Theory]
+    [InlineData(-1.0f)]
+    [InlineData(-5.0f)]
+    public void NextBool_WithChanceBelowZero_AlwaysFalse(float chance)
+    {
+      // Arrange: Generator with a valid seed.
+      var random = new SeededRandom(42);
+
+      // Act: Draw ten values with a chance below the valid range.
+      var draws = Enumerable.Range(0, 10).Select(_ => random.NextBool(chance)).ToArray();
+
+      // Assert: Out-of-range chance is clamped to zero, so every draw is false.
+      CountBools(draws, 0);
+    }
+
+    [Theory]
+    [InlineData(1.5f)]
+    [InlineData(5.0f)]
+    public void NextBool_WithChanceAboveOne_AlwaysTrue(float chance)
+    {
+      // Arrange: Generator with a valid seed.
+      var random = new SeededRandom(42);
+
+      // Act: Draw ten values with a chance above the valid range.
+      var draws = Enumerable.Range(0, 10).Select(_ => random.NextBool(chance)).ToArray();
+
+      // Assert: Out-of-range chance is clamped to one, so every draw is true.
+      CountBools(draws, 10);
+    }
+
+    [Fact]
+    public void NextBool_WithNaNChance_ThrowsArgumentOutOfRangeException()
+    {
+      // Arrange: Generator with a valid seed.
+      var random = new SeededRandom(1);
+
+      // Act/Assert: A NaN chance is rejected naming the parameter.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => random.NextBool(float.NaN));
+      Assert.Equal("chance", exception.ParamName);
+    }
+
+    [Fact]
+    public void NextBool_WithLowChance_ObservesExpectedRate()
+    {
+      // Arrange: Generator with a valid seed.
+      var random = new SeededRandom(1234);
+
+      // Act: Draw ten thousand values with a 25% chance of true.
+      var draws = Enumerable.Range(0, 10_000).Select(_ => random.NextBool(0.25f)).ToArray();
+
+      // Assert: The true count stays within a broad band around 2 500, so neither
+      // outcome can dominate (the placeholder bug always returned true).
+      var trueCount = draws.Count(value => value);
+      Assert.InRange(trueCount, 2_000, 3_000);
+    }
+
+    [Fact]
+    public void NextBool_WithSeed42_MatchesPinnedSequence()
+    {
+      // Arrange: Generator with a known seed.
+      var random = new SeededRandom(42);
+
+      // Act: Draw ten boolean values at even odds.
+      var draws = Enumerable.Range(0, 10).Select(_ => random.NextBool(0.5f)).ToArray();
+
+      // Assert: The sequence matches the pinned reference (reproducibility guard).
+      bool[] expected = [true, false, true, true, true, true, true, false, true, true];
+      Assert.Equal(expected, draws);
     }
 
     /// <summary>

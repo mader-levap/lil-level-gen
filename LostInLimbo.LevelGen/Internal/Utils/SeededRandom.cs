@@ -93,18 +93,30 @@ internal sealed class SeededRandom
   }
 
   /// <summary>
-  /// Randomly returns true or false.
+  /// Randomly returns true or false, with true returned with probability
+  /// <paramref name="chance"/>.
   /// </summary>
-  /// <param name="Chance">Chance for returning true.</param>
-  /// <returns>True or false.</returns>
-  public bool NextBool(float Chance)
+  /// <param name="chance">Probability of returning true; clamped to <c>[0, 1]</c>.</param>
+  /// <returns>True or false. Deterministic for the same seed and draw position.</returns>
+  /// <exception cref="ArgumentOutOfRangeException"><paramref name="chance"/> is NaN.</exception>
+  /// <remarks>
+  /// A chance of exactly 0 or exactly 1 short-circuits without consuming the sequence,
+  /// so callers can force an outcome without shifting later draws.
+  /// </remarks>
+  public bool NextBool(float chance)
   {
-    Chance = Math.Clamp(Chance, 0.0f, 1.0f);
-    if (Chance == 0.0f) return false;
-    if (Chance == 1.0f) return true;
+    if (float.IsNaN(chance))
+      throw new ArgumentOutOfRangeException(nameof(chance), chance, "Chance must not be NaN.");
 
-    // PLACEHOLDER: actually get random chance for true/false
-    return true;
+    chance = Math.Clamp(chance, 0.0f, 1.0f);
+    if (chance == 0.0f) return false;
+    if (chance == 1.0f) return true;
+
+    // Compare a uniform 32-bit draw against the chance scaled to [0, 2^32).
+    // Double arithmetic keeps the scaling exact; the comparison is unbiased for
+    // any chance the float can represent.
+    var threshold = (uint)(chance * 4294967296.0);
+    return (uint)NextULong() < threshold;
   }
 
   //
