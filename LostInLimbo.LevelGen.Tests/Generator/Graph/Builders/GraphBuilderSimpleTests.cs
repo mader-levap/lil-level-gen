@@ -247,7 +247,7 @@ public sealed class GraphBuilderSimpleTests
       Assert.True(success);
       GraphTestSupport.AssertValidEdges(graph);
       GraphTestSupport.AssertOpenPassages(graph);
-      var stepValues = ProcNodeRelSizeOpt.Default.BuildStepValues();
+      var stepValues = ProcNodeRelSizeOpt.Default.Prepare();
       Assert.All(graph.Nodes, node => Assert.Contains(node.RelSize, stepValues));
     }
   }

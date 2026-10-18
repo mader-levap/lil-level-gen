@@ -94,7 +94,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
     AddObstacles(complexity, nodeIds);
 
     // Finalisation.
-    ProcNodeRelSize.Execute(Graph, ProcNodeRelSizeOpt.Default, PrepData.SeedGraph);
+    new ProcNodeRelSize(Graph, ProcNodeRelSizeOpt.Default, PrepData.SeedGraph).Execute();
     ProcNodeStyle.Execute(Graph, ProcNodeStyleOpt.Default, PrepData.SeedGraph);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.

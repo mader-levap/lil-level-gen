@@ -31,7 +31,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: The distributor rejects the options before touching the graph.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("Steps", exception.ParamName);
     }
 
@@ -46,7 +46,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: Skew is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("Skew", exception.ParamName);
     }
 
@@ -60,7 +60,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: MinSize is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("MinSize", exception.ParamName);
     }
 
@@ -75,7 +75,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: The relationship bias is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("BiasRelationships", exception.ParamName);
     }
 
@@ -90,7 +90,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: The POI bias is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("BiasPois", exception.ParamName);
     }
 
@@ -106,7 +106,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: The contradiction is reported as an argument error.
       var exception = Assert.Throws<ArgumentException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("Steps", exception.ParamName);
     }
 
@@ -123,7 +123,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: The contradiction is reported as an argument error.
       var exception = Assert.Throws<ArgumentException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("Steps", exception.ParamName);
     }
 
@@ -135,7 +135,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: The unknown curve is rejected.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("Curve", exception.ParamName);
     }
 
@@ -154,7 +154,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: The collapsed step values are rejected as a contradiction.
       var exception = Assert.Throws<ArgumentException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("Growth", exception.ParamName);
     }
 
@@ -169,7 +169,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: The collapsed step values are rejected as a contradiction.
       var exception = Assert.Throws<ArgumentException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("Growth", exception.ParamName);
     }
 
@@ -184,7 +184,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: Growth is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("Growth", exception.ParamName);
     }
 
@@ -196,7 +196,7 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: The overflowing step values are rejected.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeRelSize.Execute(CreateChainGraph(4), options, Seed));
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("Growth", exception.ParamName);
     }
 
@@ -209,7 +209,36 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: Options are validated before the early exit for empty graphs.
       Assert.Throws<ArgumentOutOfRangeException>(
-        () => ProcNodeRelSize.Execute(graph, options, Seed));
+        () => new ProcNodeRelSize(graph, options, Seed).Execute());
+    }
+
+    [Fact]
+    public void Constructor_WithNullGraph_ThrowsArgumentNullException()
+    {
+      // Act & Assert: The pass refuses to be built around a missing graph.
+      var exception = Assert.Throws<ArgumentNullException>(
+        () => new ProcNodeRelSize(null!, ProcNodeRelSizeOpt.Default, Seed));
+      Assert.Equal("graph", exception.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_WithNullOptions_ThrowsArgumentNullException()
+    {
+      // Act & Assert: The pass refuses missing options.
+      var exception = Assert.Throws<ArgumentNullException>(
+        () => new ProcNodeRelSize(CreateChainGraph(4), null!, Seed));
+      Assert.Equal("options", exception.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_WithInvalidOptions_ThrowsBeforeExecute()
+    {
+      // Arrange: Options rejected by validation.
+      var options = ProcNodeRelSizeOpt.Default with { Steps = 0 };
+
+      // Act & Assert: Construction alone rejects the options, before Execute can run.
+      Assert.Throws<ArgumentOutOfRangeException>(
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed));
     }
   }
 
@@ -220,7 +249,7 @@ public sealed class ProcNodeRelSizeTests
     public void BuildStepValues_WithDefaults_ReturnsGeometricSteps()
     {
       // Act: Build the step values of the default options.
-      var values = ProcNodeRelSizeOpt.Default.BuildStepValues();
+      var values = ProcNodeRelSizeOpt.Default.Prepare();
 
       // Assert: Three doublings from 1: 1, 2, 4.
       Assert.Equal(new[] { 1, 2, 4 }, values);
@@ -239,7 +268,7 @@ public sealed class ProcNodeRelSizeTests
       };
 
       // Act: Build the step values.
-      var values = options.BuildStepValues();
+      var values = options.Prepare();
 
       // Assert: Each step adds the increment once.
       Assert.Equal(new[] { 2, 5, 8, 11 }, values);
@@ -253,7 +282,7 @@ public sealed class ProcNodeRelSizeTests
       var graph = CreateChainGraph(10);
 
       // Act: Distribute with a bias-free single-step setup.
-      ProcNodeRelSize.Execute(graph, options, Seed);
+      new ProcNodeRelSize(graph, options, Seed).Execute();
 
       // Assert: Every node uses the single step value, whatever the seed rolled.
       Assert.All(graph.Nodes, node => Assert.Equal(5, node.RelSize));
@@ -274,7 +303,7 @@ public sealed class ProcNodeRelSizeTests
       for (var seed = 0; seed < 10; seed++)
       {
         var graph = CreateStarGraph(15);
-        ProcNodeRelSize.Execute(graph, options, seed);
+        new ProcNodeRelSize(graph, options, seed).Execute();
         Assert.Single(graph.Nodes.Select(node => node.RelSize).Distinct());
       }
     }
@@ -287,13 +316,13 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithDefaults_UsesOnlyStepValues(int nodeCount)
     {
       // Arrange: The default options define the set of allowed values.
-      var expected = ProcNodeRelSizeOpt.Default.BuildStepValues();
+      var expected = ProcNodeRelSizeOpt.Default.Prepare();
 
       // Act & Assert: Across many seeds only step values are ever assigned.
       for (var seed = 0; seed < 20; seed++)
       {
         var graph = CreateChainGraph(nodeCount);
-        ProcNodeRelSize.Execute(graph, ProcNodeRelSizeOpt.Default, seed);
+        new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, seed).Execute();
         Assert.All(graph.Nodes, node => Assert.Contains(node.RelSize, expected));
       }
     }
@@ -308,14 +337,14 @@ public sealed class ProcNodeRelSizeTests
         BiasRelationships = 0f,
         BiasPois = 0f,
       };
-      var expected = options.BuildStepValues();
+      var expected = options.Prepare();
       var seen = new HashSet<int>();
 
       // Act: Distribute many moderately sized graphs and collect every value used.
       for (var seed = 0; seed < 20; seed++)
       {
         var graph = CreateChainGraph(30);
-        ProcNodeRelSize.Execute(graph, options, seed);
+        new ProcNodeRelSize(graph, options, seed).Execute();
         foreach (var node in graph.Nodes)
         {
           seen.Add(node.RelSize);
@@ -334,7 +363,7 @@ public sealed class ProcNodeRelSizeTests
       for (var seed = 0; seed < 10; seed++)
       {
         var graph = CreateStarGraph(20);
-        ProcNodeRelSize.Execute(graph, ProcNodeRelSizeOpt.Default, seed);
+        new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, seed).Execute();
         if (graph.Nodes.Select(node => node.RelSize).Distinct().Count() > 1) varyingGraphs++;
       }
 
@@ -350,7 +379,7 @@ public sealed class ProcNodeRelSizeTests
       var graph = new LilGraph();
 
       // Act: Distribute over the empty graph.
-      ProcNodeRelSize.Execute(graph, ProcNodeRelSizeOpt.Default, Seed);
+      new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, Seed).Execute();
 
       // Assert: Nothing appeared out of nowhere.
       Assert.Empty(graph.Nodes);
@@ -382,7 +411,7 @@ public sealed class ProcNodeRelSizeTests
       for (var seed = 0; seed < 100; seed++)
       {
         var graph = CreateStarGraph(12);
-        ProcNodeRelSize.Execute(graph, options, seed);
+        new ProcNodeRelSize(graph, options, seed).Execute();
         hubTotal += graph.Nodes[0].RelSize;
         for (var i = 1; i < graph.Nodes.Count; i++)
         {
@@ -416,7 +445,7 @@ public sealed class ProcNodeRelSizeTests
       for (var seed = 0; seed < 100; seed++)
       {
         var graph = CreateStarGraph(12, poiNodeIndex: 0, poiCount: 1);
-        ProcNodeRelSize.Execute(graph, options, seed);
+        new ProcNodeRelSize(graph, options, seed).Execute();
         poiTotal += graph.Nodes[0].RelSize;
         for (var i = 1; i < graph.Nodes.Count; i++)
         {
@@ -453,7 +482,7 @@ public sealed class ProcNodeRelSizeTests
         graph.Nodes[0].Pois.Add(CreatePoi(0, 0));
         graph.Nodes[0].Pois.Add(CreatePoi(0, 1));
         graph.Nodes[1].Pois.Add(CreatePoi(1, 0));
-        ProcNodeRelSize.Execute(graph, options, seed);
+        new ProcNodeRelSize(graph, options, seed).Execute();
         doublePoiTotal += graph.Nodes[0].RelSize;
         singlePoiTotal += graph.Nodes[1].RelSize;
       }
@@ -474,7 +503,7 @@ public sealed class ProcNodeRelSizeTests
         BiasRelationships = 0f,
         BiasPois = 1f,
       };
-      var stepValues = options.BuildStepValues();
+      var stepValues = options.Prepare();
       var sawSmallPoiNode = false;
       var sawLargePlainNode = false;
 
@@ -482,7 +511,7 @@ public sealed class ProcNodeRelSizeTests
       for (var seed = 0; seed < 50; seed++)
       {
         var graph = CreateStarGraph(10, poiNodeIndex: 0, poiCount: 1);
-        ProcNodeRelSize.Execute(graph, options, seed);
+        new ProcNodeRelSize(graph, options, seed).Execute();
         if (graph.Nodes[0].RelSize == stepValues[0]) sawSmallPoiNode = true;
         for (var i = 1; i < graph.Nodes.Count; i++)
         {
@@ -512,8 +541,8 @@ public sealed class ProcNodeRelSizeTests
       {
         var biasedGraph = CreateChainGraph(10);
         var plainGraph = CreateChainGraph(10);
-        ProcNodeRelSize.Execute(biasedGraph, biased, seed);
-        ProcNodeRelSize.Execute(plainGraph, plain, seed);
+        new ProcNodeRelSize(biasedGraph, biased, seed).Execute();
+        new ProcNodeRelSize(plainGraph, plain, seed).Execute();
         Assert.Equal(GetAssignments(biasedGraph), GetAssignments(plainGraph));
       }
     }
@@ -536,8 +565,8 @@ public sealed class ProcNodeRelSizeTests
       {
         var biasedGraph = CreateCycleGraph(10);
         var plainGraph = CreateCycleGraph(10);
-        ProcNodeRelSize.Execute(biasedGraph, biased, seed);
-        ProcNodeRelSize.Execute(plainGraph, plain, seed);
+        new ProcNodeRelSize(biasedGraph, biased, seed).Execute();
+        new ProcNodeRelSize(plainGraph, plain, seed).Execute();
         Assert.Equal(GetAssignments(biasedGraph), GetAssignments(plainGraph));
       }
     }
@@ -554,8 +583,8 @@ public sealed class ProcNodeRelSizeTests
       var second = CreateStarGraph(12, poiNodeIndex: 3, poiCount: 2);
 
       // Act: Distribute both with the same seed.
-      ProcNodeRelSize.Execute(first, ProcNodeRelSizeOpt.Default, Seed);
-      ProcNodeRelSize.Execute(second, ProcNodeRelSizeOpt.Default, Seed);
+      new ProcNodeRelSize(first, ProcNodeRelSizeOpt.Default, Seed).Execute();
+      new ProcNodeRelSize(second, ProcNodeRelSizeOpt.Default, Seed).Execute();
 
       // Assert: Same identifiers with the same sizes, in any comparison order.
       GraphTestSupport.AssertEqualGraphs(first, second);
@@ -570,8 +599,8 @@ public sealed class ProcNodeRelSizeTests
       var second = CreateStarGraph(30);
 
       // Act: Distribute both graphs.
-      ProcNodeRelSize.Execute(first, ProcNodeRelSizeOpt.Default, seedGraph: 1);
-      ProcNodeRelSize.Execute(second, ProcNodeRelSizeOpt.Default, seedGraph: 2);
+      new ProcNodeRelSize(first, ProcNodeRelSizeOpt.Default, seedGraph: 1).Execute();
+      new ProcNodeRelSize(second, ProcNodeRelSizeOpt.Default, seedGraph: 2).Execute();
 
       // Assert: The size sequences differ - the dominant step and draws are seed-driven.
       var firstSizes = first.Nodes.Select(node => node.RelSize).ToList();
@@ -589,8 +618,8 @@ public sealed class ProcNodeRelSizeTests
       reversed.Edges.Reverse();
 
       // Act: Distribute both with the same seed.
-      ProcNodeRelSize.Execute(original, ProcNodeRelSizeOpt.Default, Seed);
-      ProcNodeRelSize.Execute(reversed, ProcNodeRelSizeOpt.Default, Seed);
+      new ProcNodeRelSize(original, ProcNodeRelSizeOpt.Default, Seed).Execute();
+      new ProcNodeRelSize(reversed, ProcNodeRelSizeOpt.Default, Seed).Execute();
 
       // Assert: Every identifier keeps the size it got regardless of list order.
       Assert.Equal(GetAssignments(original), GetAssignments(reversed));
@@ -609,7 +638,7 @@ public sealed class ProcNodeRelSizeTests
         .ToList();
 
       // Act: Distribute.
-      ProcNodeRelSize.Execute(graph, ProcNodeRelSizeOpt.Default, Seed);
+      new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, Seed).Execute();
 
       // Assert: Node order, edges and POIs are untouched; only sizes were rewritten.
       Assert.Equal(nodeIdsBefore, graph.Nodes.Select(node => node.Id).ToList());
@@ -622,11 +651,11 @@ public sealed class ProcNodeRelSizeTests
     {
       // Arrange: One graph distributed once.
       var graph = CreateStarGraph(12, poiNodeIndex: 4, poiCount: 1);
-      ProcNodeRelSize.Execute(graph, ProcNodeRelSizeOpt.Default, Seed);
+      new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, Seed).Execute();
       var firstRun = GetAssignments(graph);
 
       // Act: Distribute the very same graph again with the same inputs.
-      ProcNodeRelSize.Execute(graph, ProcNodeRelSizeOpt.Default, Seed);
+      new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, Seed).Execute();
 
       // Assert: Sizes do not feed back into the draws, so the second run is a no-op.
       Assert.Equal(firstRun, GetAssignments(graph));

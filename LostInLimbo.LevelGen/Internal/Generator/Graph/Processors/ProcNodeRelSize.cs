@@ -14,7 +14,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// <remarks>
 /// <para>
 /// Sizes are sampled from a fixed set of step values (see
-/// <see cref="ProcNodeRelSizeOpt.BuildStepValues"/>): the options decide how many
+/// <see cref="ProcNodeRelSizeOpt.Prepare"/>): the options decide how many
 /// steps exist, how large they grow, how strongly one step dominates and how hard
 /// relationships and POIs pull nodes upward. Bias only changes likelihood - a large node
 /// without POIs and with a single relationship stays possible, just less likely.
@@ -35,7 +35,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// <see cref="LilNode.RelSize"/> is modified; identifiers, edges and POIs stay untouched.
 /// </para>
 /// </remarks>
-internal static class ProcNodeRelSize
+internal sealed class ProcNodeRelSize
 {
   /// <summary>Salt for the distribution sub-seed; keeps this pass off other passes' streams.</summary>
   private const long SaltRelSize = 0x72656C73697A65; // "relsize"
@@ -46,54 +46,75 @@ internal static class ProcNodeRelSize
   /// </summary>
   private const int SamplePrecision = 1 << 24;
 
+  /// <summary>Graph whose nodes are rewritten in place; may be empty.</summary>
+  private readonly LilGraph _graph;
+  /// <summary>Distribution parameters; validated at construction.</summary>
+  private readonly ProcNodeRelSizeOpt _options;
+  /// <summary>Random for sub-seed.</summary>
+  private readonly SeededRandom _random;
+
+  /// <summary>Ascending step values built from <c>options</c>; see <see cref="ProcNodeRelSizeOpt.Prepare"/>.</summary>
+  private readonly int[] _stepValues;
+
   /// <summary>
-  /// Assigns one of the configured step values as <see cref="LilNode.RelSize"/> to every
-  /// node of <paramref name="graph"/>.
+  /// Prepares the pass over <paramref name="graph"/>. Validates the options eagerly, so bad
+  /// options are rejected even when the graph is empty.
   /// </summary>
-  /// <param name="graph">Graph whose nodes are rewritten in place; may be empty.</param>
+  /// <param name="graph">Graph whose nodes are rewritten in place by <see cref="Execute"/>; may be empty.</param>
   /// <param name="options">Distribution parameters; validated before use.</param>
   /// <param name="seedGraph">Graph sub-seed the distribution stream is derived from.</param>
   /// <exception cref="ArgumentNullException"><paramref name="graph"/> or <paramref name="options"/> is null.</exception>
   /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="ProcNodeRelSizeOpt.Validate"/>.</exception>
   /// <exception cref="ArgumentException">Options contradict each other; see <see cref="ProcNodeRelSizeOpt.Validate"/>.</exception>
-  /// <exception cref="InvalidOperationException">An edge references a node missing from the graph, or two nodes share an identifier.</exception>
-  public static void Execute(LilGraph graph, ProcNodeRelSizeOpt options, long seedGraph)
+  public ProcNodeRelSize(LilGraph graph, ProcNodeRelSizeOpt options, long seedGraph)
   {
     if (graph is null) throw new ArgumentNullException(nameof(graph));
     if (options is null) throw new ArgumentNullException(nameof(options));
 
+    _graph = graph;
+    _options = options;
+    _random = new SeededRandom(SeedDerivation.Derive(seedGraph, SaltRelSize));
     // Validation runs even for empty graphs, so bad options never pass silently.
-    var stepValues = options.BuildStepValues();
-    if (graph.Nodes.Count == 0) return;
+    _stepValues = options.Prepare();
+  }
+
+  /// <summary>
+  /// Assigns one of the configured step values as <see cref="LilNode.RelSize"/> to every
+  /// node of the graph given to the constructor. Calling it twice is safe: the assignment
+  /// does not feed back into the draws.
+  /// </summary>
+  /// <exception cref="InvalidOperationException">An edge references a node missing from the graph, or two nodes share an identifier.</exception>
+  public void Execute()
+  {
+    if (_graph.Nodes.Count == 0) return;
 
     // One node: with no variation allowed by validation, every node gets the single step.
-    if (stepValues.Length == 1)
+    if (_stepValues.Length == 1)
     {
-      for (var i = 0; i < graph.Nodes.Count; i++)
+      for (var i = 0; i < _graph.Nodes.Count; i++)
       {
-        graph.Nodes[i] = graph.Nodes[i] with { RelSize = stepValues[0] };
+        _graph.Nodes[i] = _graph.Nodes[i] with { RelSize = _stepValues[0] };
       }
 
       return;
     }
 
-    var random = new SeededRandom(SeedDerivation.Derive(seedGraph, SaltRelSize));
-    var dominant = random.NextInt(stepValues.Length);
+    var dominant = _random.NextInt(_stepValues.Length);
 
-    var degrees = GetDegrees(graph);
+    var degrees = GetDegrees();
     var (minDegree, maxDegree) = GetRange(degrees);
-    var (minPois, maxPois) = GetPoiRange(graph);
+    var (minPois, maxPois) = GetPoiRange();
 
     // Visit in Id order so insertion order cannot influence which draws a node receives.
-    var order = BuildVisitOrder(graph);
-    var weights = new float[stepValues.Length];
+    var order = BuildVisitOrder();
+    var weights = new float[_stepValues.Length];
     foreach (var index in order)
     {
-      var node = graph.Nodes[index];
-      var bias = options.BiasRelationships * Normalize(degrees[index], minDegree, maxDegree)
-               + options.BiasPois * Normalize(node.Pois.Count, minPois, maxPois);
-      var step = SampleStep(random, stepValues.Length, options.Skew, dominant, bias, weights);
-      graph.Nodes[index] = node with { RelSize = stepValues[step] };
+      var node = _graph.Nodes[index];
+      var bias = _options.BiasRelationships * Normalize(degrees[index], minDegree, maxDegree)
+               + _options.BiasPois * Normalize(node.Pois.Count, minPois, maxPois);
+      var step = SampleStep(_stepValues.Length, _options.Skew, dominant, bias, weights);
+      _graph.Nodes[index] = node with { RelSize = _stepValues[step] };
     }
   }
 
@@ -105,19 +126,18 @@ internal static class ProcNodeRelSize
   /// Counts how many relationships touch each node, in node-index order. Both endpoints
   /// count for every edge - a passage is a relationship of both its nodes, one-way or not.
   /// </summary>
-  /// <param name="graph">Graph to inspect.</param>
   /// <returns>Relationship count per node index.</returns>
   /// <exception cref="InvalidOperationException">An edge references a missing node, or two nodes share an identifier.</exception>
-  private static int[] GetDegrees(LilGraph graph)
+  private int[] GetDegrees()
   {
-    var indexById = new Dictionary<Guid, int>(graph.Nodes.Count);
-    for (var i = 0; i < graph.Nodes.Count; i++)
+    var indexById = new Dictionary<Guid, int>(_graph.Nodes.Count);
+    for (var i = 0; i < _graph.Nodes.Count; i++)
     {
-      indexById.Add(graph.Nodes[i].Id, i);
+      indexById.Add(_graph.Nodes[i].Id, i);
     }
 
-    var degrees = new int[graph.Nodes.Count];
-    foreach (var edge in graph.Edges)
+    var degrees = new int[_graph.Nodes.Count];
+    foreach (var edge in _graph.Edges)
     {
       if (!indexById.TryGetValue(edge.From, out var from))
         throw new InvalidOperationException($"Edge {edge.Id} references unknown node {edge.From}.");
@@ -134,17 +154,16 @@ internal static class ProcNodeRelSize
   /// <summary>
   /// Produces the node indices in ascending Id order.
   /// </summary>
-  /// <param name="graph">Graph whose nodes are visited.</param>
   /// <returns>Node indices sorted by <see cref="LilNode.Id"/>.</returns>
-  private static List<int> BuildVisitOrder(LilGraph graph)
+  private List<int> BuildVisitOrder()
   {
-    var order = new List<int>(graph.Nodes.Count);
-    for (var i = 0; i < graph.Nodes.Count; i++)
+    var order = new List<int>(_graph.Nodes.Count);
+    for (var i = 0; i < _graph.Nodes.Count; i++)
     {
       order.Add(i);
     }
 
-    order.Sort((left, right) => graph.Nodes[left].Id.CompareTo(graph.Nodes[right].Id));
+    order.Sort((left, right) => _graph.Nodes[left].Id.CompareTo(_graph.Nodes[right].Id));
     return order;
   }
 
@@ -153,7 +172,7 @@ internal static class ProcNodeRelSize
   /// </summary>
   /// <param name="values">Values to range over; must not be empty.</param>
   /// <returns>The minimum and maximum value.</returns>
-  private static (int Min, int Max) GetRange(int[] values)
+  private (int Min, int Max) GetRange(int[] values)
   {
     var min = values[0];
     var max = values[0];
@@ -169,15 +188,14 @@ internal static class ProcNodeRelSize
   /// <summary>
   /// Finds the smallest and largest POI count across all nodes.
   /// </summary>
-  /// <param name="graph">Graph to inspect.</param>
   /// <returns>The minimum and maximum POI count.</returns>
-  private static (int Min, int Max) GetPoiRange(LilGraph graph)
+  private (int Min, int Max) GetPoiRange()
   {
-    var min = graph.Nodes[0].Pois.Count;
+    var min = _graph.Nodes[0].Pois.Count;
     var max = min;
-    for (var i = 1; i < graph.Nodes.Count; i++)
+    for (var i = 1; i < _graph.Nodes.Count; i++)
     {
-      var count = graph.Nodes[i].Pois.Count;
+      var count = _graph.Nodes[i].Pois.Count;
       if (count < min) min = count;
       if (count > max) max = count;
     }
@@ -192,7 +210,7 @@ internal static class ProcNodeRelSize
   /// <param name="min">Smallest count in the graph.</param>
   /// <param name="max">Largest count in the graph.</param>
   /// <returns>Normalized value, or 0 when all nodes share the same count - no distinction, no bias.</returns>
-  private static float Normalize(int value, int min, int max)
+  private float Normalize(int value, int min, int max)
   {
     if (max <= min) return 0f;
     return (value - min) / (float)(max - min);
@@ -201,15 +219,13 @@ internal static class ProcNodeRelSize
   /// <summary>
   /// Samples one step index for a single node.
   /// </summary>
-  /// <param name="random">Seeded generator providing the draw.</param>
   /// <param name="stepCount">Amount of step values; at least 2.</param>
   /// <param name="skew">Base concentration on the dominant step; within [0, 1].</param>
   /// <param name="dominant">Index of the step the skew pulls toward.</param>
   /// <param name="bias">Node's upward pull; 0 means no tilt.</param>
   /// <param name="weights">Scratch buffer of at least <paramref name="stepCount"/> entries; fully rewritten.</param>
   /// <returns>Sampled step index within <c>[0, stepCount)</c>. Deterministic for the same generator state.</returns>
-  private static int SampleStep(
-    SeededRandom random,
+  private int SampleStep(
     int stepCount,
     float skew,
     int dominant,
@@ -230,7 +246,7 @@ internal static class ProcNodeRelSize
     }
 
     // Inverse-CDF sample over the weights with a uniform fixed-point draw.
-    var target = random.NextInt(SamplePrecision) * (total / SamplePrecision);
+    var target = _random.NextInt(SamplePrecision) * (total / SamplePrecision);
     var cumulative = 0f;
     for (var step = 0; step < stepCount; step++)
     {

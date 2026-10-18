@@ -80,6 +80,19 @@ internal sealed record ProcNodeRelSizeOpt
   public float BiasPois { get; init; }
 
   /// <summary>
+  /// Builds the ascending step values this configuration distributes, for example
+  /// 1, 2, 4 for the default geometric settings.
+  /// </summary>
+  /// <returns>Step values from smallest to largest; a single value when <see cref="Steps"/> is 1.</returns>
+  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="Validate"/>.</exception>
+  /// <exception cref="ArgumentException">Options contradict each other; see <see cref="Validate"/>.</exception>
+  public int[] Prepare()
+  {
+    Validate();
+    return ComputeStepValues();
+  }
+
+  /// <summary>
   /// Checks that these options are valid.
   /// </summary>
   /// <exception cref="ArgumentOutOfRangeException">
@@ -125,19 +138,6 @@ internal sealed record ProcNodeRelSizeOpt
       if (values[i] <= values[i - 1])
         throw new ArgumentException($"Curve {Curve} with Growth {Growth} does not produce strictly increasing step values; raise Growth or lower Steps.", nameof(Growth));
     }
-  }
-
-  /// <summary>
-  /// Builds the ascending step values this configuration distributes, for example
-  /// 1, 2, 4 for the default geometric settings.
-  /// </summary>
-  /// <returns>Step values from smallest to largest; a single value when <see cref="Steps"/> is 1.</returns>
-  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="Validate"/>.</exception>
-  /// <exception cref="ArgumentException">Options contradict each other; see <see cref="Validate"/>.</exception>
-  public int[] BuildStepValues()
-  {
-    Validate();
-    return ComputeStepValues();
   }
 
   //
