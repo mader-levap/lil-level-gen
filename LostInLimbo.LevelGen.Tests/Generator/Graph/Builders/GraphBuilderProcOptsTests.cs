@@ -1,0 +1,203 @@
+using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Result.Graph;
+
+namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
+
+/// <summary>
+/// Tests that the graph builders consume processor options from
+/// <see cref="CnfGraph.ProcOpts"/> instead of the hardcoded defaults.
+/// </summary>
+/// <remarks>
+/// Both finalising builders run the same four processors, so the wiring tests cover
+/// <c>Simple</c> and <c>Linear</c> alike. Amount assertions only ever count up to the
+/// requested amount, because processor amounts are soft when eligible nodes run out.
+/// </remarks>
+public sealed class GraphBuilderProcOptsTests
+{
+  [Theory]
+  [InlineData(EnGraphBuilder.Simple)]
+  [InlineData(EnGraphBuilder.Linear)]
+  public void Build_WithZeroSecretAmount_ProducesNoSecretNodes(EnGraphBuilder builder)
+  {
+    // Arrange: Config disabling the secrets processor via proc options.
+    var graphConfig = new CnfGraph
+    {
+      Size = 5,
+      ProcOpts = CnfProcOpts.Default with
+      {
+        RelSecrets = new CnfProcRelSecretsOpts { Amount = 0 },
+      },
+    };
+
+    // Act: Build through the factory like production dispatch does.
+    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+
+    // Assert: No secret node exists and no secret edge was appended.
+    Assert.True(success);
+    Assert.Empty(graph.Nodes.Where(node => node.Secret));
+    Assert.Empty(graph.Edges.Where(edge => edge.Secret));
+  }
+
+  [Theory]
+  [InlineData(EnGraphBuilder.Simple)]
+  [InlineData(EnGraphBuilder.Linear)]
+  public void Build_WithCustomSecretAmount_ProducesThatManySecretNodes(EnGraphBuilder builder)
+  {
+    // Arrange: Config raising the secret count above the default of one.
+    var graphConfig = new CnfGraph
+    {
+      Size = 10,
+      ProcOpts = CnfProcOpts.Default with
+      {
+        RelSecrets = new CnfProcRelSecretsOpts { Amount = 3 },
+      },
+    };
+
+    // Act: Build through the factory like production dispatch does.
+    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+
+    // Assert: The configured amount of secret nodes exists.
+    Assert.True(success);
+    Assert.Equal(3, graph.Nodes.Count(node => node.Secret));
+  }
+
+  [Theory]
+  [InlineData(EnGraphBuilder.Simple)]
+  [InlineData(EnGraphBuilder.Linear)]
+  public void Build_WithZeroObjectiveAmounts_ProducesNoGoalPois(EnGraphBuilder builder)
+  {
+    // Arrange: Config disabling the objectives processor via proc options.
+    var graphConfig = new CnfGraph
+    {
+      Size = 5,
+      ProcOpts = CnfProcOpts.Default with
+      {
+        NodeObjectives = new CnfProcNodeObjectivesOpts { GoalAmount = 0, OptGoalAmount = 0 },
+      },
+    };
+
+    // Act: Build through the factory like production dispatch does.
+    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+
+    // Assert: Neither goal nor optional-goal POIs exist; start and exit still do.
+    Assert.True(success);
+    Assert.Empty(GraphTestSupport.GetPois(graph, EnPoiType.Goal));
+    Assert.Empty(GraphTestSupport.GetPois(graph, EnPoiType.OptionalGoal));
+    Assert.Single(GraphTestSupport.GetPois(graph, EnPoiType.Start));
+    Assert.Single(GraphTestSupport.GetPois(graph, EnPoiType.Exit));
+  }
+
+  [Theory]
+  [InlineData(EnGraphBuilder.Simple)]
+  [InlineData(EnGraphBuilder.Linear)]
+  public void Build_WithCustomGoalAmount_ProducesThatManyGoalPois(EnGraphBuilder builder)
+  {
+    // Arrange: Config raising the mandatory goal count; enough nodes to host them.
+    var graphConfig = new CnfGraph
+    {
+      Size = 10,
+      ProcOpts = CnfProcOpts.Default with
+      {
+        NodeObjectives = new CnfProcNodeObjectivesOpts { GoalAmount = 3, OptGoalAmount = 0 },
+      },
+    };
+
+    // Act: Build through the factory like production dispatch does.
+    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+
+    // Assert: The requested mandatory goals exist (node capacity is ample) and no
+    // optional goals were placed.
+    Assert.True(success);
+    Assert.Equal(3, GraphTestSupport.GetPois(graph, EnPoiType.Goal).Count);
+    Assert.Empty(GraphTestSupport.GetPois(graph, EnPoiType.OptionalGoal));
+  }
+
+  [Theory]
+  [InlineData(EnGraphBuilder.Simple)]
+  [InlineData(EnGraphBuilder.Linear)]
+  public void Build_WithSingleRelSizeStep_AssignsMinSizeToEveryNode(EnGraphBuilder builder)
+  {
+    // Arrange: A single step at a distinctive size, biases off to satisfy the
+    // single-step contradiction rule; secrets stay at the default of one.
+    var graphConfig = new CnfGraph
+    {
+      Size = 5,
+      ProcOpts = CnfProcOpts.Default with
+      {
+        NodeRelSize = new CnfProcNodeRelSizeOpts
+        {
+          Steps = 1,
+          MinSize = 7,
+          BiasRelationships = 0f,
+          BiasPois = 0f,
+        },
+      },
+    };
+
+    // Act: Build through the factory like production dispatch does.
+    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+
+    // Assert: Every node - including the secret one - carries the single step value.
+    Assert.True(success);
+    Assert.All(graph.Nodes, node => Assert.Equal(7, node.RelSize));
+  }
+
+  [Theory]
+  [InlineData(EnGraphBuilder.Simple)]
+  [InlineData(EnGraphBuilder.Linear)]
+  public void Build_WithSingleGroup_AssignsOneGroupToEveryNode(EnGraphBuilder builder)
+  {
+    // Arrange: Config collapsing the grouping into a single group.
+    var graphConfig = new CnfGraph
+    {
+      Size = 5,
+      ProcOpts = CnfProcOpts.Default with
+      {
+        NodeStyle = new CnfProcNodeStyleOpts { GroupCount = 1 },
+      },
+    };
+
+    // Act: Build through the factory like production dispatch does.
+    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+
+    // Assert: Every node was grouped and all groups are identical.
+    Assert.True(success);
+    Assert.All(graph.Nodes, node => Assert.NotNull(node.Style.Group));
+    Assert.Single(graph.Nodes.Select(node => node.Style.Group).Distinct());
+  }
+
+  [Theory]
+  [InlineData(EnGraphBuilder.Simple)]
+  [InlineData(EnGraphBuilder.Linear)]
+  public void Build_WithSameProcOptsAndSeed_ProducesIdenticalData(EnGraphBuilder builder)
+  {
+    // Arrange: Custom options for every processor and a fixed seed.
+    var graphConfig = new CnfGraph
+    {
+      Size = 10,
+      Connectivity = 3,
+      ProcOpts = CnfProcOpts.Default with
+      {
+        RelSecrets = new CnfProcRelSecretsOpts { Amount = 2, ChanceSecretInSecret = 0.5f },
+        NodeObjectives = new CnfProcNodeObjectivesOpts { GoalAmount = 2, OptGoalAmount = 1 },
+        NodeRelSize = new CnfProcNodeRelSizeOpts { Steps = 4, Skew = 0.5f },
+        NodeStyle = new CnfProcNodeStyleOpts { GroupCount = 2 },
+      },
+    };
+
+    // Act: Build twice with the same config and seed.
+    var (_, first) = GraphTestSupport.Build(builder, graphConfig);
+    var (_, second) = GraphTestSupport.Build(builder, graphConfig);
+
+    // Assert: Sizes, groups, POIs and edges are identical - options did not break
+    // determinism.
+    Assert.Equal(GraphTestSupport.GetAssignments(first), GraphTestSupport.GetAssignments(second));
+    Assert.Equal(GraphTestSupport.GetGroupAssignments(first), GraphTestSupport.GetGroupAssignments(second));
+    Assert.Equal(
+      GraphTestSupport.GetPois(first, EnPoiType.Goal).Select(poi => poi.Id),
+      GraphTestSupport.GetPois(second, EnPoiType.Goal).Select(poi => poi.Id));
+    Assert.Equal(
+      first.Edges.Select(edge => edge.Id),
+      second.Edges.Select(edge => edge.Id));
+  }
+}

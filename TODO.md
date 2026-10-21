@@ -1,5 +1,5 @@
 Current tasks:
-- find way to set processor options
+- (none)
 
 Later:
 - Rework config data more.

@@ -105,6 +105,69 @@ public sealed class LevelGenerationSerializerTests
       // Assert: The roundtrip is lossless (structural record equality).
       Assert.Equal(config, roundtripped);
     }
+
+    [Fact]
+    public void Serialize_WithCustomProcOpts_WritesCamelCaseSections()
+    {
+      // Arrange: Config with non-default processor options in every section.
+      var config = CnfLevelGeneration.Default with
+      {
+        Graph = new CnfGraph
+        {
+          ProcOpts = CnfProcOpts.Default with
+          {
+            RelSecrets = new CnfProcRelSecretsOpts { Amount = 2, ChanceSecretInSecret = 0.25f },
+            NodeStyle = new CnfProcNodeStyleOpts { GroupCount = 4 },
+          },
+        },
+      };
+
+      // Act: Serialize to canonical JSON.
+      var json = LevelGenerationSerializer.SerializeConfig(config);
+
+      // Assert: The proc options cross the boundary as nested camelCase objects.
+      Assert.Contains("\"procOpts\"", json);
+      Assert.Contains("\"relSecrets\"", json);
+      Assert.Contains("\"chanceSecretInSecret\": 0.25", json);
+      Assert.Contains("\"nodeStyle\"", json);
+      Assert.Contains("\"groupCount\": 4", json);
+    }
+
+    [Fact]
+    public void Roundtrip_PreservesProcessorOptions()
+    {
+      // Arrange: Config exercising every processor-options field with non-default values.
+      var config = CnfLevelGeneration.Default with
+      {
+        Graph = new CnfGraph
+        {
+          Builder = EnGraphBuilder.Linear,
+          ProcOpts = new CnfProcOpts
+          {
+            RelSecrets = new CnfProcRelSecretsOpts { Amount = 3, ChanceSecretInSecret = 0.75f },
+            NodeObjectives = new CnfProcNodeObjectivesOpts { GoalAmount = 2, OptGoalAmount = 4 },
+            NodeRelSize = new CnfProcNodeRelSizeOpts
+            {
+              Steps = 5,
+              Skew = 0.9f,
+              Curve = EnRelSizeCurve.Linear,
+              MinSize = 2,
+              Growth = 1.5f,
+              BiasRelationships = 0.1f,
+              BiasPois = 0.2f,
+            },
+            NodeStyle = new CnfProcNodeStyleOpts { GroupCount = 7 },
+          },
+        },
+      };
+
+      // Act: Serialize then deserialize.
+      var roundtripped = LevelGenerationSerializer.DeserializeConfig(
+        LevelGenerationSerializer.SerializeConfig(config));
+
+      // Assert: The roundtrip is lossless (structural record equality).
+      Assert.Equal(config, roundtripped);
+    }
   }
 
   /// <summary>Tests <see cref="LevelGenerationSerializer.DeserializeConfig"/> error paths: rejected inputs, parse failures and validation failures.</summary>
@@ -205,6 +268,54 @@ public sealed class LevelGenerationSerializerTests
     }
 
     [Fact]
+    public void Deserialize_WithNullProcOptsSection_ThrowsArgumentExceptionNamingProcOpts()
+    {
+      // Arrange: Well-formed JSON explicitly nulling the processor options section.
+      var json = "{ \"graph\": { \"procOpts\": null } }";
+
+      // Act/Assert: Validation runs after parsing and names the offending section.
+      var exception = Assert.Throws<ArgumentException>(
+        () => LevelGenerationSerializer.DeserializeConfig(json));
+      Assert.Equal("ProcOpts", exception.ParamName);
+    }
+
+    [Fact]
+    public void Deserialize_WithNullProcSection_ThrowsArgumentExceptionNamingSection()
+    {
+      // Arrange: Well-formed JSON explicitly nulling one processor's section.
+      var json = "{ \"graph\": { \"procOpts\": { \"relSecrets\": null } } }";
+
+      // Act/Assert: Validation cascades into the section and names it.
+      var exception = Assert.Throws<ArgumentException>(
+        () => LevelGenerationSerializer.DeserializeConfig(json));
+      Assert.Equal("RelSecrets", exception.ParamName);
+    }
+
+    [Fact]
+    public void Deserialize_WithInvalidProcOptsValue_ThrowsNamingNestedProperty()
+    {
+      // Arrange: Well-formed JSON whose processor options violate their own invariants.
+      var json = "{ \"graph\": { \"procOpts\": { \"relSecrets\": { \"amount\": -1 } } } }";
+
+      // Act/Assert: Validation runs on the deserialized result and names the nested property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(
+        () => LevelGenerationSerializer.DeserializeConfig(json));
+      Assert.Equal("Amount", exception.ParamName);
+    }
+
+    [Fact]
+    public void Deserialize_WithInvalidNodeStyleCount_ThrowsNamingGroupCount()
+    {
+      // Arrange: Well-formed JSON demanding fewer than one style group.
+      var json = "{ \"graph\": { \"procOpts\": { \"nodeStyle\": { \"groupCount\": 0 } } } }";
+
+      // Act/Assert: Validation runs on the deserialized result and names the nested property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(
+        () => LevelGenerationSerializer.DeserializeConfig(json));
+      Assert.Equal("GroupCount", exception.ParamName);
+    }
+
+    [Fact]
     public void Deserialize_WithUnknownEnumName_ThrowsArgumentExceptionWrappingJsonException()
     {
       // Arrange: Well-formed JSON naming a builder that does not exist.
@@ -290,6 +401,53 @@ public sealed class LevelGenerationSerializerTests
 
       // Assert: Enum name matching on read forgives casing, like property names do.
       Assert.Equal(EnGraphBuilder.Linear, config.Graph.Builder);
+    }
+
+    [Fact]
+    public void Deserialize_WithoutProcOpts_KeepsDefaultOptions()
+    {
+      // Arrange: Hand-written JSON omitting the processor options entirely.
+      var json = "{ \"graph\": { \"builder\": \"Linear\" } }";
+
+      // Act: Deserialize.
+      var config = LevelGenerationSerializer.DeserializeConfig(json);
+
+      // Assert: Missing proc options keep the defaults matching the legacy hardcoded ones.
+      Assert.Equal(CnfProcOpts.Default, config.Graph.ProcOpts);
+    }
+
+    [Fact]
+    public void Deserialize_WithPartialProcOpts_KeepsUnsetSectionDefaults()
+    {
+      // Arrange: Hand-written JSON overriding only one processor's section.
+      var json = "{ \"graph\": { \"procOpts\": { \"relSecrets\": { \"amount\": 0 } } } }";
+
+      // Act: Deserialize.
+      var config = LevelGenerationSerializer.DeserializeConfig(json);
+
+      // Assert: The overridden section carries the custom value, every other section its
+      // default.
+      Assert.Equal(0, config.Graph.ProcOpts.RelSecrets.Amount);
+      Assert.Equal(
+        CnfProcRelSecretsOpts.Default.ChanceSecretInSecret,
+        config.Graph.ProcOpts.RelSecrets.ChanceSecretInSecret);
+      Assert.Equal(CnfProcNodeObjectivesOpts.Default, config.Graph.ProcOpts.NodeObjectives);
+      Assert.Equal(CnfProcNodeRelSizeOpts.Default, config.Graph.ProcOpts.NodeRelSize);
+      Assert.Equal(CnfProcNodeStyleOpts.Default, config.Graph.ProcOpts.NodeStyle);
+    }
+
+    [Fact]
+    public void Deserialize_WithProcOptsCurveName_ParsesEnum()
+    {
+      // Arrange: Hand-written JSON naming the rel-size curve.
+      var json = "{ \"graph\": { \"procOpts\": { \"nodeRelSize\": { \"curve\": \"linear\" } } } }";
+
+      // Act: Deserialize.
+      var config = LevelGenerationSerializer.DeserializeConfig(json);
+
+      // Assert: The enum member name maps back to its value, case-insensitively like
+      // every other name on read.
+      Assert.Equal(EnRelSizeCurve.Linear, config.Graph.ProcOpts.NodeRelSize.Curve);
     }
   }
 }

@@ -55,12 +55,18 @@ public sealed record CnfGraph
   /// </summary>
   public int Complexity { get; init; } = DefaultComplexity;
 
+  /// <summary>
+  /// Options of the graph finalisation processors. Ignored by builders that run no processors.
+  /// </summary>
+  public CnfProcOpts ProcOpts { get; init; } = CnfProcOpts.Default;
+
   //
 
   /// <summary>
   /// Checks that this config can be used for generation.
   /// </summary>
   /// <exception cref="ArgumentOutOfRangeException">The builder is not a defined enum value, or a value is out of range.</exception>
+  /// <exception cref="ArgumentException">ProcOpts is null, or its values are invalid.</exception>
   public void Validate()
   {
     if (!Enum.IsDefined(typeof(EnGraphBuilder), Builder))
@@ -73,5 +79,8 @@ public sealed record CnfGraph
       throw new ArgumentOutOfRangeException(nameof(Connectivity), Connectivity, "Connectivity must be at least 0.");
     if (Complexity < 0)
       throw new ArgumentOutOfRangeException(nameof(Complexity), Complexity, "Complexity must be at least 0.");
+    if (ProcOpts is null)
+      throw new ArgumentException("ProcOpts config must not be null.", nameof(ProcOpts));
+    ProcOpts.Validate();
   }
 }

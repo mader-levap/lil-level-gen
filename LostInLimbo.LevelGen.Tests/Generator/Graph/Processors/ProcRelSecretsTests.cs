@@ -1,3 +1,4 @@
+using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
@@ -30,7 +31,7 @@ public sealed class ProcRelSecretsTests
     public void Constructor_WithNullGraph_ThrowsArgumentNullException()
     {
       // Act & Assert: A missing graph is rejected.
-      Assert.Throws<ArgumentNullException>(() => new ProcRelSecrets(null!, ProcRelSecretsOpt.Default, Seed));
+      Assert.Throws<ArgumentNullException>(() => new ProcRelSecrets(null!, CnfProcRelSecretsOpts.Default, Seed));
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public sealed class ProcRelSecretsTests
     public void Execute_WithNegativeAmount_ThrowsArgumentOutOfRangeException(int amount)
     {
       // Arrange: Options demanding a forbidden secret count.
-      var options = ProcRelSecretsOpt.Default with { Amount = amount };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = amount };
 
       // Act & Assert: The pass rejects the options before touching the graph.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -62,7 +63,7 @@ public sealed class ProcRelSecretsTests
     public void Execute_WithChanceOutOfRange_ThrowsArgumentOutOfRangeException(float chance)
     {
       // Arrange: Options with a nesting chance outside [0, 1] (NaN included).
-      var options = ProcRelSecretsOpt.Default with { ChanceSecretInSecret = chance };
+      var options = CnfProcRelSecretsOpts.Default with { ChanceSecretInSecret = chance };
 
       // Act & Assert: The chance is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -74,7 +75,7 @@ public sealed class ProcRelSecretsTests
     public void Constructor_WithInvalidOptions_ThrowsBeforeExecute()
     {
       // Arrange: Options rejected by validation.
-      var options = ProcRelSecretsOpt.Default with { Amount = -1 };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = -1 };
 
       // Act & Assert: Construction alone rejects the options, before Execute can run.
       Assert.Throws<ArgumentOutOfRangeException>(
@@ -85,7 +86,7 @@ public sealed class ProcRelSecretsTests
     public void Execute_WithInvalidOptionsOnEmptyGraph_ThrowsArgumentOutOfRangeException()
     {
       // Arrange: Empty graph; validation must still run.
-      var options = ProcRelSecretsOpt.Default with { Amount = -1 };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = -1 };
 
       // Act & Assert: Bad options never pass silently, even without nodes.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -102,7 +103,7 @@ public sealed class ProcRelSecretsTests
     {
       // Arrange: A chain graph and options that disable the pass.
       var graph = CreateStartExitChainGraph(4);
-      var options = ProcRelSecretsOpt.Default with { Amount = 0 };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = 0 };
 
       // Act: Run the pass.
       new ProcRelSecrets(graph, options, Seed).Execute();
@@ -121,7 +122,7 @@ public sealed class ProcRelSecretsTests
       var graph = new LilGraph();
 
       // Act: Run the pass with the default amount.
-      new ProcRelSecrets(graph, ProcRelSecretsOpt.Default, Seed).Execute();
+      new ProcRelSecrets(graph, CnfProcRelSecretsOpts.Default, Seed).Execute();
 
       // Assert: The graph stays empty instead of failing.
       Assert.Empty(graph.Nodes);
@@ -137,7 +138,7 @@ public sealed class ProcRelSecretsTests
       var originalEdgeIds = graph.Edges.Select(edge => edge.Id).ToHashSet();
 
       // Act: Add a single secret.
-      new ProcRelSecrets(graph, ProcRelSecretsOpt.Default, Seed).Execute();
+      new ProcRelSecrets(graph, CnfProcRelSecretsOpts.Default, Seed).Execute();
 
       // Assert: One secret node was appended - no POIs of its own, not colliding with
       // the original identifiers.
@@ -169,7 +170,7 @@ public sealed class ProcRelSecretsTests
       // Arrange: A chain graph and options that forbid nesting.
       var graph = CreateStartExitChainGraph(4);
       var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
-      var options = ProcRelSecretsOpt.Default with { Amount = 3, ChanceSecretInSecret = 0f };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = 3, ChanceSecretInSecret = 0f };
 
       // Act: Add three secrets.
       new ProcRelSecrets(graph, options, Seed).Execute();
@@ -204,7 +205,7 @@ public sealed class ProcRelSecretsTests
       {
         // Arrange: A chain graph with two secrets.
         var graph = CreateStartExitChainGraph(5);
-        var options = ProcRelSecretsOpt.Default with { Amount = 2 };
+        var options = CnfProcRelSecretsOpts.Default with { Amount = 2 };
 
         // Act: Add the secrets.
         new ProcRelSecrets(graph, options, seed).Execute();
@@ -227,7 +228,7 @@ public sealed class ProcRelSecretsTests
         // Arrange: A chain graph and options that forbid nesting.
         var graph = CreateStartExitChainGraph(4);
         var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
-        var options = ProcRelSecretsOpt.Default with { Amount = 5, ChanceSecretInSecret = 0f };
+        var options = CnfProcRelSecretsOpts.Default with { Amount = 5, ChanceSecretInSecret = 0f };
 
         // Act: Add five secrets.
         new ProcRelSecrets(graph, options, seed).Execute();
@@ -245,7 +246,7 @@ public sealed class ProcRelSecretsTests
     {
       // Arrange: A chain graph and options that force nesting.
       var graph = CreateStartExitChainGraph(4);
-      var options = ProcRelSecretsOpt.Default with { Amount = 3, ChanceSecretInSecret = 1f };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = 3, ChanceSecretInSecret = 1f };
 
       // Act: Add three secrets; the processor appends one edge per secret, in order.
       new ProcRelSecrets(graph, options, Seed).Execute();
@@ -268,7 +269,7 @@ public sealed class ProcRelSecretsTests
         // Arrange: A chain graph and options that force nesting.
         var graph = CreateStartExitChainGraph(4);
         var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
-        var options = ProcRelSecretsOpt.Default with { Amount = 4, ChanceSecretInSecret = 1f };
+        var options = CnfProcRelSecretsOpts.Default with { Amount = 4, ChanceSecretInSecret = 1f };
 
         // Act: Add four secrets.
         new ProcRelSecrets(graph, options, seed).Execute();
@@ -294,7 +295,7 @@ public sealed class ProcRelSecretsTests
         // Arrange: A chain graph and default-chance options.
         var graph = CreateStartExitChainGraph(4);
         var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
-        var options = ProcRelSecretsOpt.Default with { Amount = 5 };
+        var options = CnfProcRelSecretsOpts.Default with { Amount = 5 };
 
         // Act: Add five secrets.
         new ProcRelSecrets(graph, options, seed).Execute();
@@ -327,7 +328,7 @@ public sealed class ProcRelSecretsTests
         ]);
 
       // Act: Add a single secret.
-      new ProcRelSecrets(graph, ProcRelSecretsOpt.Default, Seed).Execute();
+      new ProcRelSecrets(graph, CnfProcRelSecretsOpts.Default, Seed).Execute();
 
       // Assert: The full node keeps its single relationship; the secret hangs off the
       // node that still has capacity.
@@ -349,7 +350,7 @@ public sealed class ProcRelSecretsTests
       var originalEdgeCount = graph.Edges.Count;
 
       // Act: Ask for three secrets anyway.
-      new ProcRelSecrets(graph, ProcRelSecretsOpt.Default with { Amount = 3 }, Seed).Execute();
+      new ProcRelSecrets(graph, CnfProcRelSecretsOpts.Default with { Amount = 3 }, Seed).Execute();
 
       // Assert: The pass stops gracefully instead of exceeding any cap or failing.
       Assert.Equal(originalNodeCount, graph.Nodes.Count);
@@ -370,7 +371,7 @@ public sealed class ProcRelSecretsTests
           (maxEdges: 2, start: false, exit: false),
           (maxEdges: 1, start: false, exit: true),
         ]);
-      var options = ProcRelSecretsOpt.Default with { Amount = 2, ChanceSecretInSecret = 0f };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = 2, ChanceSecretInSecret = 0f };
 
       // Act: Add two secrets; the nesting chance is off, so both roll ordinary hosts.
       new ProcRelSecrets(graph, options, Seed).Execute();
@@ -393,7 +394,7 @@ public sealed class ProcRelSecretsTests
           (maxEdges: 2, start: false, exit: true),
         ]);
       var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
-      var options = ProcRelSecretsOpt.Default with { Amount = 4, ChanceSecretInSecret = 1f };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = 4, ChanceSecretInSecret = 1f };
 
       // Act: Add four secrets with nesting forced.
       new ProcRelSecrets(graph, options, Seed).Execute();
@@ -421,7 +422,7 @@ public sealed class ProcRelSecretsTests
           (maxEdges: 2, start: false, exit: false),
           (maxEdges: 2, start: false, exit: true),
         ]);
-        var options = ProcRelSecretsOpt.Default with { Amount = 6 };
+        var options = CnfProcRelSecretsOpts.Default with { Amount = 6 };
 
         // Act: Add six secrets - more than the two end slots can host.
         new ProcRelSecrets(graph, options, seed).Execute();
@@ -449,7 +450,7 @@ public sealed class ProcRelSecretsTests
         (maxEdges: 2, start: false, exit: false),
         (maxEdges: 2, start: false, exit: true),
       ]);
-      var options = ProcRelSecretsOpt.Default with { Amount = 5, ChanceSecretInSecret = 0.5f };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = 5, ChanceSecretInSecret = 0.5f };
 
       // Act: Run the pass on both graphs.
       new ProcRelSecrets(first, options, Seed).Execute();
@@ -469,7 +470,7 @@ public sealed class ProcRelSecretsTests
       // Arrange: Two identical chain graphs and the same inputs.
       var first = CreateStartExitChainGraph(4);
       var second = CreateStartExitChainGraph(4);
-      var options = ProcRelSecretsOpt.Default with { Amount = 3, ChanceSecretInSecret = 0.5f };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = 3, ChanceSecretInSecret = 0.5f };
 
       // Act: Run the pass on both graphs.
       new ProcRelSecrets(first, options, Seed).Execute();
@@ -488,7 +489,7 @@ public sealed class ProcRelSecretsTests
       {
         // Arrange: A chain graph with several secrets and a non-degenerate chance.
         var graph = CreateStartExitChainGraph(4);
-        var options = ProcRelSecretsOpt.Default with { Amount = 3, ChanceSecretInSecret = 0.5f };
+        var options = CnfProcRelSecretsOpts.Default with { Amount = 3, ChanceSecretInSecret = 0.5f };
 
         // Act: Add the secrets and read back the host of every secret relationship.
         new ProcRelSecrets(graph, options, seed).Execute();
@@ -509,16 +510,16 @@ public sealed class ProcRelSecretsTests
     {
       // Arrange: A chain graph; the pass runs first, exactly like in the builders.
       var graph = CreateStartExitChainGraph(4);
-      var options = ProcRelSecretsOpt.Default with { Amount = 2, ChanceSecretInSecret = 0.5f };
+      var options = CnfProcRelSecretsOpts.Default with { Amount = 2, ChanceSecretInSecret = 0.5f };
 
       // Act: Run the finalisation passes in builder order.
       new ProcRelSecrets(graph, options, Seed).Execute();
-      new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, Seed).Execute();
-      new ProcNodeStyle(graph, ProcNodeStyleOpt.Default, Seed).Execute();
+      new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
+      new ProcNodeStyle(graph, CnfProcNodeStyleOpts.Default, Seed).Execute();
 
       // Assert: The secret nodes took part in both later passes - a configured relative
       // size and an assigned group each.
-      var stepValues = ProcNodeRelSizeOpt.Default.Prepare();
+      var stepValues = CnfProcNodeRelSizeOpts.Default.Prepare();
       foreach (var secret in graph.Nodes.Where(node => node.Secret))
       {
         Assert.Contains(secret.RelSize, stepValues);

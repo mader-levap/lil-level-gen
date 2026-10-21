@@ -102,10 +102,11 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
     AddObstacles(complexity, nodeIds);
 
     // Finalisation.
-    new ProcRelSecrets(Graph, ProcRelSecretsOpt.Default, PrepData.SeedGraph).Execute();
-    new ProcNodeObjectives(Graph, ProcNodeObjectivesOpt.Default, PrepData.SeedGraph).Execute();
-    new ProcNodeRelSize(Graph, ProcNodeRelSizeOpt.Default, PrepData.SeedGraph).Execute();
-    new ProcNodeStyle(Graph, ProcNodeStyleOpt.Default, PrepData.SeedGraph).Execute();
+    var procOpts = Config.Graph.ProcOpts;
+    new ProcRelSecrets(Graph, procOpts.RelSecrets, PrepData.SeedGraph).Execute();
+    new ProcNodeObjectives(Graph, procOpts.NodeObjectives, PrepData.SeedGraph).Execute();
+    new ProcNodeRelSize(Graph, procOpts.NodeRelSize, PrepData.SeedGraph).Execute();
+    new ProcNodeStyle(Graph, procOpts.NodeStyle, PrepData.SeedGraph).Execute();
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return true;

@@ -1,26 +1,27 @@
 using System;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 
-namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
+namespace LostInLimbo.LevelGen.Data.Config.Graph;
 
 /// <summary>
-/// Parameters of <see cref="ProcNodeObjectives"/>: how many mandatory
-/// (<see cref="EnPoiType.Goal"/>) and optional (<see cref="EnPoiType.OptionalGoal"/>)
-/// objective POIs the pass places.
+/// <para>
+/// Configuration of the objective-POIs processor (<c>ProcNodeObjectives</c>): how many
+/// mandatory (<see cref="EnPoiType.Goal"/>) and optional (<see cref="EnPoiType.OptionalGoal"/>)
+/// objective POIs it places.
+/// </para>
 /// </summary>
 /// <remarks>
 /// Zero-valued behavior: <see cref="GoalAmount"/> 0 places no mandatory goals,
-/// <see cref="OptGoalAmount"/> 0 places no optional goals; both 0 disable the pass.
+/// <see cref="OptGoalAmount"/> 0 places no optional goals; both 0 disable the processor.
 /// Both amounts are soft: when fewer eligible nodes remain than requested, the excess
-/// is ignored and the pass stops early.
+/// is ignored and the processor stops early.
 /// </remarks>
-internal sealed record ProcNodeObjectivesOpt
+public sealed record CnfProcNodeObjectivesOpts
 {
   /// <summary>
-  /// Default instance used by builders that do not pass custom options: one mandatory
-  /// goal and one optional goal.
+  /// Default instance: one mandatory goal and one optional goal.
   /// </summary>
-  public static ProcNodeObjectivesOpt Default { get; } = new()
+  public static CnfProcNodeObjectivesOpts Default { get; } = new()
   {
     GoalAmount = 1,
     OptGoalAmount = 1,
@@ -39,11 +40,9 @@ internal sealed record ProcNodeObjectivesOpt
   public int OptGoalAmount { get; init; } = 1;
 
   /// <summary>
-  /// Checks that these options are valid.
+  /// Checks that this config can be used for generation.
   /// </summary>
-  /// <exception cref="ArgumentOutOfRangeException">
-  /// Some parameter has invalid value.
-  /// </exception>
+  /// <exception cref="ArgumentOutOfRangeException">A value is out of range.</exception>
   public void Validate()
   {
     if (GoalAmount < 0)

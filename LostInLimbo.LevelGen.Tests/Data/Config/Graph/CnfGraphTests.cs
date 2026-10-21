@@ -72,4 +72,49 @@ public sealed class CnfGraphTests
     // Assert: No invariant is violated, so validation completes normally.
     graph.Validate();
   }
+
+  [Fact]
+  public void Validate_WithNullProcOpts_ThrowsArgumentExceptionNamingProcOpts()
+  {
+    // Arrange: Graph config with the processor options section explicitly nulled out.
+    var graph = new CnfGraph { ProcOpts = null! };
+
+    // Act/Assert: The null section is rejected naming the offending property.
+    var exception = Assert.Throws<ArgumentException>(() => graph.Validate());
+    Assert.Equal("ProcOpts", exception.ParamName);
+  }
+
+  [Fact]
+  public void Validate_WithInvalidProcOpts_ThrowsNamingNestedProperty()
+  {
+    // Arrange: Graph config whose processor options violate their own invariants.
+    var graph = new CnfGraph
+    {
+      ProcOpts = CnfProcOpts.Default with
+      {
+        NodeStyle = new CnfProcNodeStyleOpts { GroupCount = 0 },
+      },
+    };
+
+    // Act/Assert: Validation cascades into the section and names the nested property.
+    var exception = Assert.Throws<ArgumentOutOfRangeException>(() => graph.Validate());
+    Assert.Equal("GroupCount", exception.ParamName);
+  }
+
+  [Fact]
+  public void Validate_WithCustomProcOpts_DoesNotThrow()
+  {
+    // Arrange: Graph config with valid non-default processor options.
+    var graph = new CnfGraph
+    {
+      ProcOpts = CnfProcOpts.Default with
+      {
+        RelSecrets = new CnfProcRelSecretsOpts { Amount = 0 },
+        NodeRelSize = new CnfProcNodeRelSizeOpts { Steps = 5, Skew = 1f },
+      },
+    };
+
+    // Assert: Valid custom options pass validation.
+    graph.Validate();
+  }
 }

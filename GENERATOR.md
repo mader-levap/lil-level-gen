@@ -38,6 +38,7 @@ Configuration must be (de)serializable to/from JSON.
     - `Size`: Size of graph. Usually number of nodes. Soft cap - builder is allowed to add more nodes if small number of nodes makes it impossible to make graph while fulfilling other settings. Hard cap is 100 (`CnfGraph.MaxSize`).
     - `Connectivity`: General connectivity of graph. It is not amount of relationships between nodes, at least not directly.
     - `Complexity`: General complexity of graph. Usually number of obstacles.
+    - `ProcOpts` (`CnfProcOpts`): Options of the graph finalisation processors. One section per processor; sections left out keep defaults matching the hardcoded values used before options became configurable. Ignored by builders that run no processors (`OneNode`).
   - `CnfMap`: Map configuration. Currently placeholder.
   - `CnfDebug`: Debug configuration data.
 
@@ -82,6 +83,8 @@ Configuration must be (de)serializable to/from JSON.
 - `LinearGraphBuilder`: Chain of nodes - first holds start, last holds exit, in-between nodes link to previous and next node; node count follows `Size`. Then adds extra random relationships on top until `Connectivity` is spent or no eligible node pair remains: a random source (never the last node) links to a random later node at most `MaxSkipDistance` (2) nodes away, adjacent targets most likely and likelihood falling with distance; at most 4 extra relationships per node counted per direction (in and out separately, `MaxExtraDegree` is 2 each), never past the node's total `MaxEdges` hard cap of 5 (including skeleton), and at most one extra relationship per node pair, so an adjacent pair can carry two parallel passages while a skipping pair carries one. Start and exit always land in the first and last node respectively. Then the obstacle pass spends `Complexity`: each iteration picks a random node (never the first) that still has capacity, creates a new solution POI and adds one `RequiresSolution` condition pointing at it to every relationship going into that node - so all in-passages of a node always carry the same conditions and saturate together at `MaxConditionPerRel` (3) conditions per relationship. The solution lands at or before the node's chain predecessor, most likely right in front of the guarded passage and less likely up to `MaxConditionDistance` (3) nodes away, which keeps the graph beatable. Once every relationship is saturated the excess `Complexity` is discarded. Soft constraints throughout - never fails, unsatisfiable settings are stretched silently.
 
 All builders share the `AGraphBuilder` abstract base class, which stores the setup inputs in protected fields (`Config`, `PrepData`, `Graph`). Every builder must be deterministic for the same configuration (IDs derived from the seed, never random GUIDs) and must produce a solvable graph (no softlock).
+
+`Simple` and `Linear` finish with the same four finalisation processors in fixed order - secrets, objectives, relative size, grouping - each parameterised by its section of `CnfGraph.ProcOpts`.
 
 ### Map.
 

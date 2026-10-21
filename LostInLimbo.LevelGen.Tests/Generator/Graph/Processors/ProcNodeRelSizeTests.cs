@@ -1,3 +1,4 @@
+using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
@@ -28,7 +29,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithStepsBelowOne_ThrowsArgumentOutOfRangeException(int steps)
     {
       // Arrange: Options demanding a forbidden step count.
-      var options = ProcNodeRelSizeOpt.Default with { Steps = steps };
+      var options = CnfProcNodeRelSizeOpts.Default with { Steps = steps };
 
       // Act & Assert: The distributor rejects the options before touching the graph.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -43,7 +44,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithSkewOutOfRange_ThrowsArgumentOutOfRangeException(float skew)
     {
       // Arrange: Options with a skew outside [0, 1] (NaN included).
-      var options = ProcNodeRelSizeOpt.Default with { Skew = skew };
+      var options = CnfProcNodeRelSizeOpts.Default with { Skew = skew };
 
       // Act & Assert: Skew is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -57,7 +58,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithMinSizeBelowOne_ThrowsArgumentOutOfRangeException(int minSize)
     {
       // Arrange: Options asking for an impossible smallest size.
-      var options = ProcNodeRelSizeOpt.Default with { MinSize = minSize };
+      var options = CnfProcNodeRelSizeOpts.Default with { MinSize = minSize };
 
       // Act & Assert: MinSize is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -72,7 +73,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithInvalidRelationshipBias_ThrowsArgumentOutOfRangeException(float bias)
     {
       // Arrange: Options with a negative or non-finite relationship bias.
-      var options = ProcNodeRelSizeOpt.Default with { BiasRelationships = bias };
+      var options = CnfProcNodeRelSizeOpts.Default with { BiasRelationships = bias };
 
       // Act & Assert: The relationship bias is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -87,7 +88,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithInvalidPoiBias_ThrowsArgumentOutOfRangeException(float bias)
     {
       // Arrange: Options with a negative or non-finite POI bias.
-      var options = ProcNodeRelSizeOpt.Default with { BiasPois = bias };
+      var options = CnfProcNodeRelSizeOpts.Default with { BiasPois = bias };
 
       // Act & Assert: The POI bias is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -99,7 +100,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithSingleStepAndRelationshipBias_ThrowsArgumentException()
     {
       // Arrange: One step value forbids variation while the bias demands it.
-      var options = ProcNodeRelSizeOpt.Default with
+      var options = CnfProcNodeRelSizeOpts.Default with
       {
         Steps = 1,
         BiasRelationships = 0.5f,
@@ -115,7 +116,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithSingleStepAndPoiBias_ThrowsArgumentException()
     {
       // Arrange: One step value forbids variation while the POI bias demands it.
-      var options = ProcNodeRelSizeOpt.Default with
+      var options = CnfProcNodeRelSizeOpts.Default with
       {
         Steps = 1,
         BiasRelationships = 0f,
@@ -132,7 +133,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithUndefinedCurve_ThrowsArgumentOutOfRangeException()
     {
       // Arrange: Options with a curve value outside the enum.
-      var options = ProcNodeRelSizeOpt.Default with { Curve = (EnRelSizeCurve)42 };
+      var options = CnfProcNodeRelSizeOpts.Default with { Curve = (EnRelSizeCurve)42 };
 
       // Act & Assert: The unknown curve is rejected.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -147,7 +148,7 @@ public sealed class ProcNodeRelSizeTests
     {
       // Arrange: Linear options whose growth cannot separate the steps (0 keeps them
       // equal, negative reverses them).
-      var options = ProcNodeRelSizeOpt.Default with
+      var options = CnfProcNodeRelSizeOpts.Default with
       {
         Curve = EnRelSizeCurve.Linear,
         Growth = growth,
@@ -166,7 +167,7 @@ public sealed class ProcNodeRelSizeTests
     {
       // Arrange: Geometric options whose growth cannot separate the steps (1 keeps them
       // equal, below 1 shrinks them).
-      var options = ProcNodeRelSizeOpt.Default with { Growth = growth };
+      var options = CnfProcNodeRelSizeOpts.Default with { Growth = growth };
 
       // Act & Assert: The collapsed step values are rejected as a contradiction.
       var exception = Assert.Throws<ArgumentException>(
@@ -181,7 +182,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithNonFiniteOrOverflowingGrowth_ThrowsArgumentOutOfRangeException(float growth)
     {
       // Arrange: Growth that either is not finite or pushes step values out of Int32 range.
-      var options = ProcNodeRelSizeOpt.Default with { Growth = growth };
+      var options = CnfProcNodeRelSizeOpts.Default with { Growth = growth };
 
       // Act & Assert: Growth is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -193,7 +194,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithTooManySteps_ThrowsArgumentOutOfRangeException()
     {
       // Arrange: Sixty geometric doublings reach 2^59, far beyond Int32.
-      var options = ProcNodeRelSizeOpt.Default with { Steps = 60 };
+      var options = CnfProcNodeRelSizeOpts.Default with { Steps = 60 };
 
       // Act & Assert: The overflowing step values are rejected.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
@@ -206,7 +207,7 @@ public sealed class ProcNodeRelSizeTests
     {
       // Arrange: Empty graph, so only validation can produce an error here.
       var graph = new LilGraph();
-      var options = ProcNodeRelSizeOpt.Default with { Steps = 0 };
+      var options = CnfProcNodeRelSizeOpts.Default with { Steps = 0 };
 
       // Act & Assert: Options are validated before the early exit for empty graphs.
       Assert.Throws<ArgumentOutOfRangeException>(
@@ -218,7 +219,7 @@ public sealed class ProcNodeRelSizeTests
     {
       // Act & Assert: The pass refuses to be built around a missing graph.
       var exception = Assert.Throws<ArgumentNullException>(
-        () => new ProcNodeRelSize(null!, ProcNodeRelSizeOpt.Default, Seed));
+        () => new ProcNodeRelSize(null!, CnfProcNodeRelSizeOpts.Default, Seed));
       Assert.Equal("graph", exception.ParamName);
     }
 
@@ -235,7 +236,7 @@ public sealed class ProcNodeRelSizeTests
     public void Constructor_WithInvalidOptions_ThrowsBeforeExecute()
     {
       // Arrange: Options rejected by validation.
-      var options = ProcNodeRelSizeOpt.Default with { Steps = 0 };
+      var options = CnfProcNodeRelSizeOpts.Default with { Steps = 0 };
 
       // Act & Assert: Construction alone rejects the options, before Execute can run.
       Assert.Throws<ArgumentOutOfRangeException>(
@@ -250,7 +251,7 @@ public sealed class ProcNodeRelSizeTests
     public void BuildStepValues_WithDefaults_ReturnsGeometricSteps()
     {
       // Act: Build the step values of the default options.
-      var values = ProcNodeRelSizeOpt.Default.Prepare();
+      var values = CnfProcNodeRelSizeOpts.Default.Prepare();
 
       // Assert: Three doublings from 1: 1, 2, 4.
       Assert.Equal(new[] { 1, 2, 4 }, values);
@@ -260,7 +261,7 @@ public sealed class ProcNodeRelSizeTests
     public void BuildStepValues_WithLinearCurve_AppearsAdditively()
     {
       // Arrange: Four linear steps from 2 with an increment of 3.
-      var options = ProcNodeRelSizeOpt.Default with
+      var options = CnfProcNodeRelSizeOpts.Default with
       {
         Steps = 4,
         Curve = EnRelSizeCurve.Linear,
@@ -278,8 +279,15 @@ public sealed class ProcNodeRelSizeTests
     [Fact]
     public void Distribute_WithSingleStep_AssignsMinSizeToEveryNode()
     {
-      // Arrange: One allowed step value - the only configuration without variation.
-      var options = new ProcNodeRelSizeOpt { Steps = 1, MinSize = 5 };
+      // Arrange: One allowed step value - the only configuration without variation, so
+      // both biases must be zeroed to satisfy the single-step contradiction rule.
+      var options = new CnfProcNodeRelSizeOpts
+      {
+        Steps = 1,
+        MinSize = 5,
+        BiasRelationships = 0f,
+        BiasPois = 0f,
+      };
       var graph = CreateChainGraph(10);
 
       // Act: Distribute with a bias-free single-step setup.
@@ -293,7 +301,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithFullSkewAndNoBias_AssignsOneSharedValue()
     {
       // Arrange: All probability mass sits on the dominant step and no bias tilts away.
-      var options = ProcNodeRelSizeOpt.Default with
+      var options = CnfProcNodeRelSizeOpts.Default with
       {
         Skew = 1f,
         BiasRelationships = 0f,
@@ -317,13 +325,13 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithDefaults_UsesOnlyStepValues(int nodeCount)
     {
       // Arrange: The default options define the set of allowed values.
-      var expected = ProcNodeRelSizeOpt.Default.Prepare();
+      var expected = CnfProcNodeRelSizeOpts.Default.Prepare();
 
       // Act & Assert: Across many seeds only step values are ever assigned.
       for (var seed = 0; seed < 20; seed++)
       {
         var graph = CreateChainGraph(nodeCount);
-        new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, seed).Execute();
+        new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpts.Default, seed).Execute();
         Assert.All(graph.Nodes, node => Assert.Contains(node.RelSize, expected));
       }
     }
@@ -332,7 +340,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithZeroSkew_OverSeeds_ObservesEveryStepValue()
     {
       // Arrange: Flat base distribution without any bias to starve the extremes.
-      var options = ProcNodeRelSizeOpt.Default with
+      var options = CnfProcNodeRelSizeOpts.Default with
       {
         Skew = 0f,
         BiasRelationships = 0f,
@@ -364,7 +372,7 @@ public sealed class ProcNodeRelSizeTests
       for (var seed = 0; seed < 10; seed++)
       {
         var graph = CreateStarGraph(20);
-        new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, seed).Execute();
+        new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpts.Default, seed).Execute();
         if (graph.Nodes.Select(node => node.RelSize).Distinct().Count() > 1) varyingGraphs++;
       }
 
@@ -380,7 +388,7 @@ public sealed class ProcNodeRelSizeTests
       var graph = new LilGraph();
 
       // Act: Distribute over the empty graph.
-      new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, Seed).Execute();
+      new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
 
       // Assert: Nothing appeared out of nowhere.
       Assert.Empty(graph.Nodes);
@@ -398,7 +406,7 @@ public sealed class ProcNodeRelSizeTests
     {
       // Arrange: Star graph - one hub with the maximum degree, many leaves, no POIs, so
       // only the relationship bias can act.
-      var options = ProcNodeRelSizeOpt.Default with
+      var options = CnfProcNodeRelSizeOpts.Default with
       {
         Skew = 0f,
         BiasRelationships = 1f,
@@ -432,7 +440,7 @@ public sealed class ProcNodeRelSizeTests
     {
       // Arrange: Star graph with a single POI on the hub; relationship bias off, so
       // only the POI bias can act.
-      var options = ProcNodeRelSizeOpt.Default with
+      var options = CnfProcNodeRelSizeOpts.Default with
       {
         Skew = 0f,
         BiasRelationships = 0f,
@@ -466,7 +474,7 @@ public sealed class ProcNodeRelSizeTests
     {
       // Arrange: Two POIs on the first node, one on the second, none elsewhere; only two
       // steps, so the comparison is a simple bigger/smaller likelihood.
-      var options = ProcNodeRelSizeOpt.Default with
+      var options = CnfProcNodeRelSizeOpts.Default with
       {
         Steps = 2,
         Skew = 0f,
@@ -498,7 +506,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithBias_StillAllowsAnyNodeAnySize()
     {
       // Arrange: Strong POI bias on one node of the graph.
-      var options = ProcNodeRelSizeOpt.Default with
+      var options = CnfProcNodeRelSizeOpts.Default with
       {
         Skew = 0f,
         BiasRelationships = 0f,
@@ -529,7 +537,7 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithEqualPoiCounts_BiasChangesNothing()
     {
       // Arrange: No POIs anywhere, so the POI normalization has nothing to distinguish.
-      var biased = ProcNodeRelSizeOpt.Default with
+      var biased = CnfProcNodeRelSizeOpts.Default with
       {
         Skew = 0.4f,
         BiasRelationships = 0f,
@@ -553,7 +561,7 @@ public sealed class ProcNodeRelSizeTests
     {
       // Arrange: Cycle graph - every node has the same degree, so relationship
       // normalization has nothing to distinguish.
-      var biased = ProcNodeRelSizeOpt.Default with
+      var biased = CnfProcNodeRelSizeOpts.Default with
       {
         Skew = 0.4f,
         BiasRelationships = 1f,
@@ -584,8 +592,8 @@ public sealed class ProcNodeRelSizeTests
       var second = CreateStarGraph(12, poiNodeIndex: 3, poiCount: 2);
 
       // Act: Distribute both with the same seed.
-      new ProcNodeRelSize(first, ProcNodeRelSizeOpt.Default, Seed).Execute();
-      new ProcNodeRelSize(second, ProcNodeRelSizeOpt.Default, Seed).Execute();
+      new ProcNodeRelSize(first, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
+      new ProcNodeRelSize(second, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
 
       // Assert: Same identifiers with the same sizes, in any comparison order.
       GraphTestAssert.AssertEqualGraphs(first, second);
@@ -600,8 +608,8 @@ public sealed class ProcNodeRelSizeTests
       var second = CreateStarGraph(30);
 
       // Act: Distribute both graphs.
-      new ProcNodeRelSize(first, ProcNodeRelSizeOpt.Default, seedGraph: 1).Execute();
-      new ProcNodeRelSize(second, ProcNodeRelSizeOpt.Default, seedGraph: 2).Execute();
+      new ProcNodeRelSize(first, CnfProcNodeRelSizeOpts.Default, seedGraph: 1).Execute();
+      new ProcNodeRelSize(second, CnfProcNodeRelSizeOpts.Default, seedGraph: 2).Execute();
 
       // Assert: The size sequences differ - the dominant step and draws are seed-driven.
       var firstSizes = first.Nodes.Select(node => node.RelSize).ToList();
@@ -619,8 +627,8 @@ public sealed class ProcNodeRelSizeTests
       reversed.Edges.Reverse();
 
       // Act: Distribute both with the same seed.
-      new ProcNodeRelSize(original, ProcNodeRelSizeOpt.Default, Seed).Execute();
-      new ProcNodeRelSize(reversed, ProcNodeRelSizeOpt.Default, Seed).Execute();
+      new ProcNodeRelSize(original, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
+      new ProcNodeRelSize(reversed, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
 
       // Assert: Every identifier keeps the size it got regardless of list order.
       Assert.Equal(GetAssignments(original), GetAssignments(reversed));
@@ -639,7 +647,7 @@ public sealed class ProcNodeRelSizeTests
         .ToList();
 
       // Act: Distribute.
-      new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, Seed).Execute();
+      new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
 
       // Assert: Node order, edges and POIs are untouched; only sizes were rewritten.
       Assert.Equal(nodeIdsBefore, graph.Nodes.Select(node => node.Id).ToList());
@@ -652,11 +660,11 @@ public sealed class ProcNodeRelSizeTests
     {
       // Arrange: One graph distributed once.
       var graph = CreateStarGraph(12, poiNodeIndex: 4, poiCount: 1);
-      new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, Seed).Execute();
+      new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
       var firstRun = GetAssignments(graph);
 
       // Act: Distribute the very same graph again with the same inputs.
-      new ProcNodeRelSize(graph, ProcNodeRelSizeOpt.Default, Seed).Execute();
+      new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
 
       // Assert: Sizes do not feed back into the draws, so the second run is a no-op.
       Assert.Equal(firstRun, GetAssignments(graph));

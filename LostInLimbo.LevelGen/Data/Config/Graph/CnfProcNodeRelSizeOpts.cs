@@ -1,18 +1,20 @@
 using System;
 
-namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
+namespace LostInLimbo.LevelGen.Data.Config.Graph;
 
 /// <summary>
-/// Parameters of <see cref="ProcNodeRelSize"/>: how many relative-size steps exist,
-/// how their values progress, how strongly one step dominates the base distribution and
-/// how strongly relationships and POIs push nodes toward larger steps.
+/// <para>
+/// Configuration of the relative-size processor (<c>ProcNodeRelSize</c>): how many
+/// relative-size steps exist, how their values progress, how strongly one step dominates
+/// the base distribution and how strongly relationships and POIs push nodes toward larger
+/// steps.
+/// </para>
 /// </summary>
 /// <remarks>
 /// <para>
-/// Unlike the soft constraints of <see cref="Data.Config.Graph.CnfGraph"/>, these are hard
-/// constraints: <see cref="Validate"/> throws when the parameters are out of range or
-/// contradict each other (for example a single step together with a bias that demands
-/// variation).
+/// Unlike the soft constraints of <see cref="CnfGraph"/>, these are hard constraints:
+/// <see cref="Validate"/> throws when the parameters are out of range or contradict each
+/// other (for example a single step together with a bias that demands variation).
 /// </para>
 /// <para>
 /// Zero-valued behavior: <see cref="Skew"/> 0 makes every step equally probable,
@@ -20,13 +22,13 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// off. <see cref="Growth"/> is only relevant when <see cref="Steps"/> is greater than 1.
 /// </para>
 /// </remarks>
-internal sealed record ProcNodeRelSizeOpt
+public sealed record CnfProcNodeRelSizeOpts
 {
   /// <summary>
-  /// Default instance used by builders that do not pass custom options: three geometric
-  /// steps (1, 2, 4), mild skew and mild bias toward well-connected POI carriers.
+  /// Default instance: three geometric steps (1, 2, 4), mild skew and mild bias toward
+  /// well-connected POI carriers.
   /// </summary>
-  public static ProcNodeRelSizeOpt Default { get; } = new()
+  public static CnfProcNodeRelSizeOpts Default { get; } = new()
   {
     Steps = 3,
     Skew = 0.3f,
@@ -49,7 +51,7 @@ internal sealed record ProcNodeRelSizeOpt
   /// </para>
   /// <para>Must be a finite value within [0, 1].</para>
   /// </summary>
-  public float Skew { get; init; }
+  public float Skew { get; init; } = 0.3f;
 
   /// <summary>Progression curve of the step values; see <see cref="EnRelSizeCurve"/>.</summary>
   public EnRelSizeCurve Curve { get; init; } = EnRelSizeCurve.Geometric;
@@ -70,14 +72,14 @@ internal sealed record ProcNodeRelSizeOpt
   /// the node's min-max normalized relationship count. 0 turns the bias off; higher
   /// values tilt harder. Must be finite and non-negative.
   /// </summary>
-  public float BiasRelationships { get; init; }
+  public float BiasRelationships { get; init; } = 0.6f;
 
   /// <summary>
   /// How strongly nodes with POIs are pulled toward larger steps, scaled by the node's
   /// min-max normalized POI count - a node with several POIs pulls harder than one with a
   /// single POI. 0 turns the bias off. Must be finite and non-negative.
   /// </summary>
-  public float BiasPois { get; init; }
+  public float BiasPois { get; init; } = 0.6f;
 
   /// <summary>
   /// Builds the ascending step values this configuration distributes, for example
@@ -93,7 +95,7 @@ internal sealed record ProcNodeRelSizeOpt
   }
 
   /// <summary>
-  /// Checks that these options are valid.
+  /// Checks that this config can be used for generation.
   /// </summary>
   /// <exception cref="ArgumentOutOfRangeException">
   /// Some parameter has invalid value.
