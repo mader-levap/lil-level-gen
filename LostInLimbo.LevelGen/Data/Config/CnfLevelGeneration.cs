@@ -6,7 +6,7 @@ using LostInLimbo.LevelGen.Data.Config.Style;
 namespace LostInLimbo.LevelGen.Data.Config;
 
 /// <summary>
-/// <para>Very detailed configuration for generating a level.</para>
+/// <para>Very detailed configuration for generating a level. This is lowest level. In future, you will be able to generate this config using less detailed settings.</para>
 /// <para>This is the root of the JSON configuration file.</para>
 /// </summary>
 /// <remarks>

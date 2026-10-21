@@ -157,13 +157,18 @@ internal static class GraphTestSupport
   /// Counts how many edges touch each node, keyed by node id.
   /// </summary>
   /// <param name="graph">Graph to inspect.</param>
+  /// <param name="includeSecretEdges">
+  /// When false, secret relationships (appended by the finalisation pass) do not count -
+  /// useful for asserting builder-owned degree caps.
+  /// </param>
   /// <returns>Relationship count per node; zero for node-less graphs.</returns>
   /// <exception cref="KeyNotFoundException">An edge references a node that does not exist.</exception>
-  public static Dictionary<Guid, int> GetDegrees(LilGraph graph)
+  public static Dictionary<Guid, int> GetDegrees(LilGraph graph, bool includeSecretEdges = true)
   {
     var degrees = graph.Nodes.ToDictionary(node => node.Id, _ => 0);
     foreach (var edge in graph.Edges)
     {
+      if (!includeSecretEdges && edge.Secret) continue;
       degrees[edge.From]++;
       degrees[edge.To]++;
     }
@@ -255,9 +260,13 @@ internal static class GraphTestSupport
   /// </summary>
   /// <param name="graph">Graph to check.</param>
   /// <param name="maxDegree">Allowed relationships per node, inclusive.</param>
-  public static void AssertDegreeCap(LilGraph graph, int maxDegree)
+  /// <param name="includeSecretEdges">
+  /// When false, secret relationships (appended by the finalisation pass) are not counted -
+  /// builder-owned degree caps only cover builder-created passages.
+  /// </param>
+  public static void AssertDegreeCap(LilGraph graph, int maxDegree, bool includeSecretEdges = true)
   {
-    foreach (var (nodeId, degree) in GetDegrees(graph))
+    foreach (var (nodeId, degree) in GetDegrees(graph, includeSecretEdges))
     {
       Assert.True(degree <= maxDegree, $"Node {nodeId} has {degree} relationships, cap is {maxDegree}.");
     }
@@ -300,6 +309,7 @@ internal static class GraphTestSupport
     // Assert: Same node properties and POI contents in the same order.
     Assert.Equal(expected.Id, actual.Id);
     Assert.Equal(expected.RelSize, actual.RelSize);
+    Assert.Equal(expected.Secret, actual.Secret);
     Assert.Equal(expected.Style, actual.Style);
 
     Assert.Equal(expected.Pois.Count, actual.Pois.Count);

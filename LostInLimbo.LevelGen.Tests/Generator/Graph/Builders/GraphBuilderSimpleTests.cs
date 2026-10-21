@@ -36,9 +36,11 @@ public sealed class GraphBuilderSimpleTests
       // Act: Build a graph of the given size.
       var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size });
 
-      // Assert: The node count follows the size setting exactly.
+      // Assert: The node count follows the size setting plus the one secret node the
+      // finalisation pass appends.
       Assert.True(success);
-      Assert.Equal(size, graph.Nodes.Count);
+      Assert.Equal(size + 1, graph.Nodes.Count);
+      Assert.Single(graph.Nodes.Where(node => node.Secret));
     }
 
     [Theory]
@@ -52,10 +54,10 @@ public sealed class GraphBuilderSimpleTests
       // Act: Build a graph without any extra relationships.
       var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size });
 
-      // Assert: The skeleton is a tree - size minus one relationships - and connected,
-      // no matter which scenario was rolled.
+      // Assert: The skeleton is a tree - size minus one relationships - plus the one
+      // secret relationship of the finalisation pass; the graph stays connected.
       Assert.True(success);
-      Assert.Equal(Math.Max(0, size - 1), graph.Edges.Count);
+      Assert.Equal(Math.Max(0, size - 1) + 1, graph.Edges.Count);
       GraphTestSupport.AssertBeatable(graph);
     }
 
@@ -73,10 +75,10 @@ public sealed class GraphBuilderSimpleTests
         Connectivity = connectivity,
       });
 
-      // Assert: Every requested extra relationship exists on top of the tree, and the
-      // graph stays connected.
+      // Assert: Every requested extra relationship exists on top of the tree, plus the
+      // one secret relationship of the finalisation pass; the graph stays connected.
       Assert.True(success);
-      Assert.Equal(size - 1 + connectivity, graph.Edges.Count);
+      Assert.Equal(size - 1 + connectivity + 1, graph.Edges.Count);
       GraphTestSupport.AssertBeatable(graph);
     }
 
@@ -84,11 +86,13 @@ public sealed class GraphBuilderSimpleTests
     public void Build_WithVariousSeeds_ObservesDifferentSkeletonShapes()
     {
       // Act: Build many minimal graphs of the same size and look at the highest degree.
+      // Secret relationships of the finalisation pass are excluded - they only measure
+      // the skeleton shape.
       var maxDegrees = new List<int>();
       for (var seed = 0; seed < 30; seed++)
       {
         var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = 10 }, seed);
-        maxDegrees.Add(GraphTestSupport.GetDegrees(graph).Values.Max());
+        maxDegrees.Add(GraphTestSupport.GetDegrees(graph, includeSecretEdges: false).Values.Max());
       }
 
       // Assert: At least one seed produced a plain chain (max degree 2) and at least one
@@ -120,7 +124,7 @@ public sealed class GraphBuilderSimpleTests
 
       // Assert: The builder never fails - unsatisfiable settings are stretched silently.
       Assert.True(success);
-      Assert.Equal(size, graph.Nodes.Count);
+      Assert.Equal(size + 1, graph.Nodes.Count);
     }
 
     [Theory]
@@ -135,12 +139,20 @@ public sealed class GraphBuilderSimpleTests
         Connectivity = connectivity,
       });
 
-      // Assert: No relationships are possible, yet both POIs live on the single node.
+      // Assert: No relationships are possible, yet both POIs live on the single ordinary
+      // node; the finalisation pass appends one secret node hanging off it.
       Assert.True(success);
-      var node = Assert.Single(graph.Nodes);
-      Assert.Empty(graph.Edges);
-      Assert.Single(node.Pois.Where(poi => poi.Type == EnPoiType.Start));
-      Assert.Single(node.Pois.Where(poi => poi.Type == EnPoiType.Exit));
+      var ordinary = Assert.Single(graph.Nodes.Where(node => !node.Secret));
+      var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
+      Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Start));
+      Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Exit));
+      Assert.Empty(secret.Pois);
+
+      // Assert: The only relationship is the secret passage into the secret node.
+      var edge = Assert.Single(graph.Edges);
+      Assert.True(edge.Secret);
+      Assert.Equal(ordinary.Id, edge.From);
+      Assert.Equal(secret.Id, edge.To);
     }
 
     [Fact]
@@ -153,12 +165,13 @@ public sealed class GraphBuilderSimpleTests
         Connectivity = 10000,
       });
 
-      // Assert: The build succeeds, no node exceeds the plain degree cap (at size five
-      // even a skeleton central collects at most four nodes) and the complete graph
-      // bound is respected.
+      // Assert: The build succeeds, no node exceeds the plain degree cap on builder
+      // passages (at size five even a skeleton central collects at most four nodes; the
+      // secret relationship of the finalisation pass does not count) and the complete
+      // graph bound is respected.
       Assert.True(success);
-      GraphTestSupport.AssertDegreeCap(graph, MaxDegree);
-      Assert.True(graph.Edges.Count <= 10, "Five nodes cannot hold more than ten relationships.");
+      GraphTestSupport.AssertDegreeCap(graph, MaxDegree, includeSecretEdges: false);
+      Assert.True(graph.Edges.Count <= 11, "Five nodes cannot hold more than ten pair passages plus the secret relationship.");
       GraphTestSupport.AssertValidEdges(graph);
       GraphTestSupport.AssertOpenPassages(graph);
       GraphTestSupport.AssertBeatable(graph);
@@ -175,12 +188,13 @@ public sealed class GraphBuilderSimpleTests
       });
 
       // Assert: The build succeeds, keeps at least the skeleton, stays structurally
-      // valid and never exceeds the skeleton degree cap - central handover keeps even
-      // star-shaped skeletons bounded.
+      // valid and never exceeds the skeleton degree cap on builder passages - central
+      // handover keeps even star-shaped skeletons bounded; the secret relationship of
+      // the finalisation pass does not count.
       Assert.True(success);
       Assert.True(graph.Edges.Count >= 19, "The skeleton alone already holds 19 relationships.");
-      Assert.True(graph.Edges.Count <= 190, "Twenty nodes cannot hold more than 190 relationships.");
-      GraphTestSupport.AssertDegreeCap(graph, MaxDegreeStar);
+      Assert.True(graph.Edges.Count <= 191, "Twenty nodes cannot hold more than 190 pair passages plus the secret relationship.");
+      GraphTestSupport.AssertDegreeCap(graph, MaxDegreeStar, includeSecretEdges: false);
       GraphTestSupport.AssertValidEdges(graph);
       GraphTestSupport.AssertOpenPassages(graph);
       GraphTestSupport.AssertBeatable(graph);
@@ -200,11 +214,12 @@ public sealed class GraphBuilderSimpleTests
       {
         var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size }, seed);
 
-        // Assert: Success, exactly size minus one relationships, connectivity and the
-        // cap hold no matter which scenario was rolled.
+        // Assert: Success, exactly size minus one skeleton relationships plus the one
+        // secret relationship, connectivity and the cap on builder passages hold no
+        // matter which scenario was rolled.
         Assert.True(success);
-        Assert.Equal(size - 1, graph.Edges.Count);
-        GraphTestSupport.AssertDegreeCap(graph, MaxDegreeStar);
+        Assert.Equal(size, graph.Edges.Count);
+        GraphTestSupport.AssertDegreeCap(graph, MaxDegreeStar, includeSecretEdges: false);
         GraphTestSupport.AssertBeatable(graph, $"Skeleton graph must be connected (size {size}, seed {seed}).");
       }
     }
@@ -213,12 +228,13 @@ public sealed class GraphBuilderSimpleTests
     public void Build_WithLargeSizeAcrossSeeds_SkeletonCentralHandsOverAtCap()
     {
       // Act: Build 100-node skeletons across many seeds; star and mixed rolls fill a
-      // central node to the cap and must hand over instead of growing beyond it.
+      // central node to the cap and must hand over instead of growing beyond it. Secret
+      // relationships of the finalisation pass are excluded from the degree measure.
       var maxDegrees = new List<int>();
       for (var seed = 0; seed < 30; seed++)
       {
         var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = 100 }, seed);
-        maxDegrees.Add(GraphTestSupport.GetDegrees(graph).Values.Max());
+        maxDegrees.Add(GraphTestSupport.GetDegrees(graph, includeSecretEdges: false).Values.Max());
       }
 
       // Assert: At least one seed reached the cap exactly - proving the handover path
@@ -289,6 +305,46 @@ public sealed class GraphBuilderSimpleTests
       var firstSizes = first.Graph.Nodes.Select(node => node.RelSize).ToList();
       var secondSizes = second.Graph.Nodes.Select(node => node.RelSize).ToList();
       Assert.Equal(firstSizes, secondSizes);
+    }
+  }
+
+  /// <summary>Tests for the secret-node pass run first in the finalisation.</summary>
+  public sealed class SecretTests
+  {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(5)]
+    [InlineData(50)]
+    public void Build_AlwaysAddsExactlyOneSecretHangingOffOrdinaryNode(int size)
+    {
+      // Act: Build a graph of the given size.
+      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size });
+
+      // Assert: One secret node exists, reached only over its own secret chokepoint
+      // whose source is an ordinary node.
+      Assert.True(success);
+      var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
+      var edge = Assert.Single(graph.Edges.Where(edge => edge.Secret));
+      Assert.True(edge.Chokepoint);
+      Assert.Equal(EnPassageDirection.Bidirectional, edge.Direction);
+      Assert.Empty(edge.Conditions);
+      Assert.Equal(secret.Id, edge.To);
+      Assert.Contains(edge.From, graph.Nodes.Where(node => !node.Secret).Select(node => node.Id));
+    }
+
+    [Fact]
+    public void Build_WithSecrets_StillProducesBeatableGraph()
+    {
+      // Act: Build graphs with several seeds.
+      for (var seed = 0; seed < 10; seed++)
+      {
+        var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = 8, Connectivity = 3 }, seed);
+
+        // Assert: The hidden node stays reachable - the secret passage is open - so the
+        // beatability simulation still passes.
+        GraphTestSupport.AssertBeatable(graph, $"Secret graph must stay connected (seed {seed}).");
+      }
     }
   }
 

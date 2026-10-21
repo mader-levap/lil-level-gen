@@ -27,11 +27,12 @@ public sealed class GraphGeneratorTests
     // Act: Run graph generation.
     var success = generator.Execute();
 
-    // Assert: The graph holds the configured amount of nodes, the chain skeleton on top of
-    // which every requested extra relationship was placed, and start/exit POIs.
+    // Assert: The graph holds the configured amount of nodes plus the one secret node of
+    // the finalisation pass, the chain skeleton on top of which every requested extra
+    // relationship was placed plus the secret relationship, and start/exit POIs.
     Assert.True(success);
-    Assert.Equal(4, world.Graph.Nodes.Count);
-    Assert.Equal(3 + 2, world.Graph.Edges.Count);
+    Assert.Equal(4 + 1, world.Graph.Nodes.Count);
+    Assert.Equal(3 + 2 + 1, world.Graph.Edges.Count);
     Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Start));
     Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Exit));
   }
@@ -51,9 +52,10 @@ public sealed class GraphGeneratorTests
     // Act: Run graph generation.
     var success = generator.Execute();
 
-    // Assert: The graph holds the configured amount of nodes, a start and an exit POI.
+    // Assert: The graph holds the configured amount of nodes plus the one secret node of
+    // the finalisation pass, a start and an exit POI.
     Assert.True(success);
-    Assert.Equal(5, world.Graph.Nodes.Count);
+    Assert.Equal(5 + 1, world.Graph.Nodes.Count);
     Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Start));
     Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Exit));
   }

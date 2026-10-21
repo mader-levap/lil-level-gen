@@ -1,3 +1,6 @@
-Current and planned tasks:
+Current tasks:
+- objectives, including optional
+
+Later:
 - Rework config data more.
 - We need config data generator that will generate config based on minimal set of settings.

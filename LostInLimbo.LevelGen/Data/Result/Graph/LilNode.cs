@@ -30,6 +30,9 @@ public sealed record LilNode
   /// </summary>
   public required int RelSize { get; init; }
 
+  /// <summary>If true, this is secret node.</summary>
+  public bool Secret { get; init; } = false;
+
   /// <summary>
   /// Styling data.
   /// </summary>
