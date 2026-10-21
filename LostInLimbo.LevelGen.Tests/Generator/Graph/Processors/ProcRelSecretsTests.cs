@@ -1,5 +1,6 @@
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
+using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestSupport;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Processors;
@@ -36,7 +37,7 @@ public sealed class ProcRelSecretsTests
     public void Constructor_WithNullOptions_ThrowsArgumentNullException()
     {
       // Act & Assert: Missing options are rejected.
-      Assert.Throws<ArgumentNullException>(() => new ProcRelSecrets(CreateChainGraph(4), null!, Seed));
+      Assert.Throws<ArgumentNullException>(() => new ProcRelSecrets(CreateStartExitChainGraph(4), null!, Seed));
     }
 
     [Theory]
@@ -49,7 +50,7 @@ public sealed class ProcRelSecretsTests
 
       // Act & Assert: The pass rejects the options before touching the graph.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ProcRelSecrets(CreateChainGraph(4), options, Seed).Execute());
+        () => new ProcRelSecrets(CreateStartExitChainGraph(4), options, Seed).Execute());
       Assert.Equal("Amount", exception.ParamName);
     }
 
@@ -65,7 +66,7 @@ public sealed class ProcRelSecretsTests
 
       // Act & Assert: The chance is rejected as out of range.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ProcRelSecrets(CreateChainGraph(4), options, Seed).Execute());
+        () => new ProcRelSecrets(CreateStartExitChainGraph(4), options, Seed).Execute());
       Assert.Equal("ChanceSecretInSecret", exception.ParamName);
     }
 
@@ -77,7 +78,7 @@ public sealed class ProcRelSecretsTests
 
       // Act & Assert: Construction alone rejects the options, before Execute can run.
       Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ProcRelSecrets(CreateChainGraph(4), options, Seed));
+        () => new ProcRelSecrets(CreateStartExitChainGraph(4), options, Seed));
     }
 
     [Fact]
@@ -100,7 +101,7 @@ public sealed class ProcRelSecretsTests
     public void Execute_WithAmountZero_LeavesGraphUntouched()
     {
       // Arrange: A chain graph and options that disable the pass.
-      var graph = CreateChainGraph(4);
+      var graph = CreateStartExitChainGraph(4);
       var options = ProcRelSecretsOpt.Default with { Amount = 0 };
 
       // Act: Run the pass.
@@ -131,7 +132,7 @@ public sealed class ProcRelSecretsTests
     public void Execute_WithAmountOne_AddsOneSecretNodeWithSecretEdge()
     {
       // Arrange: A chain graph; remember the original identifiers.
-      var graph = CreateChainGraph(4);
+      var graph = CreateStartExitChainGraph(4);
       var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
       var originalEdgeIds = graph.Edges.Select(edge => edge.Id).ToHashSet();
 
@@ -166,7 +167,7 @@ public sealed class ProcRelSecretsTests
     public void Execute_WithAmountThree_WithoutNesting_AttachesEverySecretToOrdinaryNode()
     {
       // Arrange: A chain graph and options that forbid nesting.
-      var graph = CreateChainGraph(4);
+      var graph = CreateStartExitChainGraph(4);
       var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
       var options = ProcRelSecretsOpt.Default with { Amount = 3, ChanceSecretInSecret = 0f };
 
@@ -202,7 +203,7 @@ public sealed class ProcRelSecretsTests
       for (var seed = 0; seed < StatisticalSeedCount; seed++)
       {
         // Arrange: A chain graph with two secrets.
-        var graph = CreateChainGraph(5);
+        var graph = CreateStartExitChainGraph(5);
         var options = ProcRelSecretsOpt.Default with { Amount = 2 };
 
         // Act: Add the secrets.
@@ -210,7 +211,7 @@ public sealed class ProcRelSecretsTests
 
         // Assert: Every secret stays reachable over its open passage, so the
         // beatability simulation passes.
-        GraphTestSupport.AssertBeatable(graph, $"Secret graph must stay connected (seed {seed}).");
+        GraphTestAssert.AssertBeatable(graph, $"Secret graph must stay connected (seed {seed}).");
       }
     }
   }
@@ -224,7 +225,7 @@ public sealed class ProcRelSecretsTests
       for (var seed = 0; seed < StatisticalSeedCount; seed++)
       {
         // Arrange: A chain graph and options that forbid nesting.
-        var graph = CreateChainGraph(4);
+        var graph = CreateStartExitChainGraph(4);
         var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
         var options = ProcRelSecretsOpt.Default with { Amount = 5, ChanceSecretInSecret = 0f };
 
@@ -243,7 +244,7 @@ public sealed class ProcRelSecretsTests
     public void Execute_WithChanceOne_NestsEveryLaterSecretBehindASecret()
     {
       // Arrange: A chain graph and options that force nesting.
-      var graph = CreateChainGraph(4);
+      var graph = CreateStartExitChainGraph(4);
       var options = ProcRelSecretsOpt.Default with { Amount = 3, ChanceSecretInSecret = 1f };
 
       // Act: Add three secrets; the processor appends one edge per secret, in order.
@@ -265,7 +266,7 @@ public sealed class ProcRelSecretsTests
       for (var seed = 0; seed < StatisticalSeedCount; seed++)
       {
         // Arrange: A chain graph and options that force nesting.
-        var graph = CreateChainGraph(4);
+        var graph = CreateStartExitChainGraph(4);
         var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
         var options = ProcRelSecretsOpt.Default with { Amount = 4, ChanceSecretInSecret = 1f };
 
@@ -291,7 +292,7 @@ public sealed class ProcRelSecretsTests
       for (var seed = 0; seed < 100; seed++)
       {
         // Arrange: A chain graph and default-chance options.
-        var graph = CreateChainGraph(4);
+        var graph = CreateStartExitChainGraph(4);
         var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
         var options = ProcRelSecretsOpt.Default with { Amount = 5 };
 
@@ -318,8 +319,8 @@ public sealed class ProcRelSecretsTests
     public void Execute_WithSameSeed_ProducesIdenticalGraphs()
     {
       // Arrange: Two identical chain graphs and the same inputs.
-      var first = CreateChainGraph(4);
-      var second = CreateChainGraph(4);
+      var first = CreateStartExitChainGraph(4);
+      var second = CreateStartExitChainGraph(4);
       var options = ProcRelSecretsOpt.Default with { Amount = 3, ChanceSecretInSecret = 0.5f };
 
       // Act: Run the pass on both graphs.
@@ -327,7 +328,7 @@ public sealed class ProcRelSecretsTests
       new ProcRelSecrets(second, options, Seed).Execute();
 
       // Assert: Nodes and edges match one by one - identifiers and host picks included.
-      GraphTestSupport.AssertEqualGraphs(first, second);
+      GraphTestAssert.AssertEqualGraphs(first, second);
     }
 
     [Fact]
@@ -338,7 +339,7 @@ public sealed class ProcRelSecretsTests
       for (var seed = 0; seed < StatisticalSeedCount; seed++)
       {
         // Arrange: A chain graph with several secrets and a non-degenerate chance.
-        var graph = CreateChainGraph(4);
+        var graph = CreateStartExitChainGraph(4);
         var options = ProcRelSecretsOpt.Default with { Amount = 3, ChanceSecretInSecret = 0.5f };
 
         // Act: Add the secrets and read back the host of every secret relationship.
@@ -359,7 +360,7 @@ public sealed class ProcRelSecretsTests
     public void Execute_BeforeRelSizeAndStyle_AllSecretsStillGetSizeAndGroup()
     {
       // Arrange: A chain graph; the pass runs first, exactly like in the builders.
-      var graph = CreateChainGraph(4);
+      var graph = CreateStartExitChainGraph(4);
       var options = ProcRelSecretsOpt.Default with { Amount = 2, ChanceSecretInSecret = 0.5f };
 
       // Act: Run the finalisation passes in builder order.
@@ -375,7 +376,7 @@ public sealed class ProcRelSecretsTests
         Assert.Contains(secret.RelSize, stepValues);
         Assert.NotNull(secret.Style.Group);
       }
-      GraphTestSupport.AssertBeatable(graph, "Finalised graph must stay connected.");
+      GraphTestAssert.AssertBeatable(graph, "Finalised graph must stay connected.");
     }
   }
 
@@ -384,13 +385,13 @@ public sealed class ProcRelSecretsTests
   //
 
   /// <summary>
-  /// Creates a chain graph: node 1 - node 2 - ... with deterministic identifiers. The
-  /// first node holds the start POI, the last one the exit POI, so the graph can be
-  /// checked for beatability.
+  /// Wraps the shared chain shape (<see cref="CreateChainGraph"/>) and adds the real Start
+  /// and Exit POIs this suite needs: node 1 holds the start POI, the last node the exit
+  /// POI, so the graph can be checked for beatability.
   /// </summary>
   /// <param name="nodeCount">Amount of nodes; at least 1.</param>
   /// <returns>The constructed graph with <c>nodeCount - 1</c> open edges.</returns>
-  private static LilGraph CreateChainGraph(int nodeCount)
+  private static LilGraph CreateStartExitChainGraph(int nodeCount)
   {
     var graph = new LilGraph();
     for (var i = 1; i <= nodeCount; i++)

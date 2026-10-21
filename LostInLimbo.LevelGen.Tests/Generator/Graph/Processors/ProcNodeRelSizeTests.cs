@@ -1,5 +1,6 @@
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
+using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestSupport;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Distributor;
@@ -587,7 +588,7 @@ public sealed class ProcNodeRelSizeTests
       new ProcNodeRelSize(second, ProcNodeRelSizeOpt.Default, Seed).Execute();
 
       // Assert: Same identifiers with the same sizes, in any comparison order.
-      GraphTestSupport.AssertEqualGraphs(first, second);
+      GraphTestAssert.AssertEqualGraphs(first, second);
       Assert.Equal(GetAssignments(first), GetAssignments(second));
     }
 
@@ -660,122 +661,5 @@ public sealed class ProcNodeRelSizeTests
       // Assert: Sizes do not feed back into the draws, so the second run is a no-op.
       Assert.Equal(firstRun, GetAssignments(graph));
     }
-  }
-
-  //
-  // Graph fixtures
-  //
-
-  /// <summary>
-  /// Creates a chain graph: node 0 - node 1 - ... with deterministic identifiers.
-  /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 1.</param>
-  /// <param name="poiNodeIndex">Node that receives POIs, or -1 for none.</param>
-  /// <param name="poiCount">Amount of POIs to place on <paramref name="poiNodeIndex"/>.</param>
-  /// <returns>The constructed graph with <c>nodeCount - 1</c> edges.</returns>
-  private static LilGraph CreateChainGraph(int nodeCount, int poiNodeIndex = -1, int poiCount = 0)
-  {
-    var graph = CreateNodes(nodeCount, poiNodeIndex, poiCount);
-    for (var i = 0; i + 1 < nodeCount; i++)
-    {
-      graph.Edges.Add(CreateEdge(i, i + 1));
-    }
-
-    return graph;
-  }
-
-  /// <summary>
-  /// Creates a star graph: node 0 (the hub) connected to every other node.
-  /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 2.</param>
-  /// <param name="poiNodeIndex">Node that receives POIs, or -1 for none.</param>
-  /// <param name="poiCount">Amount of POIs to place on <paramref name="poiNodeIndex"/>.</param>
-  /// <returns>The constructed graph with <c>nodeCount - 1</c> edges.</returns>
-  private static LilGraph CreateStarGraph(int nodeCount, int poiNodeIndex = -1, int poiCount = 0)
-  {
-    var graph = CreateNodes(nodeCount, poiNodeIndex, poiCount);
-    for (var i = 1; i < nodeCount; i++)
-    {
-      graph.Edges.Add(CreateEdge(0, i));
-    }
-
-    return graph;
-  }
-
-  /// <summary>
-  /// Creates a cycle graph: every node has exactly the same degree of two.
-  /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 3.</param>
-  /// <returns>The constructed graph with <c>nodeCount</c> edges.</returns>
-  private static LilGraph CreateCycleGraph(int nodeCount)
-  {
-    var graph = CreateNodes(nodeCount, poiNodeIndex: -1, poiCount: 0);
-    for (var i = 0; i < nodeCount; i++)
-    {
-      graph.Edges.Add(CreateEdge(i, (i + 1) % nodeCount));
-    }
-
-    return graph;
-  }
-
-  /// <summary>
-  /// Creates the node list with deterministic identifiers and initial sizes of 1.
-  /// </summary>
-  /// <param name="nodeCount">Amount of nodes.</param>
-  /// <param name="poiNodeIndex">Node that receives POIs, or -1 for none.</param>
-  /// <param name="poiCount">Amount of POIs to place on that node.</param>
-  /// <returns>A graph holding the nodes; no edges.</returns>
-  private static LilGraph CreateNodes(int nodeCount, int poiNodeIndex, int poiCount)
-  {
-    var graph = new LilGraph();
-    for (var i = 0; i < nodeCount; i++)
-    {
-      var node = new LilNode { Id = Id(i), RelSize = 1 };
-      if (i == poiNodeIndex)
-      {
-        for (var poi = 0; poi < poiCount; poi++)
-        {
-          node.Pois.Add(CreatePoi(i, poi));
-        }
-      }
-
-      graph.Nodes.Add(node);
-    }
-
-    return graph;
-  }
-
-  /// <summary>
-  /// Creates an edge between two node indices with a deterministic identifier.
-  /// </summary>
-  /// <param name="fromIndex">Source node index.</param>
-  /// <param name="toIndex">Target node index; must differ.</param>
-  /// <returns>The constructed edge, bidirectional and unconditional.</returns>
-  private static LilEdge CreateEdge(int fromIndex, int toIndex)
-  {
-    // Low/high ordering keeps identifiers unique per unordered pair.
-    var low = Math.Min(fromIndex, toIndex);
-    var high = Math.Max(fromIndex, toIndex);
-    return new LilEdge
-    {
-      Id = Guid.Parse($"00000000-0000-0000-0001-{low:D6}{high:D6}"),
-      From = Id(fromIndex),
-      To = Id(toIndex),
-    };
-  }
-
-  /// <summary>
-  /// Creates a deterministic POI identifier unique per node and slot.
-  /// </summary>
-  /// <param name="nodeIndex">Index of the owning node.</param>
-  /// <param name="slot">POI slot on that node.</param>
-  /// <returns>A distinct, non-empty identifier.</returns>
-  private static LilPoi CreatePoi(int nodeIndex, int slot)
-  {
-    return new LilPoi
-    {
-      Id = Guid.Parse($"00000000-0000-0000-0002-{nodeIndex:D6}{slot:D6}"),
-      Type = EnPoiType.Start,
-    };
   }
 }

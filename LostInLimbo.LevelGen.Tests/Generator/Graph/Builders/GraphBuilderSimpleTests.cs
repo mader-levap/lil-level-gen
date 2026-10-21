@@ -58,7 +58,7 @@ public sealed class GraphBuilderSimpleTests
       // secret relationship of the finalisation pass; the graph stays connected.
       Assert.True(success);
       Assert.Equal(Math.Max(0, size - 1) + 1, graph.Edges.Count);
-      GraphTestSupport.AssertBeatable(graph);
+      GraphTestAssert.AssertBeatable(graph);
     }
 
     [Theory]
@@ -79,7 +79,7 @@ public sealed class GraphBuilderSimpleTests
       // one secret relationship of the finalisation pass; the graph stays connected.
       Assert.True(success);
       Assert.Equal(size - 1 + connectivity + 1, graph.Edges.Count);
-      GraphTestSupport.AssertBeatable(graph);
+      GraphTestAssert.AssertBeatable(graph);
     }
 
     [Fact]
@@ -170,11 +170,11 @@ public sealed class GraphBuilderSimpleTests
       // secret relationship of the finalisation pass does not count) and the complete
       // graph bound is respected.
       Assert.True(success);
-      GraphTestSupport.AssertDegreeCap(graph, MaxDegree, includeSecretEdges: false);
+      GraphTestAssert.AssertDegreeCap(graph, MaxDegree, includeSecretEdges: false);
       Assert.True(graph.Edges.Count <= 11, "Five nodes cannot hold more than ten pair passages plus the secret relationship.");
-      GraphTestSupport.AssertValidEdges(graph);
-      GraphTestSupport.AssertOpenPassages(graph);
-      GraphTestSupport.AssertBeatable(graph);
+      GraphTestAssert.AssertValidEdges(graph);
+      GraphTestAssert.AssertOpenPassages(graph);
+      GraphTestAssert.AssertBeatable(graph);
     }
 
     [Fact]
@@ -194,10 +194,10 @@ public sealed class GraphBuilderSimpleTests
       Assert.True(success);
       Assert.True(graph.Edges.Count >= 19, "The skeleton alone already holds 19 relationships.");
       Assert.True(graph.Edges.Count <= 191, "Twenty nodes cannot hold more than 190 pair passages plus the secret relationship.");
-      GraphTestSupport.AssertDegreeCap(graph, MaxDegreeStar, includeSecretEdges: false);
-      GraphTestSupport.AssertValidEdges(graph);
-      GraphTestSupport.AssertOpenPassages(graph);
-      GraphTestSupport.AssertBeatable(graph);
+      GraphTestAssert.AssertDegreeCap(graph, MaxDegreeStar, includeSecretEdges: false);
+      GraphTestAssert.AssertValidEdges(graph);
+      GraphTestAssert.AssertOpenPassages(graph);
+      GraphTestAssert.AssertBeatable(graph);
     }
 
     [Theory]
@@ -219,8 +219,8 @@ public sealed class GraphBuilderSimpleTests
         // matter which scenario was rolled.
         Assert.True(success);
         Assert.Equal(size, graph.Edges.Count);
-        GraphTestSupport.AssertDegreeCap(graph, MaxDegreeStar, includeSecretEdges: false);
-        GraphTestSupport.AssertBeatable(graph, $"Skeleton graph must be connected (size {size}, seed {seed}).");
+        GraphTestAssert.AssertDegreeCap(graph, MaxDegreeStar, includeSecretEdges: false);
+        GraphTestAssert.AssertBeatable(graph, $"Skeleton graph must be connected (size {size}, seed {seed}).");
       }
     }
 
@@ -261,8 +261,8 @@ public sealed class GraphBuilderSimpleTests
       // Assert: Edges are well-formed, all passages open and every node uses one of the
       // default relative-size steps.
       Assert.True(success);
-      GraphTestSupport.AssertValidEdges(graph);
-      GraphTestSupport.AssertOpenPassages(graph);
+      GraphTestAssert.AssertValidEdges(graph);
+      GraphTestAssert.AssertOpenPassages(graph);
       var stepValues = ProcNodeRelSizeOpt.Default.Prepare();
       Assert.All(graph.Nodes, node => Assert.Contains(node.RelSize, stepValues));
     }
@@ -343,7 +343,7 @@ public sealed class GraphBuilderSimpleTests
 
         // Assert: The hidden node stays reachable - the secret passage is open - so the
         // beatability simulation still passes.
-        GraphTestSupport.AssertBeatable(graph, $"Secret graph must stay connected (seed {seed}).");
+        GraphTestAssert.AssertBeatable(graph, $"Secret graph must stay connected (seed {seed}).");
       }
     }
   }
@@ -363,7 +363,7 @@ public sealed class GraphBuilderSimpleTests
 
       // Assert: Nodes, edges and POIs match one by one.
       Assert.Equal(first.Success, second.Success);
-      GraphTestSupport.AssertEqualGraphs(first.Graph, second.Graph);
+      GraphTestAssert.AssertEqualGraphs(first.Graph, second.Graph);
     }
 
     [Fact]
@@ -397,7 +397,7 @@ public sealed class GraphBuilderSimpleTests
       });
 
       // Assert: Complexity is ignored - same graph in every run.
-      GraphTestSupport.AssertEqualGraphs(reference.Graph, varied.Graph);
+      GraphTestAssert.AssertEqualGraphs(reference.Graph, varied.Graph);
     }
 
     [Fact]

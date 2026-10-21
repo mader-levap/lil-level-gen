@@ -1,7 +1,7 @@
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
-using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestSupport;
+using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Validator;
 

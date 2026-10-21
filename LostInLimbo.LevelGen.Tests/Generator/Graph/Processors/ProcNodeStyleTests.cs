@@ -1,6 +1,7 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
+using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestSupport;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Styler;
@@ -339,7 +340,7 @@ public sealed class ProcNodeStyleTests
       new ProcNodeStyle(second, ProcNodeStyleOpt.Default, Seed).Execute();
 
       // Assert: Same identifiers with the same groups.
-      GraphTestSupport.AssertEqualGraphs(first, second);
+      GraphTestAssert.AssertEqualGraphs(first, second);
       Assert.Equal(GetGroupAssignments(first), GetGroupAssignments(second));
     }
 
@@ -446,126 +447,9 @@ public sealed class ProcNodeStyleTests
         new ProcNodeStyle(second, ProcNodeStyleOpt.Default, seed).Execute();
 
         // Assert: The restricted-relationship fallback stays deterministic too.
-        GraphTestSupport.AssertEqualGraphs(first, second);
+        GraphTestAssert.AssertEqualGraphs(first, second);
       }
     }
-  }
-
-  //
-  // Graph fixtures
-  //
-
-  /// <summary>
-  /// Creates a chain graph: node 0 - node 1 - ... with deterministic identifiers.
-  /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 1.</param>
-  /// <param name="secretEdges">When true, every relationship is a secret passage.</param>
-  /// <param name="oneWayEdges">When true, every relationship only allows growth forward.</param>
-  /// <param name="poiNodeIndex">Node that receives POIs, or -1 for none.</param>
-  /// <param name="poiCount">Amount of POIs to place on <paramref name="poiNodeIndex"/>.</param>
-  /// <returns>The constructed graph with <c>nodeCount - 1</c> edges.</returns>
-  private static LilGraph CreateChainGraph(
-    int nodeCount,
-    bool secretEdges = false,
-    bool oneWayEdges = false,
-    int poiNodeIndex = -1,
-    int poiCount = 0)
-  {
-    var graph = CreateNodes(poiNodeIndex, poiCount, nodeCount);
-    for (var i = 0; i + 1 < nodeCount; i++)
-    {
-      graph.Edges.Add(CreateEdge(
-        i,
-        i + 1,
-        direction: oneWayEdges ? EnPassageDirection.OneWay : EnPassageDirection.Bidirectional,
-        secret: secretEdges));
-    }
-
-    return graph;
-  }
-
-  /// <summary>
-  /// Creates a chain whose relationships cycle through the three restricted kinds:
-  /// secret, one-way and conditional.
-  /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 1.</param>
-  /// <returns>The constructed graph with <c>nodeCount - 1</c> restricted edges.</returns>
-  private static LilGraph CreateRestrictedChainGraph(int nodeCount)
-  {
-    var graph = CreateNodes(poiNodeIndex: -1, poiCount: 0, nodeCount: nodeCount);
-    for (var i = 0; i + 1 < nodeCount; i++)
-    {
-      var kind = i % 3;
-      graph.Edges.Add(kind switch
-      {
-        0 => CreateEdge(i, i + 1, secret: true),
-        1 => CreateEdge(i, i + 1, direction: EnPassageDirection.OneWay),
-        _ => CreateEdge(i, i + 1, conditions: [Condition(i)]),
-      });
-    }
-
-    return graph;
-  }
-
-  /// <summary>
-  /// Creates the node list with deterministic identifiers and initial sizes of 1.
-  /// </summary>
-  /// <param name="poiNodeIndex">Node that receives POIs, or -1 for none.</param>
-  /// <param name="poiCount">Amount of POIs to place on that node.</param>
-  /// <param name="nodeCount">Amount of nodes.</param>
-  /// <returns>A graph holding the nodes; no edges.</returns>
-  private static LilGraph CreateNodes(int poiNodeIndex, int poiCount, int nodeCount)
-  {
-    var graph = new LilGraph();
-    for (var i = 0; i < nodeCount; i++)
-    {
-      var node = new LilNode { Id = Id(i), RelSize = 1 };
-      if (i == poiNodeIndex)
-      {
-        for (var poi = 0; poi < poiCount; poi++)
-        {
-          node.Pois.Add(new LilPoi
-          {
-            Id = Guid.Parse($"00000000-0000-0000-0002-{i:D6}{poi:D6}"),
-            Type = EnPoiType.Start,
-          });
-        }
-      }
-
-      graph.Nodes.Add(node);
-    }
-
-    return graph;
-  }
-
-  /// <summary>
-  /// Creates an edge between two node indices with a deterministic identifier.
-  /// </summary>
-  /// <param name="fromIndex">Source node index.</param>
-  /// <param name="toIndex">Target node index; must differ.</param>
-  /// <param name="direction">Passage direction; open bidirectional unless set otherwise.</param>
-  /// <param name="secret">Whether the passage is secret.</param>
-  /// <param name="conditions">Passage requirements; open passage when null or empty.</param>
-  /// <returns>The constructed edge.</returns>
-  private static LilEdge CreateEdge(
-    int fromIndex,
-    int toIndex,
-    EnPassageDirection direction = EnPassageDirection.Bidirectional,
-    bool secret = false,
-    LilCondition[]? conditions = null)
-  {
-    // Low/high ordering keeps identifiers unique per unordered pair.
-    var low = Math.Min(fromIndex, toIndex);
-    var high = Math.Max(fromIndex, toIndex);
-    return new LilEdge
-    {
-      Id = Guid.Parse($"00000000-0000-0000-0001-{low:D6}{high:D6}"),
-      From = Id(fromIndex),
-      To = Id(toIndex),
-      Direction = direction,
-      Secret = secret,
-      Conditions = conditions is null ? new List<LilCondition>() : [.. conditions],
-    };
   }
 
   /// <summary>

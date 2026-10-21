@@ -68,7 +68,7 @@ public sealed class GraphBuilderLinearTests
       Assert.True(success);
       Assert.Equal(Math.Max(0, size - 1) + 1, graph.Edges.Count);
       GraphAssertions.AssertExactChain(graph, size);
-      GraphTestSupport.AssertBeatable(graph, "Chain graph must be connected.");
+      GraphTestAssert.AssertBeatable(graph, "Chain graph must be connected.");
     }
 
     [Theory]
@@ -92,7 +92,7 @@ public sealed class GraphBuilderLinearTests
         // connected.
         Assert.True(success, $"Build failed for size {size}, seed {seed}.");
         Assert.Equal(size - 1 + connectivity + 1, graph.Edges.Count);
-        GraphTestSupport.AssertBeatable(graph, $"Graph must stay connected (size {size}, seed {seed}).");
+        GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (size {size}, seed {seed}).");
       }
     }
   }
@@ -206,9 +206,9 @@ public sealed class GraphBuilderLinearTests
         GraphAssertions.AssertForwardAndSkipWindow(graph);
         GraphAssertions.AssertExtraDegreeCaps(graph);
         GraphAssertions.AssertPairPassageCounts(graph);
-        GraphTestSupport.AssertValidEdges(graph, allowDuplicates: true);
-        GraphTestSupport.AssertOpenPassages(graph);
-        GraphTestSupport.AssertBeatable(graph, $"Graph must stay connected (size {size}, seed {seed}).");
+        GraphTestAssert.AssertValidEdges(graph, allowDuplicates: true);
+        GraphTestAssert.AssertOpenPassages(graph);
+        GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (size {size}, seed {seed}).");
       }
     }
 
@@ -298,7 +298,7 @@ public sealed class GraphBuilderLinearTests
       // Assert: No solution POI exists and every passage stays open.
       Assert.True(success);
       Assert.Empty(GraphTestSupport.GetPois(graph, EnPoiType.Solution));
-      GraphTestSupport.AssertOpenPassages(graph);
+      GraphTestAssert.AssertOpenPassages(graph);
     }
 
     [Theory]
@@ -357,7 +357,7 @@ public sealed class GraphBuilderLinearTests
       Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Exit));
       Assert.DoesNotContain(ordinary.Pois, poi => poi.Type == EnPoiType.Solution);
       Assert.Empty(secret.Pois);
-      GraphTestSupport.AssertOpenPassages(graph);
+      GraphTestAssert.AssertOpenPassages(graph);
     }
 
     [Fact]
@@ -384,7 +384,7 @@ public sealed class GraphBuilderLinearTests
         // Assert: The per-relationship condition cap holds exactly at saturation.
         Assert.Equal(MaxConditionPerRel, edge.Conditions.Count);
       }
-      GraphTestSupport.AssertBeatable(graph, "Saturated graph must stay beatable.");
+      GraphTestAssert.AssertBeatable(graph, "Saturated graph must stay beatable.");
     }
 
     [Theory]
@@ -520,8 +520,8 @@ public sealed class GraphBuilderLinearTests
         // Assert: The build succeeds and the beatability simulation passes with
         // conditions active - solutions are always reachable before they are demanded.
         Assert.True(success, $"Build failed for size {size}, seed {seed}.");
-        GraphTestSupport.AssertValidEdges(graph, allowDuplicates: true);
-        GraphTestSupport.AssertBeatable(graph, $"Conditioned graph must stay beatable (size {size}, seed {seed}).");
+        GraphTestAssert.AssertValidEdges(graph, allowDuplicates: true);
+        GraphTestAssert.AssertBeatable(graph, $"Conditioned graph must stay beatable (size {size}, seed {seed}).");
       }
     }
   }
@@ -585,7 +585,7 @@ public sealed class GraphBuilderLinearTests
 
         // Assert: The hidden node stays reachable - the secret passage is open - so the
         // beatability simulation still passes.
-        GraphTestSupport.AssertBeatable(graph, $"Secret graph must stay connected (seed {seed}).");
+        GraphTestAssert.AssertBeatable(graph, $"Secret graph must stay connected (seed {seed}).");
       }
     }
   }
@@ -605,7 +605,7 @@ public sealed class GraphBuilderLinearTests
 
       // Assert: Nodes, edges (including conditions) and POIs match one by one.
       Assert.Equal(first.Success, second.Success);
-      GraphTestSupport.AssertEqualGraphs(first.Graph, second.Graph);
+      GraphTestAssert.AssertEqualGraphs(first.Graph, second.Graph);
     }
 
     [Fact]
@@ -640,7 +640,7 @@ public sealed class GraphBuilderLinearTests
       // POIs and conditions while the reference stays open.
       Assert.Empty(GraphTestSupport.GetPois(reference.Graph, EnPoiType.Solution));
       Assert.Equal(5, GraphTestSupport.GetPois(varied.Graph, EnPoiType.Solution).Count);
-      GraphTestSupport.AssertOpenPassages(reference.Graph);
+      GraphTestAssert.AssertOpenPassages(reference.Graph);
       Assert.NotEqual(reference.Graph, varied.Graph);
     }
 
@@ -696,10 +696,10 @@ public sealed class GraphBuilderLinearTests
         // valid, every passage is open for now, and start reaches exit with all nodes
         // reachable.
         Assert.True(success, $"Build failed for size {size}, seed {seed}.");
-        GraphTestSupport.AssertValidEdges(graph, allowDuplicates: true);
-        GraphTestSupport.AssertOpenPassages(graph);
-        GraphTestSupport.AssertBeatable(graph, $"Graph must stay connected (size {size}, seed {seed}).");
-        GraphTestSupport.AssertBeatable(graph);
+        GraphTestAssert.AssertValidEdges(graph, allowDuplicates: true);
+        GraphTestAssert.AssertOpenPassages(graph);
+        GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (size {size}, seed {seed}).");
+        GraphTestAssert.AssertBeatable(graph);
       }
     }
   }
