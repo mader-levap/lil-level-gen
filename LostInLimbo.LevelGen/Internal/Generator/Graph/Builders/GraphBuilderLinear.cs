@@ -33,7 +33,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <list type="bullet">
 /// <item>Create linearly connected skeleton.</item>
 /// <item>Add PoIs. Start and exit are at ends of linear graph.</item>
-/// <item>Extra relationships between nodes up to connectivity and <see cref="MaxExtraDegree"/>.</item>
+/// <item>Extra relationships between nodes up to connectivity, <see cref="MaxExtraDegree"/>
+/// and the node <see cref="LilNode.MaxEdges"/> hard cap.</item>
 /// <item>Create obstacles for relationships up to complexity and
 /// <see cref="MaxConditionPerRel"/>: one shared solution condition per chosen node's
 /// incoming relationships, solution most likely near its guarded passage within
@@ -43,6 +44,12 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// </remarks>
 internal sealed class GraphBuilderLinear : AGraphBuilder
 {
+  /// <summary>
+  /// Maximum amount of relationships a node may have, counting skeleton and extra
+  /// relationships together. Assigned to every node as its <see cref="LilNode.MaxEdges"/>
+  /// hard cap and enforced by the extra-relationships pass.
+  /// </summary>
+  internal const int MaxEdges = 5;
   /// <summary>
   /// Maximum amount of extra relationships a node may gain in the extra-relationships phase (inclusive).
   /// Important: we count in and out relationships separately.
@@ -83,14 +90,15 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
     var size = Config.Graph.Size;
     var connectivity = Config.Graph.Connectivity;
     var complexity = Config.Graph.Complexity;
+    var degrees = new int[size];
     var extraOutDegrees = new int[size];
     var extraInDegrees = new int[size];
     var extraPairs = new bool[size, size];
 
     var nodeIds = CreateNodes(size);
-    CreateSkeleton(size, nodeIds);
+    CreateSkeleton(size, nodeIds, degrees);
     PlacePois();
-    AddExtraRelationships(connectivity, nodeIds, extraOutDegrees, extraInDegrees, extraPairs);
+    AddExtraRelationships(connectivity, nodeIds, degrees, extraOutDegrees, extraInDegrees, extraPairs);
     AddObstacles(complexity, nodeIds);
 
     // Finalisation.
@@ -124,6 +132,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
       Graph.Nodes.Add(new LilNode { 
         Id = id,
         RelSize = NodeRelSize,
+        MaxEdges = MaxEdges,
       });
     }
 
@@ -136,10 +145,11 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// </summary>
   /// <param name="size">Total amount of nodes, from <c>CnfGraph.Size</c>.</param>
   /// <param name="nodeIds">Node identifiers in chain order.</param>
-  private void CreateSkeleton(int size, Guid[] nodeIds)
+  /// <param name="degrees">Per-node relationship count, updated in place.</param>
+  private void CreateSkeleton(int size, Guid[] nodeIds, int[] degrees)
   {
     for (var i = 0; i + 1 < size; i++)
-      AddEdge(i, i + 1, nodeIds, SkeletonPassage);
+      AddEdge(i, i + 1, nodeIds, degrees, SkeletonPassage);
   }
 
   //
@@ -171,19 +181,20 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
 
   /// <summary>
   /// Adds extra relationships on top of the skeleton until connectivity is spent or no
-  /// eligible node pair remains under the constraints of <see cref="MaxExtraDegree"/> and
-  /// <see cref="MaxSkipDistance"/>.
+  /// eligible node pair remains under the constraints of <see cref="MaxExtraDegree"/>,
+  /// <see cref="MaxSkipDistance"/> and the <see cref="MaxEdges"/> hard cap.
   /// </summary>
   /// <remarks>
   /// <para>One relationship is added per iteration:</para>
   /// <list type="number">
   /// <item>The source (node A) is picked uniformly among all nodes that are not the last node,
-  /// still have out-capacity under <see cref="MaxExtraDegree"/> and can actually place a
-  /// relationship forward - so a source without any eligible target never blocks the pass.</item>
+  /// still have out-capacity under <see cref="MaxExtraDegree"/>, still have total capacity
+  /// under <see cref="MaxEdges"/> and can actually place a relationship forward - so a source
+  /// without any eligible target never blocks the pass.</item>
   /// <item>The target (node B) is picked among nodes after A within <see cref="MaxSkipDistance"/>
-  /// skipped nodes, with in-capacity under <see cref="MaxExtraDegree"/> and no extra
-  /// relationship yet on the (A, B) pair. Targets are weighted linearly by remaining skips
-  /// (adjacent most likely, see <see cref="PickTarget"/>).</item>
+  /// skipped nodes, with in-capacity under <see cref="MaxExtraDegree"/>, total capacity under
+  /// <see cref="MaxEdges"/> and no extra relationship yet on the (A, B) pair. Targets are
+  /// weighted linearly by remaining skips (adjacent most likely, see <see cref="PickTarget"/>).</item>
   /// </list>
   /// <para>When no eligible source (and therefore no eligible pair) remains, the pass ends
   /// silently - connectivity is a soft constraint. At most one extra relationship per node
@@ -192,12 +203,14 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// </remarks>
   /// <param name="connectivity">Requested amount of extra relationships, from <c>CnfGraph.Connectivity</c>.</param>
   /// <param name="nodeIds">Node identifiers in chain order.</param>
+  /// <param name="degrees">Total relationships per node (skeleton plus extra), updated in place.</param>
   /// <param name="extraOutDegrees">Extra relationships per source node, updated in place.</param>
   /// <param name="extraInDegrees">Extra relationships per target node, updated in place.</param>
   /// <param name="extraPairs">Flags pairs that already carry an extra relationship, updated in place (both directions).</param>
   private void AddExtraRelationships(
     int connectivity,
     Guid[] nodeIds,
+    int[] degrees,
     int[] extraOutDegrees,
     int[] extraInDegrees,
     bool[,] extraPairs)
@@ -213,16 +226,17 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
       for (var from = 0; from < size - 1; from++)
       {
         if (extraOutDegrees[from] >= MaxExtraDegree) continue;
-        if (HasEligibleTarget(from, extraInDegrees, extraPairs, size)) sources.Add(from);
+        if (degrees[from] >= MaxEdges) continue;
+        if (HasEligibleTarget(from, degrees, extraInDegrees, extraPairs, size)) sources.Add(from);
       }
 
       // No source with an eligible target remains; excess connectivity is ignored.
       if (sources.Count == 0) break;
 
       var source = sources[Random.NextInt(sources.Count)];
-      var target = PickTarget(source, extraInDegrees, extraPairs, size);
+      var target = PickTarget(source, degrees, extraInDegrees, extraPairs, size);
 
-      AddEdge(source, target, nodeIds, ExtraPassage);
+      AddEdge(source, target, nodeIds, degrees, ExtraPassage);
       extraOutDegrees[source]++;
       extraInDegrees[target]++;
       extraPairs[source, target] = true;
@@ -235,17 +249,20 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// Checks whether a source can place at least one extra relationship forward.
   /// </summary>
   /// <param name="from">Index of the source node; never the last node.</param>
+  /// <param name="degrees">Total relationships per node.</param>
   /// <param name="extraInDegrees">Extra relationships per target node.</param>
   /// <param name="extraPairs">Pairs that already carry an extra relationship.</param>
   /// <param name="size">Total amount of nodes.</param>
   /// <returns>True when at least one target within the skip window is eligible.</returns>
-  private bool HasEligibleTarget(int from, int[] extraInDegrees, bool[,] extraPairs, int size)
+  private bool HasEligibleTarget(int from, int[] degrees, int[] extraInDegrees, bool[,] extraPairs, int size)
   {
     var lastTarget = Math.Min(from + MaxSkipDistance + 1, size - 1);
     for (var to = from + 1; to <= lastTarget; to++)
     {
       if (extraPairs[from, to]) continue;
-      if (extraInDegrees[to] < MaxExtraDegree) return true;
+      if (extraInDegrees[to] >= MaxExtraDegree) continue;
+      if (degrees[to] >= MaxEdges) continue;
+      return true;
     }
 
     return false;
@@ -260,13 +277,14 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// <remarks>Deterministic for the same generator state; candidates are enumerated in
   /// chain order.</remarks>
   /// <param name="from">Index of the source node; must have at least one eligible target.</param>
+  /// <param name="degrees">Total relationships per node.</param>
   /// <param name="extraInDegrees">Extra relationships per target node.</param>
   /// <param name="extraPairs">Pairs that already carry an extra relationship.</param>
   /// <param name="size">Total amount of nodes.</param>
   /// <returns>Index of the chosen target node.</returns>
   /// <exception cref="InvalidOperationException">No eligible target remains; unreachable while
   /// <see cref="HasEligibleTarget"/> agreed that one exists.</exception>
-  private int PickTarget(int from, int[] extraInDegrees, bool[,] extraPairs, int size)
+  private int PickTarget(int from, int[] degrees, int[] extraInDegrees, bool[,] extraPairs, int size)
   {
     var lastTarget = Math.Min(from + MaxSkipDistance + 1, size - 1);
     var totalWeight = 0;
@@ -274,6 +292,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
     {
       if (extraPairs[from, to]) continue;
       if (extraInDegrees[to] >= MaxExtraDegree) continue;
+      if (degrees[to] >= MaxEdges) continue;
       totalWeight += MaxSkipDistance + 1 - (to - from - 1);
     }
 
@@ -286,6 +305,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
     {
       if (extraPairs[from, to]) continue;
       if (extraInDegrees[to] >= MaxExtraDegree) continue;
+      if (degrees[to] >= MaxEdges) continue;
       roll -= MaxSkipDistance + 1 - (to - from - 1);
       if (roll < 0) return to;
     }
@@ -294,14 +314,19 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   }
 
   /// <summary>
-  /// Adds one bidirectional edge between the two nodes in chain order. It is always chokepoint.
+  /// Adds one bidirectional edge between the two nodes in chain order and updates the
+  /// degree bookkeeping. It is always chokepoint.
   /// </summary>
   /// <param name="from">Index of the source node; must be earlier in the chain than <paramref name="to"/>.</param>
   /// <param name="to">Index of the target node; must differ from <paramref name="from"/>.</param>
   /// <param name="nodeIds">Node identifiers in chain order.</param>
+  /// <param name="degrees">Per-node relationship count, updated in place.</param>
   /// <param name="passage">Passage ordinal for the node pair; keeps parallel passages unique.</param>
-  private void AddEdge(int from, int to, Guid[] nodeIds, int passage)
+  private void AddEdge(int from, int to, Guid[] nodeIds, int[] degrees, int passage)
   {
+    degrees[from]++;
+    degrees[to]++;
+
     Graph.Edges.Add(new LilEdge
     {
       Id = DeriveEdgeId(from, to, passage),

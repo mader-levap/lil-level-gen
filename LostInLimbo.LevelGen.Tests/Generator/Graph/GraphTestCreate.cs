@@ -16,6 +16,12 @@ internal static class GraphTestCreate
   /// <summary>Relative size used by hand-built test nodes; only satisfies <see cref="LilNode.RelSize"/>.</summary>
   public const int DefaultNodeRelSize = 1;
 
+  /// <summary>
+  /// MaxEdges used by hand-built test nodes unless a test sets an explicit cap; negative
+  /// means no limit, so shared fixtures stay unaffected by the hard cap.
+  /// </summary>
+  public const int DefaultNodeMaxEdges = -1;
+
   //
   // Identifier and element primitives
   //
@@ -32,11 +38,25 @@ internal static class GraphTestCreate
   /// <summary>Creates a node with the given identifier and POIs.</summary>
   /// <param name="id">Small integer identifier of the node.</param>
   /// <param name="pois">POIs contained in the node; none when omitted.</param>
-  /// <returns>A node with <see cref="DefaultNodeRelSize"/> relative size.</returns>
+  /// <returns>A node with <see cref="DefaultNodeRelSize"/> relative size and no edge limit.</returns>
   public static LilNode Node(int id, params LilPoi[] pois) => new()
   {
     Id = Id(id),
     RelSize = DefaultNodeRelSize,
+    MaxEdges = DefaultNodeMaxEdges,
+    Pois = [.. pois],
+  };
+
+  /// <summary>Creates a node with the given identifier, edge cap and POIs.</summary>
+  /// <param name="id">Small integer identifier of the node.</param>
+  /// <param name="maxEdges">Hard cap of touching relationships; negative means no limit.</param>
+  /// <param name="pois">POIs contained in the node; none when omitted.</param>
+  /// <returns>A node with <see cref="DefaultNodeRelSize"/> relative size.</returns>
+  public static LilNode Node(int id, int maxEdges, params LilPoi[] pois) => new()
+  {
+    Id = Id(id),
+    RelSize = DefaultNodeRelSize,
+    MaxEdges = maxEdges,
     Pois = [.. pois],
   };
 
@@ -44,11 +64,12 @@ internal static class GraphTestCreate
   /// <param name="id">Small integer identifier of the node.</param>
   /// <param name="style">Styling of this node.</param>
   /// <param name="pois">POIs contained in the node; none when omitted.</param>
-  /// <returns>A node with <see cref="DefaultNodeRelSize"/> relative size.</returns>
+  /// <returns>A node with <see cref="DefaultNodeRelSize"/> relative size and no edge limit.</returns>
   public static LilNode Node(int id, LilStyle style, params LilPoi[] pois) => new()
   {
     Id = Id(id),
     RelSize = DefaultNodeRelSize,
+    MaxEdges = DefaultNodeMaxEdges,
     Style = style,
     Pois = [.. pois],
   };
@@ -251,7 +272,7 @@ internal static class GraphTestCreate
     var graph = new LilGraph();
     for (var i = 0; i < nodeCount; i++)
     {
-      var node = new LilNode { Id = Id(i), RelSize = DefaultNodeRelSize };
+      var node = new LilNode { Id = Id(i), RelSize = DefaultNodeRelSize, MaxEdges = DefaultNodeMaxEdges };
       if (i == poiNodeIndex)
       {
         for (var poi = 0; poi < poiCount; poi++)

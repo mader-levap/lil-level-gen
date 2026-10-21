@@ -10,10 +10,10 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Validator;
 /// connectivity and the final beatability outcome with its failure reasons.
 /// </summary>
 /// <remarks>
-/// Grouped into suites: structure (references, POIs), connectivity (flood-fill reachability)
-/// and conditions (key/door solvability). Test graphs are hand-built so each failure shape
-/// can be isolated; positive cases are additionally cross-checked against real builder
-/// output in <c>LevelGraphValidationTests</c>.
+/// Grouped into suites: structure (references, POIs), the MaxEdges hard cap, connectivity
+/// (flood-fill reachability) and conditions (key/door solvability). Test graphs are
+/// hand-built so each failure shape can be isolated; positive cases are additionally
+/// cross-checked against real builder output in <c>LevelGraphValidationTests</c>.
 /// </remarks>
 public sealed class GraphValidatorTests
 {
@@ -517,6 +517,159 @@ public sealed class GraphValidatorTests
       // Assert: Both endpoints flood and the key is collected, so the shortcut passes too.
       Assert.True(result.Success);
       Assert.Null(result.FailureReason);
+    }
+  }
+
+  /// <summary>Tests the <see cref="LilNode.MaxEdges"/> hard cap: over-cap failures and unlimited negative caps.</summary>
+  public sealed class MaxEdgesTests
+  {
+    [Fact]
+    public void Validate_NodeOverMaxEdgesCap_Fails()
+    {
+      // Arrange: Start node capped at one relationship, yet two edges touch it. The cap
+      // violation must be reported before any traversal outcome would complain.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, maxEdges: 1, Poi(10, EnPoiType.Start), Poi(11, EnPoiType.Exit)),
+          Node(2),
+          Node(3),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 1, to: 3),
+        ],
+      };
+
+      // Act: Validate the graph with an over-saturated node.
+      var result = Validate(graph);
+
+      // Assert: Failure naming the node, its degree and the cap.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Node {Id(1)} has 2 relationships, over its MaxEdges cap of 1.",
+        result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_NodeExactlyAtMaxEdgesCap_Succeeds()
+    {
+      // Arrange: Every node sits exactly at its cap of one relationship.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, maxEdges: 1, Poi(10, EnPoiType.Start)),
+          Node(2, maxEdges: 1, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges = [Edge(100, from: 1, to: 2)],
+      };
+
+      // Act: Validate the saturated but legal graph.
+      var result = Validate(graph);
+
+      // Assert: The cap is inclusive, so the graph stays beatable.
+      Assert.True(result.Success);
+      Assert.Null(result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_NegativeMaxEdges_NeverFails()
+    {
+      // Arrange: A hub holding many relationships, but its cap is negative - no limit.
+      var nodes = new List<LilNode> { Node(1, maxEdges: -1, Poi(10, EnPoiType.Start), Poi(11, EnPoiType.Exit)) };
+      var edges = new List<LilEdge>();
+      for (var i = 2; i <= 8; i++)
+      {
+        nodes.Add(Node(i));
+        edges.Add(Edge(100 + i, from: 1, to: i));
+      }
+      var graph = new LilGraph { Nodes = nodes, Edges = edges };
+
+      // Act: Validate the high-degree hub without a limit.
+      var result = Validate(graph);
+
+      // Assert: The negative cap disables the check entirely.
+      Assert.True(result.Success);
+      Assert.Null(result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_ZeroMaxEdgesWithoutEdges_Succeeds()
+    {
+      // Arrange: A single node with a zero cap and no edges to count.
+      var graph = new LilGraph
+      {
+        Nodes = [Node(1, maxEdges: 0, Poi(10, EnPoiType.Start), Poi(11, EnPoiType.Exit))],
+      };
+
+      // Act: Validate the edge-less graph.
+      var result = Validate(graph);
+
+      // Assert: Zero relationships fit a zero cap.
+      Assert.True(result.Success);
+      Assert.Null(result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_ParallelPassagesBothCountTowardCap()
+    {
+      // Arrange: Two passages between the same pair; the cap of one cannot hold both.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, maxEdges: 1, Poi(10, EnPoiType.Start)),
+          Node(2, maxEdges: 2, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 1, to: 2),
+        ],
+      };
+
+      // Act: Validate the graph with a parallel passage over the cap.
+      var result = Validate(graph);
+
+      // Assert: Both passages count, so the first node reports two relationships.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Node {Id(1)} has 2 relationships, over its MaxEdges cap of 1.",
+        result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_MaxEdgesCapViolation_ReportsBeforeUnreachableExit()
+    {
+      // Arrange: The exit is unreachable AND a node exceeds its cap; the structural
+      // cap violation must win because it runs before the traversal outcome.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, maxEdges: 1, Poi(10, EnPoiType.Start)),
+          Node(2, maxEdges: 1, Poi(11, EnPoiType.Exit)),
+          Node(3),
+          Node(4),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 3),
+          Edge(101, from: 1, to: 4),
+        ],
+      };
+
+      // Act: Validate the doubly broken graph.
+      var result = Validate(graph);
+
+      // Assert: The most structural reason is reported first.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Node {Id(1)} has 2 relationships, over its MaxEdges cap of 1.",
+        result.FailureReason);
     }
   }
 

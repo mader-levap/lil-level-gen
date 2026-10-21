@@ -16,6 +16,9 @@ public sealed class LilGraphDataTests
   /// <summary>Relative size used by test nodes; only required to satisfy <see cref="LilNode.RelSize"/>.</summary>
   private const int NodeRelSize = 1;
 
+  /// <summary>Edge cap used by test nodes; negative means no limit.</summary>
+  private const int NodeMaxEdges = -1;
+
   /// <summary>Tests <see cref="LilGraph"/>: default state and built-graph contents.</summary>
   public sealed class GraphTests
   {
@@ -48,18 +51,21 @@ public sealed class LilGraphDataTests
           {
             Id = startId,
             RelSize = NodeRelSize,
+            MaxEdges = NodeMaxEdges,
             Pois = [new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Start }],
           },
           new LilNode
           {
             Id = keyNodeId,
             RelSize = NodeRelSize,
+            MaxEdges = NodeMaxEdges,
             Pois = [new LilPoi { Id = keyPoiId, Type = EnPoiType.Solution, Name = "Key" }],
           },
           new LilNode
           {
             Id = exitId,
             RelSize = NodeRelSize,
+            MaxEdges = NodeMaxEdges,
             Pois = [new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Exit }],
           },
         ],
@@ -97,13 +103,14 @@ public sealed class LilGraphDataTests
     public void LilNode_WithRequiredMembersOnly_HasEmptyPoisList()
     {
       // Arrange/Act: Create node with only the required members set.
-      var node = new LilNode { Id = Guid.NewGuid(), RelSize = NodeRelSize };
+      var node = new LilNode { Id = Guid.NewGuid(), RelSize = NodeRelSize, MaxEdges = NodeMaxEdges };
 
       // Assert: Required members hold given values; Pois list is present and empty, never null.
       Assert.NotNull(node.Pois);
       Assert.Empty(node.Pois);
       Assert.NotEqual(Guid.Empty, node.Id);
       Assert.Equal(NodeRelSize, node.RelSize);
+      Assert.Equal(NodeMaxEdges, node.MaxEdges);
     }
 
     [Fact]
@@ -116,6 +123,7 @@ public sealed class LilGraphDataTests
       {
         Id = Guid.NewGuid(),
         RelSize = NodeRelSize,
+        MaxEdges = NodeMaxEdges,
         Pois =
         [
           new LilPoi { Id = redKeyId, Type = EnPoiType.Solution, Name = "Red Key" },
@@ -146,12 +154,14 @@ public sealed class LilGraphDataTests
       {
         Id = id,
         RelSize = NodeRelSize,
+        MaxEdges = NodeMaxEdges,
         Pois = [new LilPoi { Id = poiId, Type = EnPoiType.Start }],
       };
       var node2 = new LilNode
       {
         Id = id,
         RelSize = NodeRelSize,
+        MaxEdges = NodeMaxEdges,
         Pois = [new LilPoi { Id = poiId, Type = EnPoiType.Start }],
       };
 
@@ -172,6 +182,7 @@ public sealed class LilGraphDataTests
       {
         Id = Guid.NewGuid(),
         RelSize = NodeRelSize,
+        MaxEdges = NodeMaxEdges,
         Pois = [new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Goal }],
       };
 
@@ -249,6 +260,7 @@ public sealed class LilGraphDataTests
       {
         Id = Guid.NewGuid(),
         RelSize = NodeRelSize,
+        MaxEdges = NodeMaxEdges,
         Pois =
         [
           new LilPoi { Id = redKeyId, Type = EnPoiType.Solution, Name = "Red Key" },

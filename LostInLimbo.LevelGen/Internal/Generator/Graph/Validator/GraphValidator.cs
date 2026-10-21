@@ -23,8 +23,9 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// at the root cause: a conditioned passage that can never be satisfied (softlock) first,
 /// an unreachable exit second, and leftover unreachable nodes last as the catch-all (e.g. a
 /// disconnected dead-end branch while the exit itself is fine). Structural problems
-/// (missing nodes, dangling references, duplicate identifiers) are reported before any
-/// traversal. Each reason is reported only for the first failing check.
+/// (missing nodes, dangling references, duplicate identifiers, nodes over their
+/// <see cref="LilNode.MaxEdges"/> hard cap) are reported before any traversal. Each reason
+/// is reported only for the first failing check.
 /// </para>
 /// <para>Instances hold per-call state, so create a new instance per validation
 /// (or use <see cref="LevelGraphValidation"/>); one instance must not be shared across
@@ -62,6 +63,8 @@ internal sealed class GraphValidator(LilGraph? graph)
     result = Setup();
     if (result != null) return result;
     result = CheckEdges();
+    if (result != null) return result;
+    result = CheckMaxEdges();
     if (result != null) return result;
     result = CheckTraversals();
     if (result != null) return result;
@@ -135,6 +138,36 @@ internal sealed class GraphValidator(LilGraph? graph)
           return GraphValidationResult.Fail($"Condition on edge {edge.Id} references missing POI {condition.RequiresPoi}.");
       }
     }
+    return null;
+  }
+
+  /// <summary>
+  /// Checks that no node exceeds its <see cref="LilNode.MaxEdges"/> hard cap; a negative
+  /// cap means no limit. Counts every relationship touching the node, from either end.
+  /// </summary>
+  /// <remarks>Runs after <see cref="CheckEdges"/>, so every edge endpoint is known to exist.</remarks>
+  /// <returns>Null if success, otherwise failure.</returns>
+  private GraphValidationResult? CheckMaxEdges()
+  {
+    var degrees = new Dictionary<Guid, int>(_graph!.Nodes.Count);
+    foreach (var node in _graph.Nodes)
+    {
+      degrees[node.Id] = 0;
+    }
+
+    foreach (var edge in _graph.Edges)
+    {
+      degrees[edge.From]++;
+      degrees[edge.To]++;
+    }
+
+    foreach (var node in _graph.Nodes)
+    {
+      if (node.MaxEdges >= 0 && degrees[node.Id] > node.MaxEdges)
+        return GraphValidationResult.Fail(
+          $"Node {node.Id} has {degrees[node.Id]} relationships, over its MaxEdges cap of {node.MaxEdges}.");
+    }
+
     return null;
   }
 

@@ -15,11 +15,11 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 /// </remarks>
 public sealed class GraphBuilderSimpleTests
 {
-  /// <summary>Mirrors <c>SimpleGraphBuilder.MaxDegree</c>: cap of the random-relationships phase.</summary>
-  private const int MaxDegree = GraphBuilderSimple.MaxDegree;
+  /// <summary>Mirrors <c>GraphBuilderSimple.MaxEdges</c>: cap of the random-relationships phase.</summary>
+  private const int MaxDegree = GraphBuilderSimple.MaxEdges;
 
-  /// <summary>Mirrors <c>SimpleGraphBuilder.MaxDegreeStar</c>: cap of the skeleton phase.</summary>
-  private const int MaxDegreeStar = GraphBuilderSimple.MaxDegreeStar;
+  /// <summary>Mirrors <c>GraphBuilderSimple.MaxEdgesStar</c>: cap of the skeleton phase.</summary>
+  private const int MaxDegreeStar = GraphBuilderSimple.MaxEdgesStar;
 
   /// <summary>Tests for the skeleton shape: node count, minimality, connectivity, scenarios.</summary>
   public sealed class ShapeTests
@@ -171,6 +171,10 @@ public sealed class GraphBuilderSimpleTests
       // graph bound is respected.
       Assert.True(success);
       GraphTestAssert.AssertDegreeCap(graph, MaxDegree, includeSecretEdges: false);
+      GraphTestAssert.AssertMaxEdges(graph);
+      Assert.All(
+        graph.Nodes.Where(node => !node.Secret),
+        node => Assert.Equal(MaxDegreeStar, node.MaxEdges));
       Assert.True(graph.Edges.Count <= 11, "Five nodes cannot hold more than ten pair passages plus the secret relationship.");
       GraphTestAssert.AssertValidEdges(graph);
       GraphTestAssert.AssertOpenPassages(graph);
@@ -195,6 +199,7 @@ public sealed class GraphBuilderSimpleTests
       Assert.True(graph.Edges.Count >= 19, "The skeleton alone already holds 19 relationships.");
       Assert.True(graph.Edges.Count <= 191, "Twenty nodes cannot hold more than 190 pair passages plus the secret relationship.");
       GraphTestAssert.AssertDegreeCap(graph, MaxDegreeStar, includeSecretEdges: false);
+      GraphTestAssert.AssertMaxEdges(graph);
       GraphTestAssert.AssertValidEdges(graph);
       GraphTestAssert.AssertOpenPassages(graph);
       GraphTestAssert.AssertBeatable(graph);

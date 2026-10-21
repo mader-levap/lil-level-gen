@@ -38,6 +38,7 @@ internal sealed class GraphBuilderOneNode : AGraphBuilder
     {
       Id = nodeId,
       RelSize = NodeRelSize,
+      MaxEdges = 0,
       Pois =
       [
         new LilPoi { Id = startPoiId, Type = EnPoiType.Start },

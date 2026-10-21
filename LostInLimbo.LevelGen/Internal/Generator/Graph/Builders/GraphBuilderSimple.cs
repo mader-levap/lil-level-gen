@@ -10,8 +10,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <para>
 /// Builds the simple level graph: one or more nodes without obstacles. Start and exit may or
 /// may not be in the same node. Skeleton relationships may not exceed
-/// <see cref="MaxDegreeStar"/> per node; connectivity-driven relationships on top of the
-/// skeleton may not exceed <see cref="MaxDegree"/> per node.
+/// <see cref="MaxEdgesStar"/> per node; connectivity-driven relationships on top of the
+/// skeleton may not exceed <see cref="MaxEdges"/> per node.
 /// </para>
 /// </summary>
 /// <remarks>
@@ -27,19 +27,19 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <list type="bullet">
 /// <item>Create minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
 /// <item>Add PoIs. Start and exit are random and same node is allowed.</item>
-/// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxDegree"/>.</item>
+/// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxEdges"/>.</item>
 /// <item>Finalisation: secret nodes, node relative size and grouping.</item>
 /// </list>
 /// </remarks>
 internal sealed class GraphBuilderSimple : AGraphBuilder
 {
   /// <summary>Maximum amount of relationships a node may gain in the extra-relationships phase (inclusive).</summary>
-  internal const int MaxDegree = 4;
+  internal const int MaxEdges = 4;
   /// <summary>
   /// Maximum amount of relationships a node may gain in the skeleton phase (inclusive). A
   /// central node that reaches this cap hands its remaining nodes over to a new central.
   /// </summary>
-  internal const int MaxDegreeStar = 7;
+  internal const int MaxEdgesStar = 7;
   /// <summary>Minimum size where scenarios differ.</summary>
   private const int ScenarioSize = 3;
 
@@ -61,7 +61,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   /// <summary>
   /// Skeleton scenario for the minimal spanning structure. All three come from the same
   /// algorithm: create a linear prefix of nodes, then attach the rest to a central node,
-  /// handing over to a new central when the current one reaches <see cref="MaxDegreeStar"/>.
+  /// handing over to a new central when the current one reaches <see cref="MaxEdgesStar"/>.
   /// </summary>
   private enum EnSkeletonScenario
   {
@@ -116,7 +116,11 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
       var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltNode, index);
       var id = IdDerivation.Derive(subSeed, SaltNode);
       nodeIds[index] = id;
-      Graph.Nodes.Add(new LilNode { Id = id, RelSize = NodeRelSize });
+      Graph.Nodes.Add(new LilNode {
+        Id = id,
+        RelSize = NodeRelSize,
+        MaxEdges = MaxEdgesStar
+      });
     }
 
     return nodeIds;
@@ -125,7 +129,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   /// <summary>
   /// Creates the minimal connected skeleton: a chain over a linear prefix of nodes, with
   /// every remaining node attached to the current central node. When a central node reaches
-  /// <see cref="MaxDegreeStar"/>, a new central takes over so no node exceeds the skeleton
+  /// <see cref="MaxEdgesStar"/>, a new central takes over so no node exceeds the skeleton
   /// cap. Uses exactly <c>size - 1</c> relationships - the minimum for a connected graph.
   /// </summary>
   /// <param name="size">Total amount of nodes, from <c>CnfGraph.Size</c>.</param>
@@ -157,7 +161,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
       var central = PickCentral(linearCount);
       for (var i = linearCount; i < size; i++)
       {
-        if (degrees[central] >= MaxDegreeStar) central = PickNextCentral(degrees);
+        if (degrees[central] >= MaxEdgesStar) central = PickNextCentral(degrees);
         AddEdge(central, i, nodeIds, degrees, adjacency);
       }
     }
@@ -191,7 +195,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
 
   /// <summary>
   /// Picks a replacement central node once the previous one reached
-  /// <see cref="MaxDegreeStar"/>. Only already attached nodes (degree at least one) below
+  /// <see cref="MaxEdgesStar"/>. Only already attached nodes (degree at least one) below
   /// the cap are eligible - an unattached node would split the skeleton into components.
   /// </summary>
   /// <remarks>
@@ -203,7 +207,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   /// <param name="degrees">Per-node relationship count.</param>
   /// <returns>Index of the chosen central node.</returns>
   /// <exception cref="InvalidOperationException">
-  /// No eligible node remains; unreachable as long as <see cref="MaxDegreeStar"/> is at least two.
+  /// No eligible node remains; unreachable as long as <see cref="MaxEdgesStar"/> is at least two.
   /// </exception>
   private int PickNextCentral(int[] degrees)
   {
@@ -211,7 +215,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
     var eligible = new List<int>();
     for (var i = 0; i < degrees.Length; i++)
     {
-      if (degrees[i] >= 1 && degrees[i] < MaxDegreeStar) eligible.Add(i);
+      if (degrees[i] >= 1 && degrees[i] < MaxEdgesStar) eligible.Add(i);
     }
 
     if (eligible.Count == 0)
@@ -288,7 +292,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
     foreach (var (from, to) in candidates)
     {
       if (added >= connectivity) break;
-      if (degrees[from] >= MaxDegree || degrees[to] >= MaxDegree) continue;
+      if (degrees[from] >= MaxEdges || degrees[to] >= MaxEdges) continue;
 
       AddEdge(from, to, nodeIds, degrees, adjacency);
       added++;

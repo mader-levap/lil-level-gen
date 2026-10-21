@@ -25,17 +25,16 @@ public sealed record LilNode
   /// </summary>
   public required Guid Id { get; init; }
 
-  /// <summary>
-  /// Size relative to other nodes. Must be set by the generator.
-  /// </summary>
+  /// <summary>Size relative to other nodes.</summary>
   public required int RelSize { get; init; }
+
+  /// <summary>Maximum allowed amount of edges. Negative number means no limit. This is hard cap.</summary>
+  public required int MaxEdges { get; init; }
 
   /// <summary>If true, this is secret node.</summary>
   public bool Secret { get; init; } = false;
 
-  /// <summary>
-  /// Styling data.
-  /// </summary>
+  /// <summary>Styling data.</summary>
   public LilStyle Style { get; init; } = new();
 
   /// <summary>

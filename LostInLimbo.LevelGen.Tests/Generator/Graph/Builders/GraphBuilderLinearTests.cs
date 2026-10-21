@@ -20,6 +20,9 @@ public sealed class GraphBuilderLinearTests
   /// <summary>Cap of the extra-relationships phase per direction.</summary>
   private const int MaxExtraDegree = GraphBuilderLinear.MaxExtraDegree;
 
+  /// <summary>Hard cap of relationships per node, set on every node by the builder.</summary>
+  private const int MaxEdges = GraphBuilderLinear.MaxEdges;
+
   /// <summary>Nodes an extra relationship may skip.</summary>
   private const int MaxSkipDistance = GraphBuilderLinear.MaxSkipDistance;
 
@@ -200,12 +203,16 @@ public sealed class GraphBuilderLinearTests
 
         // Assert: The build succeeds, keeps at least the skeleton and every constraint of
         // the extra-relationships pass holds: chain order, skip window, per-direction
-        // degree caps and the one-extra-per-pair rule.
+        // degree caps, the one-extra-per-pair rule and the node MaxEdges hard cap.
         Assert.True(success, $"Build failed for size {size}, seed {seed}.");
         Assert.True(graph.Edges.Count >= size - 1, $"Skeleton missing (size {size}, seed {seed}).");
         GraphAssertions.AssertForwardAndSkipWindow(graph);
         GraphAssertions.AssertExtraDegreeCaps(graph);
         GraphAssertions.AssertPairPassageCounts(graph);
+        GraphTestAssert.AssertMaxEdges(graph);
+        Assert.All(
+          graph.Nodes.Where(node => !node.Secret),
+          node => Assert.Equal(MaxEdges, node.MaxEdges));
         GraphTestAssert.AssertValidEdges(graph, allowDuplicates: true);
         GraphTestAssert.AssertOpenPassages(graph);
         GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (size {size}, seed {seed}).");

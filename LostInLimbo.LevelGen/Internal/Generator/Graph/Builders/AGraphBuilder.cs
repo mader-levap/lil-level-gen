@@ -28,6 +28,9 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// world is discarded when it is cancelled).</item>
 /// <item><b>Failsafe</b>: Graph build can fail, though builders should give best effort to make it as unlikely as possible.
 /// Graph configuration variables are soft constraints: builders are allowed to ignore unreasonable values.</item>
+/// <item><b>MaxEdges cap</b>: every created node must receive a <see cref="LilNode.MaxEdges"/>
+/// value (negative means no limit), and the builder must never produce a node whose total
+/// relationship count - skeleton, extras and parallel passages alike - exceeds that cap.</item>
 /// </list>
 /// <para>
 /// Note: overly complex graphs might fail later during map generation. For example, it might be

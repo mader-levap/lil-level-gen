@@ -312,6 +312,154 @@ public sealed class ProcRelSecretsTests
     }
   }
 
+  /// <summary>Tests for the MaxEdges hard cap: host filtering, graceful stop, nesting under pressure.</summary>
+  public sealed class MaxEdgesTests
+  {
+    [Fact]
+    public void Execute_WithHostAtCapacity_SkipsThatHost()
+    {
+      // Arrange: Chain of two; the first node is capped at its single skeleton
+      // relationship, the second one has no limit - only the second can host.
+      var graph = CreateCappedChainGraph(
+        [
+          (maxEdges: 1, start: true, exit: false),
+          (maxEdges: -1, start: false, exit: true),
+        ]);
+
+      // Act: Add a single secret.
+      new ProcRelSecrets(graph, ProcRelSecretsOpt.Default, Seed).Execute();
+
+      // Assert: The full node keeps its single relationship; the secret hangs off the
+      // node that still has capacity.
+      var edge = Assert.Single(graph.Edges.Where(edge => edge.Secret));
+      Assert.Equal(Id(2), edge.From);
+      Assert.Equal(1, GraphTestSupport.GetDegrees(graph)[Id(1)]);
+    }
+
+    [Fact]
+    public void Execute_WithAllHostsAtCapacity_AddsNoSecrets()
+    {
+      // Arrange: Both nodes sit exactly at their cap of one relationship.
+      var graph = CreateCappedChainGraph(
+        [
+          (maxEdges: 1, start: true, exit: false),
+          (maxEdges: 1, start: false, exit: true),
+        ]);
+      var originalNodeCount = graph.Nodes.Count;
+      var originalEdgeCount = graph.Edges.Count;
+
+      // Act: Ask for three secrets anyway.
+      new ProcRelSecrets(graph, ProcRelSecretsOpt.Default with { Amount = 3 }, Seed).Execute();
+
+      // Assert: The pass stops gracefully instead of exceeding any cap or failing.
+      Assert.Equal(originalNodeCount, graph.Nodes.Count);
+      Assert.Equal(originalEdgeCount, graph.Edges.Count);
+      Assert.DoesNotContain(graph.Nodes, node => node.Secret);
+      GraphTestAssert.AssertMaxEdges(graph);
+    }
+
+    [Fact]
+    public void Execute_WithNegativeMaxEdges_TreatsHostAsUnlimited()
+    {
+      // Arrange: Only the first node has capacity - unlimited by negative cap; the other
+      // two sit at their positive caps (node 2 is full on skeleton, node 3 on its single
+      // skeleton relationship).
+      var graph = CreateCappedChainGraph(
+        [
+          (maxEdges: -1, start: true, exit: false),
+          (maxEdges: 2, start: false, exit: false),
+          (maxEdges: 1, start: false, exit: true),
+        ]);
+      var options = ProcRelSecretsOpt.Default with { Amount = 2, ChanceSecretInSecret = 0f };
+
+      // Act: Add two secrets; the nesting chance is off, so both roll ordinary hosts.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: Both secrets hang off the unlimited node - negative cap means no limit.
+      var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+      Assert.Equal(2, secretEdges.Count);
+      Assert.All(secretEdges, edge => Assert.Equal(Id(1), edge.From));
+      GraphTestAssert.AssertMaxEdges(graph);
+    }
+
+    [Fact]
+    public void Execute_WithForcedNesting_KeepsNestingWhileOrdinaryHostsAreFull()
+    {
+      // Arrange: Two chain nodes with one free slot each; after the first secret one
+      // ordinary host may already be full, so nesting carries the remaining secrets.
+      var graph = CreateCappedChainGraph(
+        [
+          (maxEdges: 2, start: true, exit: false),
+          (maxEdges: 2, start: false, exit: true),
+        ]);
+      var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
+      var options = ProcRelSecretsOpt.Default with { Amount = 4, ChanceSecretInSecret = 1f };
+
+      // Act: Add four secrets with nesting forced.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: Exactly one secret relationship starts at an ordinary node - the first
+      // one - and the other three nest behind secrets despite the tight host caps.
+      var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+      Assert.Equal(4, secretEdges.Count);
+      Assert.Single(secretEdges.Where(edge => originalNodeIds.Contains(edge.From)));
+      GraphTestAssert.AssertMaxEdges(graph);
+      GraphTestAssert.AssertBeatable(graph, "Nested capped graph must stay connected.");
+    }
+
+    [Fact]
+    public void Execute_OverManySeeds_NeverExceedsMaxEdges()
+    {
+      for (var seed = 0; seed < StatisticalSeedCount; seed++)
+      {
+        // Arrange: Chain with tight caps; ends hold one relationship already, middles
+        // two - only the ends can ever host another relationship.
+        var graph = CreateCappedChainGraph(
+        [
+          (maxEdges: 2, start: true, exit: false),
+          (maxEdges: 2, start: false, exit: false),
+          (maxEdges: 2, start: false, exit: false),
+          (maxEdges: 2, start: false, exit: true),
+        ]);
+        var options = ProcRelSecretsOpt.Default with { Amount = 6 };
+
+        // Act: Add six secrets - more than the two end slots can host.
+        new ProcRelSecrets(graph, options, seed).Execute();
+
+        // Assert: No node ever exceeds its hard cap and the graph stays beatable; the
+        // pass simply places fewer secrets than requested once capacity runs out.
+        GraphTestAssert.AssertMaxEdges(graph);
+        GraphTestAssert.AssertBeatable(graph, $"Capped graph must stay connected (seed {seed}).");
+      }
+    }
+
+    [Fact]
+    public void Execute_WithSameSeedAndCaps_ProducesIdenticalGraphs()
+    {
+      // Arrange: Two identical capped chain graphs and the same inputs.
+      var first = CreateCappedChainGraph(
+      [
+        (maxEdges: 2, start: true, exit: false),
+        (maxEdges: 2, start: false, exit: false),
+        (maxEdges: 2, start: false, exit: true),
+      ]);
+      var second = CreateCappedChainGraph(
+      [
+        (maxEdges: 2, start: true, exit: false),
+        (maxEdges: 2, start: false, exit: false),
+        (maxEdges: 2, start: false, exit: true),
+      ]);
+      var options = ProcRelSecretsOpt.Default with { Amount = 5, ChanceSecretInSecret = 0.5f };
+
+      // Act: Run the pass on both graphs.
+      new ProcRelSecrets(first, options, Seed).Execute();
+      new ProcRelSecrets(second, options, Seed).Execute();
+
+      // Assert: Capacity filtering stays part of the deterministic output.
+      GraphTestAssert.AssertEqualGraphs(first, second);
+    }
+  }
+
   /// <summary>Tests for reproducibility of the additions.</summary>
   public sealed class DeterminismTests
   {
@@ -385,9 +533,9 @@ public sealed class ProcRelSecretsTests
   //
 
   /// <summary>
-  /// Wraps the shared chain shape (<see cref="CreateChainGraph"/>) and adds the real Start
-  /// and Exit POIs this suite needs: node 1 holds the start POI, the last node the exit
-  /// POI, so the graph can be checked for beatability.
+  /// Wraps the shared chain shape and adds the real Start and Exit POIs this suite needs:
+  /// node 1 holds the start POI, the last node the exit POI, so the graph can be checked
+  /// for beatability.
   /// </summary>
   /// <param name="nodeCount">Amount of nodes; at least 1.</param>
   /// <returns>The constructed graph with <c>nodeCount - 1</c> open edges.</returns>
@@ -405,6 +553,33 @@ public sealed class ProcRelSecretsTests
     for (var i = 1; i < nodeCount; i++)
     {
       graph.Edges.Add(Edge(i, i, i + 1));
+    }
+
+    return graph;
+  }
+
+  /// <summary>
+  /// Builds a chain graph whose nodes carry explicit <see cref="LilNode.MaxEdges"/> caps,
+  /// one tuple per node in chain order (node 1 first).
+  /// </summary>
+  /// <param name="nodes">Per-node cap and POI flags in chain order; at least one node.</param>
+  /// <returns>The constructed graph with one open edge per consecutive node pair.</returns>
+  private static LilGraph CreateCappedChainGraph(
+    IReadOnlyList<(int maxEdges, bool start, bool exit)> nodes)
+  {
+    var graph = new LilGraph();
+    for (var i = 0; i < nodes.Count; i++)
+    {
+      var (maxEdges, start, exit) = nodes[i];
+      var pois = new List<LilPoi>();
+      if (start) pois.Add(Poi(1000 + i + 1, EnPoiType.Start));
+      if (exit) pois.Add(Poi(2000 + i + 1, EnPoiType.Exit));
+      graph.Nodes.Add(Node(i + 1, maxEdges, [.. pois]));
+    }
+
+    for (var i = 0; i + 1 < nodes.Count; i++)
+    {
+      graph.Edges.Add(Edge(i + 1, i + 1, i + 2));
     }
 
     return graph;

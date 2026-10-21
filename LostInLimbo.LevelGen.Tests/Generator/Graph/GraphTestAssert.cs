@@ -10,7 +10,7 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
 /// <remarks>
 /// Not a test class itself - xUnit only collects types that contain test methods.
 /// Assertions here must stay builder-neutral: builder-specific expectations belong in the
-/// individual test classes (see e.g. <c>SimpleGraphBuilderTests.MaxDegree</c>).
+/// individual test classes (see e.g. <c>GraphBuilderSimpleTests.MaxDegree</c>).
 /// Pairs of this class and its siblings: <see cref="GraphTestCreate"/> builds graphs,
 /// <see cref="GraphTestSupport"/> runs builders and queries results, this class asserts
 /// outcomes.
@@ -83,6 +83,26 @@ internal static class GraphTestAssert
     }
   }
 
+  /// <summary>
+  /// Asserts that every node respects its own <see cref="LilNode.MaxEdges"/> hard cap;
+  /// a negative cap means no limit. Counts every relationship touching the node, including
+  /// secret relationships of the finalisation pass.
+  /// </summary>
+  /// <param name="graph">Graph to check.</param>
+  public static void AssertMaxEdges(LilGraph graph)
+  {
+    var degrees = GraphTestSupport.GetDegrees(graph);
+    foreach (var node in graph.Nodes)
+    {
+      if (node.MaxEdges < 0) continue;
+
+      // Assert: The node stays under its hard cap.
+      Assert.True(
+        degrees[node.Id] <= node.MaxEdges,
+        $"Node {node.Id} has {degrees[node.Id]} relationships, MaxEdges cap is {node.MaxEdges}.");
+    }
+  }
+
   //
   //
 
@@ -121,6 +141,7 @@ internal static class GraphTestAssert
     // Assert: Same node properties and POI contents in the same order.
     Assert.Equal(expected.Id, actual.Id);
     Assert.Equal(expected.RelSize, actual.RelSize);
+    Assert.Equal(expected.MaxEdges, actual.MaxEdges);
     Assert.Equal(expected.Secret, actual.Secret);
     Assert.Equal(expected.Style, actual.Style);
 
