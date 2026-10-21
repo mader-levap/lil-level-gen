@@ -139,14 +139,17 @@ public sealed class GraphBuilderSimpleTests
         Connectivity = connectivity,
       });
 
-      // Assert: No relationships are possible, yet both POIs live on the single ordinary
-      // node; the finalisation pass appends one secret node hanging off it.
+      // Assert: No relationships are possible, yet both POIs and the mandatory goal live
+      // on the single ordinary node; the finalisation pass appends one secret node
+      // hanging off it, which hosts the optional goal (allowed in secret nodes).
       Assert.True(success);
       var ordinary = Assert.Single(graph.Nodes.Where(node => !node.Secret));
       var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
       Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Start));
       Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Exit));
-      Assert.Empty(secret.Pois);
+      Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Goal));
+      Assert.Single(secret.Pois);
+      Assert.Single(secret.Pois.Where(poi => poi.Type == EnPoiType.OptionalGoal));
 
       // Assert: The only relationship is the secret passage into the secret node.
       var edge = Assert.Single(graph.Edges);
@@ -442,11 +445,14 @@ public sealed class GraphBuilderSimpleTests
       // Act: Build a graph of the given size.
       var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size });
 
-      // Assert: Exactly two POIs exist across the graph, one of each required type.
+      // Assert: Exactly one POI of each type exists across the graph - Start, Exit and
+      // the two objectives placed by the finalisation pass.
       var pois = graph.Nodes.SelectMany(node => node.Pois).ToList();
-      Assert.Equal(2, pois.Count);
+      Assert.Equal(4, pois.Count);
       Assert.Single(pois.Where(poi => poi.Type == EnPoiType.Start));
       Assert.Single(pois.Where(poi => poi.Type == EnPoiType.Exit));
+      Assert.Single(pois.Where(poi => poi.Type == EnPoiType.Goal));
+      Assert.Single(pois.Where(poi => poi.Type == EnPoiType.OptionalGoal));
       Assert.All(pois, poi => Assert.NotEqual(Guid.Empty, poi.Id));
     }
 

@@ -28,7 +28,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <item>Create minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
 /// <item>Add PoIs. Start and exit are random and same node is allowed.</item>
 /// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxEdges"/>.</item>
-/// <item>Finalisation: secret nodes, node relative size and grouping.</item>
+/// <item>Finalisation: secret nodes, objective POIs, node relative size and grouping.</item>
 /// </list>
 /// </remarks>
 internal sealed class GraphBuilderSimple : AGraphBuilder
@@ -90,6 +90,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
 
     // Finalisation.
     new ProcRelSecrets(Graph, ProcRelSecretsOpt.Default, PrepData.SeedGraph).Execute();
+    new ProcNodeObjectives(Graph, ProcNodeObjectivesOpt.Default, PrepData.SeedGraph).Execute();
     new ProcNodeRelSize(Graph, ProcNodeRelSizeOpt.Default, PrepData.SeedGraph).Execute();
     new ProcNodeStyle(Graph, ProcNodeStyleOpt.Default, PrepData.SeedGraph).Execute();
 

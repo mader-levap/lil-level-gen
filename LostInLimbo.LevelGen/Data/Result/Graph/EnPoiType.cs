@@ -15,6 +15,8 @@ public enum EnPoiType
   Exit,
   /// <summary>Place that advances the level objective.</summary>
   Goal,
+  /// <summary>Place that contains some other goal that is not necessary to beat level.</summary>
+  OptionalGoal,
   /// <summary>Place that contains something required elsewhere, e.g. key/button/lever for a conditional door.</summary>
   Solution,
 }

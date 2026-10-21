@@ -24,7 +24,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// an unreachable exit second, and leftover unreachable nodes last as the catch-all (e.g. a
 /// disconnected dead-end branch while the exit itself is fine). Structural problems
 /// (missing nodes, dangling references, duplicate identifiers, nodes over their
-/// <see cref="LilNode.MaxEdges"/> hard cap) are reported before any traversal. Each reason
+/// <see cref="LilNode.MaxEdges"/> hard cap, a Goal POI inside a secret node) are reported
+/// before any traversal. Each reason
 /// is reported only for the first failing check.
 /// </para>
 /// <para>Instances hold per-call state, so create a new instance per validation
@@ -61,6 +62,8 @@ internal sealed class GraphValidator(LilGraph? graph)
     if (result != null) return result;
 
     result = Setup();
+    if (result != null) return result;
+    result = CheckGoalSecrets();
     if (result != null) return result;
     result = CheckEdges();
     if (result != null) return result;
@@ -111,6 +114,30 @@ internal sealed class GraphValidator(LilGraph? graph)
 
     if (_startNodeIds.Count == 0) return GraphValidationResult.Fail("Graph has no Start PoI.");
     if (_exitNodeIds.Count == 0) return GraphValidationResult.Fail("Graph has no Exit PoI.");
+
+    return null;
+  }
+
+  /// <summary>
+  /// Checks that no secret node hosts a <see cref="EnPoiType.Goal"/> POI - a mandatory
+  /// objective must stay findable without knowing about the hidden passage. An
+  /// <see cref="EnPoiType.OptionalGoal"/> POI is allowed in a secret node, and multiple
+  /// goals in one (non-secret) node are fine.
+  /// </summary>
+  /// <remarks>Runs after <see cref="Setup"/>, so all POIs are known to be unique.</remarks>
+  /// <returns>Null if success, otherwise failure.</returns>
+  private GraphValidationResult? CheckGoalSecrets()
+  {
+    foreach (var node in _graph!.Nodes)
+    {
+      if (!node.Secret) continue;
+
+      foreach (var poi in node.Pois)
+      {
+        if (poi.Type == EnPoiType.Goal)
+          return GraphValidationResult.Fail($"Goal PoI {poi.Id} is in secret node {node.Id}.");
+      }
+    }
 
     return null;
   }

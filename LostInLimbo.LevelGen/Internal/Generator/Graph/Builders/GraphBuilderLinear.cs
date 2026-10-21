@@ -39,7 +39,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <see cref="MaxConditionPerRel"/>: one shared solution condition per chosen node's
 /// incoming relationships, solution most likely near its guarded passage within
 /// <see cref="MaxConditionDistance"/>.</item>
-/// <item>Finalisation: secret nodes, node relative size and grouping.</item>
+/// <item>Finalisation: secret nodes, objective POIs, node relative size and grouping.</item>
 /// </list>
 /// </remarks>
 internal sealed class GraphBuilderLinear : AGraphBuilder
@@ -103,6 +103,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
 
     // Finalisation.
     new ProcRelSecrets(Graph, ProcRelSecretsOpt.Default, PrepData.SeedGraph).Execute();
+    new ProcNodeObjectives(Graph, ProcNodeObjectivesOpt.Default, PrepData.SeedGraph).Execute();
     new ProcNodeRelSize(Graph, ProcNodeRelSizeOpt.Default, PrepData.SeedGraph).Execute();
     new ProcNodeStyle(Graph, ProcNodeStyleOpt.Default, PrepData.SeedGraph).Execute();
 

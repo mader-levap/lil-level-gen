@@ -1,5 +1,5 @@
 Current tasks:
-- objectives, including optional
+- find way to set processor options
 
 Later:
 - Rework config data more.

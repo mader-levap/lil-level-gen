@@ -673,6 +673,135 @@ public sealed class GraphValidatorTests
     }
   }
 
+  /// <summary>Tests for the goal-in-secret rule and its deliberate exceptions.</summary>
+  public sealed class GoalPoiTests
+  {
+    [Fact]
+    public void Validate_GoalPoiInSecretNode_Fails()
+    {
+      // Arrange: A beatable graph whose secret node hosts a mandatory goal.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3, Poi(12, EnPoiType.Goal)) with { Secret = true },
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 2, to: 3, secret: true),
+        ],
+      };
+
+      // Act: Validate the graph with the mandatory goal in the secret node.
+      var result = Validate(graph);
+
+      // Assert: Failure with the dedicated reason.
+      Assert.False(result.Success);
+      Assert.Equal($"Goal PoI {Id(12)} is in secret node {Id(3)}.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_OptionalGoalPoiInSecretNode_Succeeds()
+    {
+      // Arrange: The same beatable graph, but the secret node hosts an optional goal.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3, Poi(12, EnPoiType.OptionalGoal)) with { Secret = true },
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 2, to: 3, secret: true),
+        ],
+      };
+
+      // Act: Validate the graph with the optional goal in the secret node.
+      var result = Validate(graph);
+
+      // Assert: An optional goal in a secret node is explicitly allowed.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_GoalPoiInOrdinaryNode_Succeeds()
+    {
+      // Arrange: A beatable two-node graph whose ordinary node hosts a mandatory goal.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start), Poi(12, EnPoiType.Goal)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges = [Edge(100, from: 1, to: 2)],
+      };
+
+      // Act: Validate the graph with the mandatory goal in an ordinary node.
+      var result = Validate(graph);
+
+      // Assert: The rule only fires for secret nodes.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_MultipleGoalPoisInOneOrdinaryNode_Succeeds()
+    {
+      // Arrange: A beatable two-node graph whose ordinary node hosts a Start, a
+      // mandatory goal and an optional goal at once - multiplicity is not the rule's
+      // business.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start), Poi(12, EnPoiType.Goal), Poi(13, EnPoiType.OptionalGoal)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges = [Edge(100, from: 1, to: 2)],
+      };
+
+      // Act: Validate the graph with two goals on one node.
+      var result = Validate(graph);
+
+      // Assert: Multiple goals per node are fine as far as the validator is concerned.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_GoalPoiInSecretNode_ReportsBeforeUnreachableExit()
+    {
+      // Arrange: The exit is unreachable AND a secret node hosts a mandatory goal; the
+      // goal-in-secret problem must win because it is structural and runs before the
+      // traversal outcome.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3, Poi(12, EnPoiType.Goal)) with { Secret = true },
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 3, secret: true),
+        ],
+      };
+
+      // Act: Validate the doubly broken graph.
+      var result = Validate(graph);
+
+      // Assert: The structural reason is reported first.
+      Assert.False(result.Success);
+      Assert.Equal($"Goal PoI {Id(12)} is in secret node {Id(3)}.", result.FailureReason);
+    }
+  }
+
   /// <summary>
   /// Runs one validation on a fresh validator instance. A <see cref="GraphValidator"/> holds
   /// per-call state, so instances must not be reused or shared across threads.

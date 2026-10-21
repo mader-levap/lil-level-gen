@@ -113,17 +113,23 @@ public sealed class GraphBuilderLinearTests
       // Act: Build a graph of the given size.
       var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph { Size = size });
 
-      // Assert: Exactly two POIs exist across the graph, one of each required type.
+      // Assert: Exactly one POI of each type exists across the graph - Start, Exit and
+      // the two objectives placed by the finalisation pass.
       var pois = graph.Nodes.SelectMany(node => node.Pois).ToList();
-      Assert.Equal(2, pois.Count);
+      Assert.Equal(4, pois.Count);
       Assert.Single(pois.Where(poi => poi.Type == EnPoiType.Start));
       Assert.Single(pois.Where(poi => poi.Type == EnPoiType.Exit));
+      Assert.Single(pois.Where(poi => poi.Type == EnPoiType.Goal));
+      Assert.Single(pois.Where(poi => poi.Type == EnPoiType.OptionalGoal));
 
       // Assert: The start lives in the first chain node, the exit in the last one; the
-      // secret node appended by finalisation carries no POI of its own.
+      // secret node appended by finalisation never carries Start, Exit or a mandatory
+      // goal - only an optional goal may land there.
       var chain = graph.Nodes.Where(node => !node.Secret).ToList();
       Assert.Single(chain[0].Pois.Where(poi => poi.Type == EnPoiType.Start));
       Assert.Single(chain[^1].Pois.Where(poi => poi.Type == EnPoiType.Exit));
+      var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
+      Assert.DoesNotContain(secret.Pois, poi => poi.Type is EnPoiType.Start or EnPoiType.Exit or EnPoiType.Goal);
 
       if (size > 1)
       {
@@ -149,14 +155,17 @@ public sealed class GraphBuilderLinearTests
         Connectivity = connectivity,
       });
 
-      // Assert: No relationship is possible, yet both POIs live on the single ordinary
-      // node; the finalisation pass appends one secret node hanging off it.
+      // Assert: No relationship is possible, yet both POIs and the mandatory goal live on
+      // the single ordinary node; the finalisation pass appends one secret node hanging
+      // off it, which hosts the optional goal (allowed in secret nodes).
       Assert.True(success);
       var ordinary = Assert.Single(graph.Nodes.Where(node => !node.Secret));
       var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
       Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Start));
       Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Exit));
-      Assert.Empty(secret.Pois);
+      Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Goal));
+      Assert.Single(secret.Pois);
+      Assert.Single(secret.Pois.Where(poi => poi.Type == EnPoiType.OptionalGoal));
 
       // Assert: The only relationship is the secret passage into the secret node.
       var edge = Assert.Single(graph.Edges);
@@ -355,15 +364,18 @@ public sealed class GraphBuilderLinearTests
         Complexity = complexity,
       });
 
-      // Assert: Build succeeds, the ordinary node holds both POIs, the finalisation pass
-      // appends one secret node without POIs, and no solution or condition appears.
+      // Assert: Build succeeds, the ordinary node holds both POIs and the mandatory goal,
+      // the finalisation pass appends one secret node holding only the optional goal, and
+      // no solution or condition appears.
       Assert.True(success);
       var ordinary = Assert.Single(graph.Nodes.Where(node => !node.Secret));
       var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
       Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Start));
       Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Exit));
+      Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Goal));
       Assert.DoesNotContain(ordinary.Pois, poi => poi.Type == EnPoiType.Solution);
-      Assert.Empty(secret.Pois);
+      Assert.Single(secret.Pois);
+      Assert.Single(secret.Pois.Where(poi => poi.Type == EnPoiType.OptionalGoal));
       GraphTestAssert.AssertOpenPassages(graph);
     }
 
