@@ -167,14 +167,18 @@ public sealed class CnfProcOptsTests
       Assert.Equal(2f, CnfProcNodeRelSizeOpts.Default.Growth);
     }
 
-    [Fact]
-    public void NodeRelSize_WithContradictoryStepsAndBias_ThrowsArgumentException()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void NodeRelSize_WithContradictorySingleStepAndBias_ThrowsArgumentException(bool useRelationshipBias)
     {
-      // Arrange: A single step leaves no variation for a positive bias.
+      // Arrange: A single step leaves no variation for a positive bias - whichever of
+      // the two biases is set.
       var opts = CnfProcNodeRelSizeOpts.Default with
       {
         Steps = 1,
-        BiasRelationships = 0.5f,
+        BiasRelationships = useRelationshipBias ? 0.5f : 0f,
+        BiasPois = useRelationshipBias ? 0f : 0.5f,
       };
 
       // Act/Assert: The contradiction is rejected naming the step count.

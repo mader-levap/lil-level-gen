@@ -41,57 +41,16 @@ public sealed class ProcRelSecretsTests
       Assert.Throws<ArgumentNullException>(() => new ProcRelSecrets(CreateStartExitChainGraph(4), null!, Seed));
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(-10)]
-    public void Execute_WithNegativeAmount_ThrowsArgumentOutOfRangeException(int amount)
-    {
-      // Arrange: Options demanding a forbidden secret count.
-      var options = CnfProcRelSecretsOpts.Default with { Amount = amount };
-
-      // Act & Assert: The pass rejects the options before touching the graph.
-      var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ProcRelSecrets(CreateStartExitChainGraph(4), options, Seed).Execute());
-      Assert.Equal("Amount", exception.ParamName);
-    }
-
-    [Theory]
-    [InlineData(-0.1f)]
-    [InlineData(1.1f)]
-    [InlineData(float.NaN)]
-    [InlineData(float.PositiveInfinity)]
-    public void Execute_WithChanceOutOfRange_ThrowsArgumentOutOfRangeException(float chance)
-    {
-      // Arrange: Options with a nesting chance outside [0, 1] (NaN included).
-      var options = CnfProcRelSecretsOpts.Default with { ChanceSecretInSecret = chance };
-
-      // Act & Assert: The chance is rejected as out of range.
-      var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ProcRelSecrets(CreateStartExitChainGraph(4), options, Seed).Execute());
-      Assert.Equal("ChanceSecretInSecret", exception.ParamName);
-    }
-
     [Fact]
     public void Constructor_WithInvalidOptions_ThrowsBeforeExecute()
     {
-      // Arrange: Options rejected by validation.
+      // Arrange: Options rejected by validation; the rules themselves are pinned by
+      // CnfProcOptsTests.
       var options = CnfProcRelSecretsOpts.Default with { Amount = -1 };
 
       // Act & Assert: Construction alone rejects the options, before Execute can run.
       Assert.Throws<ArgumentOutOfRangeException>(
         () => new ProcRelSecrets(CreateStartExitChainGraph(4), options, Seed));
-    }
-
-    [Fact]
-    public void Execute_WithInvalidOptionsOnEmptyGraph_ThrowsArgumentOutOfRangeException()
-    {
-      // Arrange: Empty graph; validation must still run.
-      var options = CnfProcRelSecretsOpts.Default with { Amount = -1 };
-
-      // Act & Assert: Bad options never pass silently, even without nodes.
-      var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ProcRelSecrets(new LilGraph(), options, Seed).Execute());
-      Assert.Equal("Amount", exception.ParamName);
     }
   }
 
@@ -532,32 +491,6 @@ public sealed class ProcRelSecretsTests
   //
   // Graph fixtures
   //
-
-  /// <summary>
-  /// Wraps the shared chain shape and adds the real Start and Exit POIs this suite needs:
-  /// node 1 holds the start POI, the last node the exit POI, so the graph can be checked
-  /// for beatability.
-  /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 1.</param>
-  /// <returns>The constructed graph with <c>nodeCount - 1</c> open edges.</returns>
-  private static LilGraph CreateStartExitChainGraph(int nodeCount)
-  {
-    var graph = new LilGraph();
-    for (var i = 1; i <= nodeCount; i++)
-    {
-      var pois = new List<LilPoi>();
-      if (i == 1) pois.Add(Poi(1000 + i, EnPoiType.Start));
-      if (i == nodeCount) pois.Add(Poi(2000 + i, EnPoiType.Exit));
-      graph.Nodes.Add(Node(i, [.. pois]));
-    }
-
-    for (var i = 1; i < nodeCount; i++)
-    {
-      graph.Edges.Add(Edge(i, i, i + 1));
-    }
-
-    return graph;
-  }
 
   /// <summary>
   /// Builds a chain graph whose nodes carry explicit <see cref="LilNode.MaxEdges"/> caps,

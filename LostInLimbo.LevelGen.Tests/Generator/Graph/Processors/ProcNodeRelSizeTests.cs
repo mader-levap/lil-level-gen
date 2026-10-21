@@ -4,7 +4,7 @@ using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestSupport;
 
-namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Distributor;
+namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Processors;
 
 /// <summary>
 /// Tests <see cref="ProcNodeRelSize"/>: option validation, step assignment rules,
@@ -96,51 +96,6 @@ public sealed class ProcNodeRelSizeTests
       Assert.Equal("BiasPois", exception.ParamName);
     }
 
-    [Fact]
-    public void Distribute_WithSingleStepAndRelationshipBias_ThrowsArgumentException()
-    {
-      // Arrange: One step value forbids variation while the bias demands it.
-      var options = CnfProcNodeRelSizeOpts.Default with
-      {
-        Steps = 1,
-        BiasRelationships = 0.5f,
-      };
-
-      // Act & Assert: The contradiction is reported as an argument error.
-      var exception = Assert.Throws<ArgumentException>(
-        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
-      Assert.Equal("Steps", exception.ParamName);
-    }
-
-    [Fact]
-    public void Distribute_WithSingleStepAndPoiBias_ThrowsArgumentException()
-    {
-      // Arrange: One step value forbids variation while the POI bias demands it.
-      var options = CnfProcNodeRelSizeOpts.Default with
-      {
-        Steps = 1,
-        BiasRelationships = 0f,
-        BiasPois = 0.5f,
-      };
-
-      // Act & Assert: The contradiction is reported as an argument error.
-      var exception = Assert.Throws<ArgumentException>(
-        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
-      Assert.Equal("Steps", exception.ParamName);
-    }
-
-    [Fact]
-    public void Distribute_WithUndefinedCurve_ThrowsArgumentOutOfRangeException()
-    {
-      // Arrange: Options with a curve value outside the enum.
-      var options = CnfProcNodeRelSizeOpts.Default with { Curve = (EnRelSizeCurve)42 };
-
-      // Act & Assert: The unknown curve is rejected.
-      var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
-      Assert.Equal("Curve", exception.ParamName);
-    }
-
     [Theory]
     [InlineData(0f)]
     [InlineData(-1f)]
@@ -203,18 +158,6 @@ public sealed class ProcNodeRelSizeTests
     }
 
     [Fact]
-    public void Distribute_WithInvalidOptionsAndEmptyGraph_StillThrows()
-    {
-      // Arrange: Empty graph, so only validation can produce an error here.
-      var graph = new LilGraph();
-      var options = CnfProcNodeRelSizeOpts.Default with { Steps = 0 };
-
-      // Act & Assert: Options are validated before the early exit for empty graphs.
-      Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ProcNodeRelSize(graph, options, Seed).Execute());
-    }
-
-    [Fact]
     public void Constructor_WithNullGraph_ThrowsArgumentNullException()
     {
       // Act & Assert: The pass refuses to be built around a missing graph.
@@ -235,7 +178,8 @@ public sealed class ProcNodeRelSizeTests
     [Fact]
     public void Constructor_WithInvalidOptions_ThrowsBeforeExecute()
     {
-      // Arrange: Options rejected by validation.
+      // Arrange: Options rejected by validation; the rules themselves are pinned by
+      // CnfProcOptsTests.
       var options = CnfProcNodeRelSizeOpts.Default with { Steps = 0 };
 
       // Act & Assert: Construction alone rejects the options, before Execute can run.

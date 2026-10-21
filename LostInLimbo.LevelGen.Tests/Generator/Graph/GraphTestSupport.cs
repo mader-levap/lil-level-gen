@@ -18,6 +18,15 @@ internal static class GraphTestSupport
   /// <summary>Default graph sub-seed used by tests unless a test needs another one.</summary>
   public const long DefaultSeedGraph = 42;
 
+  /// <summary>
+  /// Proc options with the secrets processor disabled - for builder tests that assert
+  /// plain skeleton shape without compensating for the default secret node.
+  /// </summary>
+  public static CnfProcOpts NoSecrets { get; } = CnfProcOpts.Default with
+  {
+    RelSecrets = new CnfProcRelSecretsOpts { Amount = 0 },
+  };
+
   //
   // Build runner
   //

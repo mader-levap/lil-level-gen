@@ -33,14 +33,16 @@ public sealed class GraphBuilderSimpleTests
     [InlineData(100)]
     public void Build_WithAnySize_ProducesConfiguredNodeCount(int size)
     {
-      // Act: Build a graph of the given size.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size });
+      // Act: Build a graph of the given size, without the default secret node.
+      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      {
+        Size = size,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      });
 
-      // Assert: The node count follows the size setting plus the one secret node the
-      // finalisation pass appends.
+      // Assert: The node count follows the size setting exactly.
       Assert.True(success);
-      Assert.Equal(size + 1, graph.Nodes.Count);
-      Assert.Single(graph.Nodes.Where(node => node.Secret));
+      Assert.Equal(size, graph.Nodes.Count);
     }
 
     [Theory]
@@ -51,13 +53,18 @@ public sealed class GraphBuilderSimpleTests
     [InlineData(100)]
     public void Build_WithZeroConnectivity_ProducesMinimalConnectedGraph(int size)
     {
-      // Act: Build a graph without any extra relationships.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size });
+      // Act: Build a graph without any extra relationships, without the default secret
+      // node.
+      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      {
+        Size = size,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      });
 
-      // Assert: The skeleton is a tree - size minus one relationships - plus the one
-      // secret relationship of the finalisation pass; the graph stays connected.
+      // Assert: The skeleton is a tree - size minus one relationships - and the graph
+      // stays connected.
       Assert.True(success);
-      Assert.Equal(Math.Max(0, size - 1) + 1, graph.Edges.Count);
+      Assert.Equal(Math.Max(0, size - 1), graph.Edges.Count);
       GraphTestAssert.AssertBeatable(graph);
     }
 
@@ -68,17 +75,19 @@ public sealed class GraphBuilderSimpleTests
     [InlineData(100, 50)]
     public void Build_WithConnectivityBelowCapacity_ConsumesAllConnectivity(int size, int connectivity)
     {
-      // Act: Build a graph whose requested extras fit under the degree cap.
+      // Act: Build a graph whose requested extras fit under the degree cap, without the
+      // default secret node.
       var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = size,
         Connectivity = connectivity,
+        ProcOpts = GraphTestSupport.NoSecrets,
       });
 
-      // Assert: Every requested extra relationship exists on top of the tree, plus the
-      // one secret relationship of the finalisation pass; the graph stays connected.
+      // Assert: Every requested extra relationship exists on top of the tree and the
+      // graph stays connected.
       Assert.True(success);
-      Assert.Equal(size - 1 + connectivity + 1, graph.Edges.Count);
+      Assert.Equal(size - 1 + connectivity, graph.Edges.Count);
       GraphTestAssert.AssertBeatable(graph);
     }
 
@@ -86,13 +95,14 @@ public sealed class GraphBuilderSimpleTests
     public void Build_WithVariousSeeds_ObservesDifferentSkeletonShapes()
     {
       // Act: Build many minimal graphs of the same size and look at the highest degree.
-      // Secret relationships of the finalisation pass are excluded - they only measure
-      // the skeleton shape.
       var maxDegrees = new List<int>();
       for (var seed = 0; seed < 30; seed++)
       {
-        var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = 10 }, seed);
-        maxDegrees.Add(GraphTestSupport.GetDegrees(graph, includeSecretEdges: false).Values.Max());
+        var (_, graph) = GraphTestSupport.Build(
+          EnGraphBuilder.Simple,
+          new CnfGraph { Size = 10, ProcOpts = GraphTestSupport.NoSecrets },
+          seed);
+        maxDegrees.Add(GraphTestSupport.GetDegrees(graph).Values.Max());
       }
 
       // Assert: At least one seed produced a plain chain (max degree 2) and at least one
@@ -115,16 +125,18 @@ public sealed class GraphBuilderSimpleTests
     [InlineData(100, 100000)]
     public void Build_WithAnyConfig_Succeeds(int size, int connectivity)
     {
-      // Act: Build with configs ranging from trivial to far beyond capacity.
+      // Act: Build with configs ranging from trivial to far beyond capacity, without the
+      // default secret node.
       var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = size,
         Connectivity = connectivity,
+        ProcOpts = GraphTestSupport.NoSecrets,
       });
 
       // Assert: The builder never fails - unsatisfiable settings are stretched silently.
       Assert.True(success);
-      Assert.Equal(size + 1, graph.Nodes.Count);
+      Assert.Equal(size, graph.Nodes.Count);
     }
 
     [Theory]
@@ -161,24 +173,23 @@ public sealed class GraphBuilderSimpleTests
     [Fact]
     public void Build_WithExcessiveConnectivityAtSmallSize_ObeysDegreeCap()
     {
-      // Act: Ask for far more relationships than a five-node graph can hold.
+      // Act: Ask for far more relationships than a five-node graph can hold, without the
+      // default secret node.
       var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = 5,
         Connectivity = 10000,
+        ProcOpts = GraphTestSupport.NoSecrets,
       });
 
       // Assert: The build succeeds, no node exceeds the plain degree cap on builder
-      // passages (at size five even a skeleton central collects at most four nodes; the
-      // secret relationship of the finalisation pass does not count) and the complete
-      // graph bound is respected.
+      // passages (at size five even a skeleton central collects at most four nodes) and
+      // the complete graph bound is respected.
       Assert.True(success);
-      GraphTestAssert.AssertDegreeCap(graph, MaxDegree, includeSecretEdges: false);
+      GraphTestAssert.AssertDegreeCap(graph, MaxDegree);
       GraphTestAssert.AssertMaxEdges(graph);
-      Assert.All(
-        graph.Nodes.Where(node => !node.Secret),
-        node => Assert.Equal(MaxDegreeStar, node.MaxEdges));
-      Assert.True(graph.Edges.Count <= 11, "Five nodes cannot hold more than ten pair passages plus the secret relationship.");
+      Assert.All(graph.Nodes, node => Assert.Equal(MaxDegreeStar, node.MaxEdges));
+      Assert.True(graph.Edges.Count <= 10, "Five nodes cannot hold more than ten pair passages.");
       GraphTestAssert.AssertValidEdges(graph);
       GraphTestAssert.AssertOpenPassages(graph);
       GraphTestAssert.AssertBeatable(graph);
@@ -187,21 +198,22 @@ public sealed class GraphBuilderSimpleTests
     [Fact]
     public void Build_WithExcessiveConnectivityAtLargeSize_SucceedsWithValidStructure()
     {
-      // Act: Ask for far more relationships than a twenty-node graph can hold.
+      // Act: Ask for far more relationships than a twenty-node graph can hold, without
+      // the default secret node.
       var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = 20,
         Connectivity = 10000,
+        ProcOpts = GraphTestSupport.NoSecrets,
       });
 
       // Assert: The build succeeds, keeps at least the skeleton, stays structurally
       // valid and never exceeds the skeleton degree cap on builder passages - central
-      // handover keeps even star-shaped skeletons bounded; the secret relationship of
-      // the finalisation pass does not count.
+      // handover keeps even star-shaped skeletons bounded.
       Assert.True(success);
       Assert.True(graph.Edges.Count >= 19, "The skeleton alone already holds 19 relationships.");
-      Assert.True(graph.Edges.Count <= 191, "Twenty nodes cannot hold more than 190 pair passages plus the secret relationship.");
-      GraphTestAssert.AssertDegreeCap(graph, MaxDegreeStar, includeSecretEdges: false);
+      Assert.True(graph.Edges.Count <= 190, "Twenty nodes cannot hold more than 190 pair passages.");
+      GraphTestAssert.AssertDegreeCap(graph, MaxDegreeStar);
       GraphTestAssert.AssertMaxEdges(graph);
       GraphTestAssert.AssertValidEdges(graph);
       GraphTestAssert.AssertOpenPassages(graph);
@@ -220,14 +232,16 @@ public sealed class GraphBuilderSimpleTests
       // skeleton degree cap and stay a connected tree.
       for (var seed = 0; seed < 30; seed++)
       {
-        var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size }, seed);
+        var (success, graph) = GraphTestSupport.Build(
+          EnGraphBuilder.Simple,
+          new CnfGraph { Size = size, ProcOpts = GraphTestSupport.NoSecrets },
+          seed);
 
-        // Assert: Success, exactly size minus one skeleton relationships plus the one
-        // secret relationship, connectivity and the cap on builder passages hold no
-        // matter which scenario was rolled.
+        // Assert: Success, exactly size minus one skeleton relationships, connectivity
+        // and the degree cap hold no matter which scenario was rolled.
         Assert.True(success);
-        Assert.Equal(size, graph.Edges.Count);
-        GraphTestAssert.AssertDegreeCap(graph, MaxDegreeStar, includeSecretEdges: false);
+        Assert.Equal(size - 1, graph.Edges.Count);
+        GraphTestAssert.AssertDegreeCap(graph, MaxDegreeStar);
         GraphTestAssert.AssertBeatable(graph, $"Skeleton graph must be connected (size {size}, seed {seed}).");
       }
     }
@@ -236,13 +250,15 @@ public sealed class GraphBuilderSimpleTests
     public void Build_WithLargeSizeAcrossSeeds_SkeletonCentralHandsOverAtCap()
     {
       // Act: Build 100-node skeletons across many seeds; star and mixed rolls fill a
-      // central node to the cap and must hand over instead of growing beyond it. Secret
-      // relationships of the finalisation pass are excluded from the degree measure.
+      // central node to the cap and must hand over instead of growing beyond it.
       var maxDegrees = new List<int>();
       for (var seed = 0; seed < 30; seed++)
       {
-        var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = 100 }, seed);
-        maxDegrees.Add(GraphTestSupport.GetDegrees(graph, includeSecretEdges: false).Values.Max());
+        var (_, graph) = GraphTestSupport.Build(
+          EnGraphBuilder.Simple,
+          new CnfGraph { Size = 100, ProcOpts = GraphTestSupport.NoSecrets },
+          seed);
+        maxDegrees.Add(GraphTestSupport.GetDegrees(graph).Values.Max());
       }
 
       // Assert: At least one seed reached the cap exactly - proving the handover path
@@ -273,46 +289,6 @@ public sealed class GraphBuilderSimpleTests
       GraphTestAssert.AssertOpenPassages(graph);
       var stepValues = CnfProcNodeRelSizeOpts.Default.Prepare();
       Assert.All(graph.Nodes, node => Assert.Contains(node.RelSize, stepValues));
-    }
-  }
-
-  /// <summary>Tests for the relative-size distribution pass run at the end of the build.</summary>
-  public sealed class RelSizeTests
-  {
-    [Fact]
-    public void Build_WithDefaults_ProducesVaryingRelSizes()
-    {
-      // Act: Build moderately sized graphs across several seeds.
-      var varyingGraphs = 0;
-      for (var seed = 0; seed < 10; seed++)
-      {
-        var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
-        {
-          Size = 15,
-          Connectivity = 3,
-        }, seed);
-        if (graph.Nodes.Select(node => node.RelSize).Distinct().Count() > 1) varyingGraphs++;
-      }
-
-      // Assert: Almost every graph uses more than one size - the pass must not collapse
-      // onto a single value in practice.
-      Assert.True(varyingGraphs >= 8, $"Only {varyingGraphs} of 10 graphs used more than one relative size.");
-    }
-
-    [Fact]
-    public void Build_WithSameSeed_ProducesSameRelSizes()
-    {
-      // Arrange: Same config and seed for two builds.
-      var config = new CnfGraph { Size = 20, Connectivity = 8 };
-
-      // Act: Build both graphs.
-      var first = GraphTestSupport.Build(EnGraphBuilder.Simple, config);
-      var second = GraphTestSupport.Build(EnGraphBuilder.Simple, config);
-
-      // Assert: The distribution is part of the deterministic output, node by node.
-      var firstSizes = first.Graph.Nodes.Select(node => node.RelSize).ToList();
-      var secondSizes = second.Graph.Nodes.Select(node => node.RelSize).ToList();
-      Assert.Equal(firstSizes, secondSizes);
     }
   }
 

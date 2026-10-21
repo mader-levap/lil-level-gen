@@ -212,6 +212,31 @@ internal static class GraphTestCreate
   }
 
   /// <summary>
+  /// Creates a chain graph with real Start and Exit POIs: node 1 holds the Start POI, the
+  /// last node the Exit POI, so the graph can be checked for beatability.
+  /// </summary>
+  /// <param name="nodeCount">Amount of nodes; at least 1.</param>
+  /// <returns>The constructed graph with <c>nodeCount - 1</c> open edges.</returns>
+  public static LilGraph CreateStartExitChainGraph(int nodeCount)
+  {
+    var graph = new LilGraph();
+    for (var i = 1; i <= nodeCount; i++)
+    {
+      var pois = new List<LilPoi>();
+      if (i == 1) pois.Add(Poi(1000 + i, EnPoiType.Start));
+      if (i == nodeCount) pois.Add(Poi(2000 + i, EnPoiType.Exit));
+      graph.Nodes.Add(Node(i, [.. pois]));
+    }
+
+    for (var i = 1; i < nodeCount; i++)
+    {
+      graph.Edges.Add(Edge(i, i, i + 1));
+    }
+
+    return graph;
+  }
+
+  /// <summary>
   /// Creates an edge between two node indices with a pair-derived deterministic identifier.
   /// </summary>
   /// <param name="fromIndex">Source node index.</param>

@@ -4,7 +4,7 @@ using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestSupport;
 
-namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Styler;
+namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Processors;
 
 /// <summary>
 /// Tests <see cref="ProcNodeStyle"/>: option validation, group naming and distribution,
@@ -42,41 +42,16 @@ public sealed class ProcNodeStyleTests
       Assert.Throws<ArgumentNullException>(() => new ProcNodeStyle(CreateChainGraph(4), null!, Seed));
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    public void Execute_WithGroupCountBelowOne_ThrowsArgumentOutOfRangeException(int groupCount)
-    {
-      // Arrange: Options demanding a forbidden group count.
-      var options = CnfProcNodeStyleOpts.Default with { GroupCount = groupCount };
-
-      // Act & Assert: The styler rejects the options before touching the graph.
-      var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ProcNodeStyle(CreateChainGraph(4), options, Seed).Execute());
-      Assert.Equal("GroupCount", exception.ParamName);
-    }
-
     [Fact]
     public void Constructor_WithInvalidOptions_ThrowsBeforeExecute()
     {
-      // Arrange: Options rejected by validation.
+      // Arrange: Options rejected by validation; the rules themselves are pinned by
+      // CnfProcOptsTests.
       var options = CnfProcNodeStyleOpts.Default with { GroupCount = 0 };
 
       // Act & Assert: Construction alone rejects the options, before Execute can run.
       Assert.Throws<ArgumentOutOfRangeException>(
         () => new ProcNodeStyle(CreateChainGraph(4), options, Seed));
-    }
-
-    [Fact]
-    public void Execute_WithInvalidGroupCountOnEmptyGraph_ThrowsArgumentOutOfRangeException()
-    {
-      // Arrange: Empty graph; validation must still run.
-      var options = CnfProcNodeStyleOpts.Default with { GroupCount = 0 };
-
-      // Act & Assert: Bad options never pass silently, even without nodes.
-      var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ProcNodeStyle(new LilGraph(), options, Seed).Execute());
-      Assert.Equal("GroupCount", exception.ParamName);
     }
 
     [Fact]
@@ -222,17 +197,6 @@ public sealed class ProcNodeStyleTests
 
       // Assert: The split is seed-driven rather than always an even three-way split.
       Assert.True(distributions.Count > 1, $"Expected varied splits, got: {string.Join(" | ", distributions)}");
-    }
-
-    [Fact]
-    public void Build_WithSimpleBuilder_AssignsGroupsToEveryNode()
-    {
-      // Arrange & Act: Build a graph exactly like production dispatch does.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple);
-
-      // Assert: The builder's styling pass left no node ungrouped.
-      Assert.True(success);
-      Assert.All(graph.Nodes, node => Assert.NotNull(node.Style.Group));
     }
   }
 

@@ -145,6 +145,28 @@ public sealed class GraphBuilderProcOptsTests
   [Theory]
   [InlineData(EnGraphBuilder.Simple)]
   [InlineData(EnGraphBuilder.Linear)]
+  public void Build_WithDefaultRelSizeOpts_ProducesVaryingRelSizes(EnGraphBuilder builder)
+  {
+    // Act: Build moderately sized graphs across several seeds with the default options.
+    var varyingGraphs = 0;
+    for (var seed = 0; seed < 10; seed++)
+    {
+      var (_, graph) = GraphTestSupport.Build(builder, new CnfGraph
+      {
+        Size = 15,
+        Connectivity = 3,
+      }, seed);
+      if (graph.Nodes.Select(node => node.RelSize).Distinct().Count() > 1) varyingGraphs++;
+    }
+
+    // Assert: Almost every graph uses more than one size - the pass must not collapse
+    // onto a single value in practice.
+    Assert.True(varyingGraphs >= 8, $"Only {varyingGraphs} of 10 graphs used more than one relative size.");
+  }
+
+  [Theory]
+  [InlineData(EnGraphBuilder.Simple)]
+  [InlineData(EnGraphBuilder.Linear)]
   public void Build_WithSingleGroup_AssignsOneGroupToEveryNode(EnGraphBuilder builder)
   {
     // Arrange: Config collapsing the grouping into a single group.
