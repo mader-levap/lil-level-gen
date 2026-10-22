@@ -98,11 +98,10 @@ public sealed class ProcNodeRelSizeTests
 
     [Theory]
     [InlineData(0f)]
-    [InlineData(-1f)]
     public void Distribute_WithLinearCurveAndNonIncreasingGrowth_ThrowsArgumentException(float growth)
     {
-      // Arrange: Linear options whose growth cannot separate the steps (0 keeps them
-      // equal, negative reverses them).
+      // Arrange: Linear options whose growth cannot separate the steps (zero keeps them
+      // equal); negative growth is out of range and rejected separately.
       var options = CnfProcNodeRelSizeOpts.Default with
       {
         Curve = EnRelSizeCurve.Linear,
@@ -126,6 +125,25 @@ public sealed class ProcNodeRelSizeTests
 
       // Act & Assert: The collapsed step values are rejected as a contradiction.
       var exception = Assert.Throws<ArgumentException>(
+        () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
+      Assert.Equal("Growth", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(EnRelSizeCurve.Linear, -1f)]
+    [InlineData(EnRelSizeCurve.Geometric, -2f)]
+    public void Distribute_WithNegativeGrowth_ThrowsArgumentOutOfRangeException(EnRelSizeCurve curve, float growth)
+    {
+      // Arrange: Growth below zero violates the documented non-negative range, whichever
+      // curve consumes it.
+      var options = CnfProcNodeRelSizeOpts.Default with
+      {
+        Curve = curve,
+        Growth = growth,
+      };
+
+      // Act & Assert: The out-of-range growth is rejected before any step arithmetic.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(
         () => new ProcNodeRelSize(CreateChainGraph(4), options, Seed).Execute());
       Assert.Equal("Growth", exception.ParamName);
     }

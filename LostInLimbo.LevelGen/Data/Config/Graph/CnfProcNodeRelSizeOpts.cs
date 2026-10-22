@@ -94,6 +94,8 @@ public sealed record CnfProcNodeRelSizeOpts
     return ComputeStepValues();
   }
 
+  //
+
   /// <summary>
   /// Checks that this config can be used for generation.
   /// </summary>
@@ -122,8 +124,8 @@ public sealed record CnfProcNodeRelSizeOpts
 
     // Growth only matters when there is more than one step to derive.
     if (Steps == 1) return;
-    if (!float.IsFinite(Growth))
-      throw new ArgumentOutOfRangeException(nameof(Growth), Growth, "Growth must be a finite value.");
+    if (!float.IsFinite(Growth) || Growth < 0f)
+      throw new ArgumentOutOfRangeException(nameof(Growth), Growth, "Growth must be a finite value of at least 0.");
 
     var raw = ComputeRawStepValues();
     for (var i = 0; i < raw.Length; i++)

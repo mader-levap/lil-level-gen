@@ -187,6 +187,20 @@ public sealed class CnfProcOptsTests
     }
 
     [Fact]
+    public void NodeRelSize_WithNegativeGrowth_ThrowsArgumentOutOfRangeException()
+    {
+      // Arrange: Growth below zero violates the documented non-negative range.
+      var opts = CnfProcNodeRelSizeOpts.Default with
+      {
+        Growth = -1f,
+      };
+
+      // Act/Assert: The out-of-range value is rejected naming the offending property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
+      Assert.Equal("Growth", exception.ParamName);
+    }
+
+    [Fact]
     public void NodeRelSize_WithUndefinedCurve_ThrowsArgumentOutOfRangeException()
     {
       // Arrange: Config carrying a curve value no member defines.

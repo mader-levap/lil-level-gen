@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 
 namespace LostInLimbo.LevelGen.Data.Utils.Geometry;
@@ -15,19 +16,18 @@ public record struct LilPoint(int X, int Y, int Z)
   /// </summary>
   /// <param name="dimension">The dimension.</param>
   /// <param name="amount">The amount.</param>
-  public void Move(EnDimension dimension, int amount)
+  public LilPoint Move(EnDimension dimension, int amount)
   {
     switch (dimension)
     {
       case EnDimension.X :
-        X += amount;
-        break;
+        return this with { X = X + amount };
       case EnDimension.Y :
-        Y += amount;
-        break;
+        return this with { Y = Y + amount };
       case EnDimension.Z :
-        Z += amount;
-        break;
+        return this with { Z = Z + amount };
+      default:
+        throw new ArgumentOutOfRangeException(nameof(EnDimension), dimension, "Unknown EnDimension enum.");
     }
   }
 }

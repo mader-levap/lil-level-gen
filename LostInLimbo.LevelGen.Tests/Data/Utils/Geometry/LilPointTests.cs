@@ -17,7 +17,7 @@ public sealed class LilPointTests
     var point = new LilPoint(x, y, z);
 
     // Act: Move the point along the given dimension.
-    point.Move(dimension, 1);
+    point = point.Move(dimension, 1);
 
     // Assert: Only the moved axis changed; the others kept their coordinates.
     switch (dimension)
@@ -44,7 +44,7 @@ public sealed class LilPointTests
     var point = new LilPoint(3, 5, 7);
 
     // Act: Move the point against the given dimension.
-    point.Move(dimension, -2);
+    point = point.Move(dimension, -2);
 
     // Assert: Only the moved axis changed, by the negative amount.
     switch (dimension)
@@ -68,7 +68,7 @@ public sealed class LilPointTests
     var point = new LilPoint(1, 2, 3);
 
     // Act: Move along an axis by zero.
-    point.Move(EnDimension.Y, 0);
+    point = point.Move(EnDimension.Y, 0);
 
     // Assert: The point still has its original coordinates.
     Assert.Equal(new LilPoint(1, 2, 3), point);

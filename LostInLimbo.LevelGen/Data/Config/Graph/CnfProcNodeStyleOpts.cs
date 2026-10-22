@@ -21,6 +21,8 @@ public sealed record CnfProcNodeStyleOpts
   /// </summary>
   public int GroupCount { get; init; } = 3;
 
+  //
+
   /// <summary>
   /// Checks that this config can be used for generation.
   /// </summary>

@@ -1,6 +1,6 @@
 Current tasks:
 - Review code
-- Review tests
+- Review tests, with and without coverage
 
 Later:
 - Rework config data more.

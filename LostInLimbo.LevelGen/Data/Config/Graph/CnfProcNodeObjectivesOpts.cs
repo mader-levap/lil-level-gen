@@ -39,6 +39,8 @@ public sealed record CnfProcNodeObjectivesOpts
   /// </summary>
   public int OptGoalAmount { get; init; } = 1;
 
+  //
+
   /// <summary>
   /// Checks that this config can be used for generation.
   /// </summary>

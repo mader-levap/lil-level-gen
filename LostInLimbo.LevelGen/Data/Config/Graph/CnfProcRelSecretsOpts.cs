@@ -11,6 +11,11 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 /// </remarks>
 public sealed record CnfProcRelSecretsOpts
 {
+  /// <summary>Maximum allowed amount - keeps generation cost bounded.</summary>
+  public const int MaxAmount = 100;
+
+  //
+
   /// <summary>
   /// Default instance: one secret node and a ten percent chance of secret-in-secret
   /// nesting.
@@ -22,7 +27,7 @@ public sealed record CnfProcRelSecretsOpts
   };
 
   /// <summary>
-  /// Number of secret nodes to append; 0 disables the processor. Must not be negative.
+  /// Number of secret nodes to append; 0 disables the processor. Must not be negative. The hard cap is <see cref="MaxAmount"/>.
   /// </summary>
   public int Amount { get; init; } = 1;
 
@@ -34,6 +39,8 @@ public sealed record CnfProcRelSecretsOpts
   /// </summary>
   public float ChanceSecretInSecret { get; init; } = 0.1f;
 
+  //
+
   /// <summary>
   /// Checks that this config can be used for generation.
   /// </summary>
@@ -42,6 +49,8 @@ public sealed record CnfProcRelSecretsOpts
   {
     if (Amount < 0)
       throw new ArgumentOutOfRangeException(nameof(Amount), Amount, "Amount must not be negative.");
+    if (Amount > MaxAmount)
+      throw new ArgumentOutOfRangeException(nameof(Amount), Amount, $"Amount must not exceed {MaxAmount}.");
     if (!float.IsFinite(ChanceSecretInSecret) || ChanceSecretInSecret < 0f || ChanceSecretInSecret > 1f)
       throw new ArgumentOutOfRangeException(nameof(ChanceSecretInSecret), ChanceSecretInSecret, "ChanceSecretInSecret must be a finite value within [0, 1].");
   }
