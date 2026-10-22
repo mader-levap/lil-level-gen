@@ -57,7 +57,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   internal const int MaxExtraDegree = 2;
   /// <summary>Maximum number of conditions that a single relationship can have.</summary>
   internal const int MaxConditionPerRel = 3;
-  /// <summary>Maximum distance between the solution and the node having a relationship with a relevant condition.</summary>
+  /// <summary>Maximum distance between the solution and the guarded node's chain predecessor (so at most MaxConditionDistance + 1 from the guarded node).</summary>
   internal const int MaxConditionDistance = 3;
   /// <summary>Maximum number of nodes that can be skipped by an extra relationship.</summary>
   internal const int MaxSkipDistance = 2;
@@ -398,7 +398,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
 
       var target = targets[Random.NextInt(targets.Count)];
 
-      // One new solution per obstacle, placed before the guarded node's chain predecessor.
+      // One new solution per obstacle, placed at or before the guarded node's chain predecessor.
       var solutionPoi = new LilPoi
       {
         Id = DeriveSolutionId(added),

@@ -26,7 +26,7 @@ internal sealed class PrepassGenerator
   /// <summary>
   /// Create prepass data.
   /// </summary>
-  /// <returns>Prepass data or null if it failed for some reason.</returns>
+  /// <returns>The prepared prepass data.</returns>
   public PrepData Create()
   {
     var worldSeed = _config.General.Seed;

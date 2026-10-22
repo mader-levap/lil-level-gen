@@ -413,7 +413,7 @@ public sealed class LevelGeneratorTests
     }
 
     [Fact]
-    public void TryRequestPause_BeforeExecute_KeepsPhaseAtGraph()
+    public void TryRequestPause_BeforeExecute_KeepsPhaseAtPrepass()
     {
       // Arrange: A claimed run asked to pause before it touches any generation pass.
       var statusStore = new GenerationStatusStore();

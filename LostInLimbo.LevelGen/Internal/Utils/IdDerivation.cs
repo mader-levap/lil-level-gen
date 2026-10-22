@@ -19,8 +19,8 @@ internal static class IdDerivation
   /// <param name="salt">Role salt identifying which identifier to derive (e.g. node vs. start POI).</param>
   /// <returns>Identifier that is always equal for the same inputs. Not <see cref="Guid.Empty"/>.</returns>
   /// <remarks>
-  /// The 16 identifier bytes are filled explicitly in little-endian order from two independent
-  /// mixes, so the result does not depend on platform endianness. The result is never
+  /// The 16 identifier bytes are filled explicitly in little-endian order from a mix and a
+  /// second mix chained off it, so the result does not depend on platform endianness. The result is never
   /// <see cref="Guid.Empty"/>: if the first half is non-zero the identifier already differs from
   /// empty, and if the first half is zero the second half is <c>Mix(0)</c>, which is non-zero.
   /// </remarks>

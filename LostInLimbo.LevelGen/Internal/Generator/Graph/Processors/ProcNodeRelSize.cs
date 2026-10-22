@@ -83,7 +83,8 @@ internal sealed class ProcNodeRelSize
   /// Assigns one of the configured step values as <see cref="LilNode.RelSize"/> to every
   /// node of the graph given to the constructor.
   /// </summary>
-  /// <exception cref="InvalidOperationException">An edge references a node missing from the graph, or two nodes share an identifier.</exception>
+  /// <exception cref="InvalidOperationException">An edge references a node missing from the graph.</exception>
+  /// <exception cref="ArgumentException">Two nodes share an identifier.</exception>
   public void Execute()
   {
     if (_graph.Nodes.Count == 0) return;
@@ -127,7 +128,8 @@ internal sealed class ProcNodeRelSize
   /// count for every edge - a passage is a relationship of both its nodes, one-way or not.
   /// </summary>
   /// <returns>Relationship count per node index.</returns>
-  /// <exception cref="InvalidOperationException">An edge references a missing node, or two nodes share an identifier.</exception>
+  /// <exception cref="InvalidOperationException">An edge references a missing node.</exception>
+  /// <exception cref="ArgumentException">Two nodes share an identifier.</exception>
   private int[] GetDegrees()
   {
     var indexById = new Dictionary<Guid, int>(_graph.Nodes.Count);

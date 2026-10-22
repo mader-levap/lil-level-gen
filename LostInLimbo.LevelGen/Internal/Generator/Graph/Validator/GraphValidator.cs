@@ -51,7 +51,6 @@ internal sealed class GraphValidator(LilGraph? graph)
   /// <summary>
   /// Validates the given level graph for beatability.
   /// </summary>
-  /// <param name="graph">Graph to check; the map, stats and phase of the world are not read.</param>
   /// <returns>
   /// A result whose <see cref="GraphValidationResult.Success"/> is <see langword="true"/> when
   /// the graph is beatable; otherwise a failed result with the reason of the first failed check.
@@ -220,7 +219,7 @@ internal sealed class GraphValidator(LilGraph? graph)
         // Forward direction: From -> To, valid for both passage directions.
         if (_flooded.Contains(edge.From) && FloodNode(_flooded, collectedPois, edge.To)) changed = true;
 
-        // Backward direction: only open passages can be walked against their From -> To sense.
+        // Backward direction: only bidirectional passages can be walked against their From -> To sense.
         if (edge.Direction == EnPassageDirection.Bidirectional
             && _flooded.Contains(edge.To)
             && FloodNode(_flooded, collectedPois, edge.From))

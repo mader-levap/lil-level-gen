@@ -10,7 +10,7 @@ namespace LostInLimbo.LevelGen.Tests.Data.Result;
 public sealed class LilWorldTests
 {
   [Fact]
-  public void LilWorld_WithDefaultConstruction_StartsInGraphPhaseWithEmptySections()
+  public void LilWorld_WithDefaultConstruction_StartsInPrepassPhaseWithEmptySections()
   {
     // Arrange/Act: Create world without any data.
     var world = new LilWorld();

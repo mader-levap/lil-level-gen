@@ -610,7 +610,7 @@ public sealed class ProcNodeRelSizeTests
       // Act: Distribute the very same graph again with the same inputs.
       new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
 
-      // Assert: Sizes do not feed back into the draws, so the second run is a no-op.
+      // Assert: Sizes do not feed back into the draws, so the second run produces the identical assignment again.
       Assert.Equal(firstRun, GetAssignments(graph));
     }
   }

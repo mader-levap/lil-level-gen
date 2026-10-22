@@ -17,8 +17,9 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// <para>Updates the status during execution, so the consumer can show progress.</para>
 /// </summary>
 /// <remarks>
-/// NOTE: right now it is a placeholder that pretends to do something: it advances a fixed number
-/// of steps, each imitating work by sleeping (see <see cref="MainLoop"/>).
+/// Prepass and graph runs are real passes that complete within a single execution; only the
+/// map phase is still a placeholder that advances a fixed number of steps, each imitating
+/// work by sleeping (see <see cref="MainLoop"/>).
 /// Mutates its world in place on the worker thread, so consumers never get it from a
 /// running run: terminal publishes pair it with a <see cref="EnGenResult.Paused"/> or
 /// <see cref="EnGenResult.Finished"/> status in the store, and every other outcome pairs with
@@ -189,8 +190,9 @@ internal sealed class LevelGenerator
   }
 
   /// <summary>
-  /// Placeholder for generation passes: advances the placeholder step loop, where every step
-  /// imitates real work by sleeping. The number of steps comes from <see cref="CnfDebug.PlaceholderSteps"/>.
+  /// Runs the generation passes in order: prepass, graph, then the placeholder map loop, where
+  /// each map step imitates real work by sleeping. The number of map steps comes from
+  /// <see cref="CnfDebug.PlaceholderSteps"/>.
   /// </summary>
   /// <param name="cancellationToken">Token checked at every step boundary.</param>
   /// <returns>Generation result. Finished when all steps are done, otherwise Paused.</returns>

@@ -46,7 +46,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 internal sealed class ProcNodeStyle
 {
   /// <summary>Salt for the distribution sub-seed; keeps this pass off other passes' streams.</summary>
-  private const long SaltStyle = 0x32658C73697A65; // "style"
+  private const long SaltStyle = 0x7374796C65; // "style"
 
   /// <summary>Graph whose nodes are rewritten in place; may be empty.</summary>
   private readonly LilGraph _graph;
@@ -80,7 +80,8 @@ internal sealed class ProcNodeStyle
   /// Assigns <see cref="LilStyle.Group"/> in <see cref="LilNode.Style"/> to every node
   /// of the graph given to the constructor.
   /// </summary>
-  /// <exception cref="InvalidOperationException">An edge references a node missing from the graph, or two nodes share an identifier.</exception>
+  /// <exception cref="InvalidOperationException">An edge references a node missing from the graph.</exception>
+  /// <exception cref="ArgumentException">Two nodes share an identifier.</exception>
   public void Execute()
   {
     if (_graph.Nodes.Count == 0) return;

@@ -7,7 +7,7 @@ using LostInLimbo.LevelGen.Internal.Generator.Prepass;
 namespace LostInLimbo.LevelGen.Internal.Generator.Map;
 
 /// <summary>
-/// <para>Generates map data. Modifies <c>LilMap</c>.</para>
+/// <para>Placeholder map pass; currently only advances the step counter (does not modify <c>LilMap</c>).</para>
 /// NOTE: right now it is a placeholder.
 /// </summary>
 internal sealed class MapGenerator

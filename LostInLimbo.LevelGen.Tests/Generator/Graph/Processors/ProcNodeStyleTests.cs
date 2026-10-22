@@ -375,7 +375,7 @@ public sealed class ProcNodeStyleTests
       // Act: Style the very same graph again with the same inputs.
       new ProcNodeStyle(graph, CnfProcNodeStyleOpts.Default, Seed).Execute();
 
-      // Assert: Existing groups do not feed back into the draws, so the second run is a no-op.
+      // Assert: Existing groups do not feed back into the draws, so the second run produces the identical assignment again.
       Assert.Equal(firstRun, GetGroupAssignments(graph));
     }
 

@@ -12,6 +12,10 @@ public enum EnRunKind
   /// not exist yet, so this behaves like <see cref="Step"/> (advances a single step, then pauses).
   /// </summary>
   Area,
-  /// <summary>Advance generation by a single step (the smallest unit of work that gives consistent data after completion). Useful for debugging in the editor.</summary>
+  /// <summary>
+  /// Advance generation by a single step (the smallest unit of work that gives consistent data
+  /// after completion). Useful for debugging in the editor. NOTE: pending prepass and graph
+  /// phases complete within the same execution; only the map phase is stepped.
+  /// </summary>
   Step,
 }

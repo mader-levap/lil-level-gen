@@ -50,10 +50,10 @@ public sealed record CnfLevelGeneration
   //
 
   /// <summary>
-  /// Validates every invariant of this configuration, including its sections.
+  /// Validates the invariants of this configuration and its general, graph and debug sections.
   /// </summary>
   /// <exception cref="ArgumentOutOfRangeException">A numeric setting is out of range, or a section carries an invalid value.</exception>
-  /// <exception cref="ArgumentException">A section reference is <see langword="null"/>.</exception>
+  /// <exception cref="ArgumentException">The <see cref="General"/> or <see cref="Graph"/> section is <see langword="null"/>.</exception>
   public void Validate()
   {
     if (ConfigVersion < 1)

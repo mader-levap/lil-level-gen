@@ -7,7 +7,7 @@ namespace LostInLimbo.LevelGen.Tests.Data.Result.Graph;
 /// multi-POI / multi-condition construction.
 /// </summary>
 /// <remarks>
-/// These tests cover data shapes only; generation algorithms and validation come later.
+/// These tests cover data shapes only; generation algorithms and validation are covered elsewhere.
 /// Note: record equality compares collection properties by reference, so assertions on
 /// lists check counts and contents element-wise instead of whole-graph Assert.Equal.
 /// </remarks>

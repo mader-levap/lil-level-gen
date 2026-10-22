@@ -60,7 +60,7 @@ internal sealed class GenerationStatusStore
   /// <summary>
   /// Replaces the whole status snapshot.
   /// </summary>
-  /// <param name="status">New snapshot.</param>
+  /// <param name="status">New status.</param>
   /// <param name="world">
   /// World to pair with the status, or <see langword="null"/> (default) when the status must
   /// not expose one. Terminal publishes of a paused or finished run pass their world here so

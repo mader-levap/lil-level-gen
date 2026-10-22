@@ -10,8 +10,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <para>
 /// Builds the simple level graph: one or more nodes without obstacles. Start and exit may or
 /// may not be in the same node. Skeleton relationships may not exceed
-/// <see cref="MaxEdgesStar"/> per node; connectivity-driven relationships on top of the
-/// skeleton may not exceed <see cref="MaxEdges"/> per node.
+/// <see cref="MaxEdgesStar"/> per node; the extra-relationships phase skips any node whose
+/// total degree has already reached <see cref="MaxEdges"/>.
 /// </para>
 /// </summary>
 /// <remarks>
@@ -33,7 +33,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// </remarks>
 internal sealed class GraphBuilderSimple : AGraphBuilder
 {
-  /// <summary>Maximum number of relationships a node may gain in the extra-relationships phase (inclusive).</summary>
+  /// <summary>Total-degree eligibility threshold for the extra-relationships phase: nodes whose degree has reached this cap are skipped, so extras never push total degree above it (inclusive).</summary>
   internal const int MaxEdges = 4;
   /// <summary>
   /// Maximum number of relationships a node may gain in the skeleton phase (inclusive). A
