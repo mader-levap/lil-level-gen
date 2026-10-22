@@ -3,7 +3,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Prepass;
 /// <summary>
 /// Holds data derived from config before actual generation.
 /// </summary>
-public sealed record PrepData
+internal sealed record PrepData
 {
   /// <summary>Sub-seed for graph generation.</summary>
   public long SeedGraph { get; set; } = 0;

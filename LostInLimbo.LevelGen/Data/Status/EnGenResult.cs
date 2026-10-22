@@ -1,4 +1,4 @@
-namespace LostInLimbo.LevelGen.Internal.Status.Data;
+namespace LostInLimbo.LevelGen.Data.Status;
 
 /// <summary>
 /// Lifecycle state and result of a generation run.

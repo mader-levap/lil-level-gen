@@ -1,4 +1,5 @@
 using LostInLimbo.LevelGen.Data.Result;
+using LostInLimbo.LevelGen.Data.Status;
 
 namespace LostInLimbo.LevelGen.Internal.Status.Data;
 

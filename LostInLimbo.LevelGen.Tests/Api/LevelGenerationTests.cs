@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
-using LostInLimbo.LevelGen.Internal.Status.Data;
+using LostInLimbo.LevelGen.Data.Status;
 
 namespace LostInLimbo.LevelGen.Tests.Api;
 

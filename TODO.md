@@ -1,5 +1,4 @@
 Current tasks:
-- Review comments
 - Review code
 - Review tests
 

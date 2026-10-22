@@ -1,5 +1,6 @@
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Result;
+using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Internal.Status.Data;
 
 namespace LostInLimbo.LevelGen.Internal.Status;

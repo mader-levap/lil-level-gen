@@ -3,9 +3,9 @@ using System.Diagnostics;
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Result;
+using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Internal.Generator;
 using LostInLimbo.LevelGen.Internal.Status;
-using LostInLimbo.LevelGen.Internal.Status.Data;
 
 namespace LostInLimbo.LevelGen.Api;
 
