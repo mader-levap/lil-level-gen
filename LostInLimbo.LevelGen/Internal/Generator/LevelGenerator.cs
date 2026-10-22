@@ -27,7 +27,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// </remarks>
 internal sealed class LevelGenerator
 {
-  private MapGenerator _mapGenerator;
+  /// <summary>Map generator. Lazily created as it needs data unavailable in constructor.</summary>
+  private MapGenerator _mapGenerator = null!;
 
   /// <summary>Kind of run. Mutated only between runs via <see cref="SetRunKind"/>.</summary>
   private EnRunKind _enRunKind;
@@ -73,8 +74,6 @@ internal sealed class LevelGenerator
     _enRunKind = enRunKind;
     _config = config;
     _statusStore = statusStore;
-
-    _mapGenerator = new MapGenerator(config, _prepData!, _world);
   }
 
   /// <summary>
@@ -173,8 +172,8 @@ internal sealed class LevelGenerator
       // First checkpoint: a token cancelled before the run got going ends it right away.
       cancellationToken.ThrowIfCancellationRequested();
 
-      EnGenResult GenResult = RunGeneration(cancellationToken);
-      PublishTerminal(GenResult); // Finished or Paused here.
+      EnGenResult genResult = RunGeneration(cancellationToken);
+      PublishTerminal(genResult); // Finished or Paused here.
     }
     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
     {
@@ -198,7 +197,7 @@ internal sealed class LevelGenerator
   /// <returns>Generation result. Finished when all steps are done, otherwise Paused.</returns>
   private EnGenResult RunGeneration(CancellationToken cancellationToken)
   {
-    if (_config.Debug?.FailAtStart == true) throw new Exception("Deliberate failure at start.");
+    if (_config.Debug?.FailAtStart == true) throw new InvalidOperationException("Deliberate failure at start.");
 
     MainLoop(cancellationToken);
 
@@ -235,11 +234,9 @@ internal sealed class LevelGenerator
 
     PrepassGenerator prepassGenerator = new PrepassGenerator(_config);
     _prepData = prepassGenerator.Create();
-    if (_prepData != null) {
-      _world.Phase = EnPhase.Graph; // move to next phase
-      return true;
-    }
-    return false;
+    _mapGenerator = new MapGenerator(_config, _prepData, _world);
+    _world.Phase = EnPhase.Graph; // move to next phase
+    return true;
   }
 
   /// <summary>
@@ -256,9 +253,9 @@ internal sealed class LevelGenerator
     cancellationToken.ThrowIfCancellationRequested();
 
     GraphGenerator graphGenerator = new GraphGenerator(_config, _prepData!, _world);
-    bool Result = graphGenerator.Execute();
-    if (Result) _world.Phase = EnPhase.Map; // move to next phase
-    return Result;
+    bool result = graphGenerator.Execute();
+    if (result) _world.Phase = EnPhase.Map; // move to next phase
+    return result;
   }
 
   /// <summary>

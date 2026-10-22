@@ -291,7 +291,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: Status reports an error carrying the deliberate failure, and is not stuck running.
       Assert.Equal(EnGenResult.Error, statusStore.Current.Result);
-      var error = Assert.IsType<Exception>(statusStore.Current.Error);
+      var error = Assert.IsType<InvalidOperationException>(statusStore.Current.Error);
       Assert.Equal("Deliberate failure at start.", error.Message);
     }
 

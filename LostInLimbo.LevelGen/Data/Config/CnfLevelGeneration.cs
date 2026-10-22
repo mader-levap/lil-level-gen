@@ -64,7 +64,9 @@ public sealed record CnfLevelGeneration
       throw new ArgumentException("Graph config must not be null.", nameof(Graph));
 
     General.Validate();
+    Style.Validate();
     Graph.Validate();
+    Map.Validate();
     Debug?.Validate();
   }
 }
