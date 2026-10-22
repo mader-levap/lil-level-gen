@@ -1,7 +1,7 @@
 namespace LostInLimbo.LevelGen.Data.Utils.Geometry;
 
 /// <summary>
-/// Represents direction on plane. All 8 directions are represented.
+/// Represents a direction on a plane. All 8 directions are represented.
 /// </summary>
 public enum EnDir
 {

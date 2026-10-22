@@ -1,5 +1,3 @@
-using System;
-
 namespace LostInLimbo.LevelGen.Data.Config.Map;
 
 /// <summary>
@@ -26,7 +24,6 @@ public sealed record CnfMap
   /// <summary>
   /// Checks that this config can be used for generation.
   /// </summary>
-  /// <exception cref="ArgumentOutOfRangeException">The builder is not a defined enum value, or a value is out of range.</exception>
   public void Validate()
   {
   }

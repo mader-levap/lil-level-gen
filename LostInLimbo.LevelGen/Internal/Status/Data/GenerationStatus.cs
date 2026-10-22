@@ -3,7 +3,7 @@ using System;
 namespace LostInLimbo.LevelGen.Internal.Status.Data;
 
 /// <summary>
-/// Provides current status of generation and other related data that allow tracking progress.
+/// Provides the current status of generation and other related data that allow tracking progress.
 /// </summary>
 /// <remarks>
 /// Immutable snapshot: replace the whole instance instead of mutating it, so the status can be

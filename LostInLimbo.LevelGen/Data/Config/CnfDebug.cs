@@ -6,7 +6,7 @@ namespace LostInLimbo.LevelGen.Data.Config;
 /// Debug configuration data.
 /// </summary>
 /// <remarks>
-/// Used in tests and development for debugging. Not used in actual game.
+/// Used in tests and development for debugging. Not used in the actual game.
 /// </remarks>
 public sealed record CnfDebug
 {
@@ -22,7 +22,7 @@ public sealed record CnfDebug
   public static CnfDebug Default { get; } = new();
 
   /// <summary>
-  /// If true, throw exception already at start.
+  /// If true, throw an exception already at the start.
   /// </summary>
   public bool FailAtStart { get; init; } = false;
 
@@ -36,7 +36,7 @@ public sealed record CnfDebug
 
   /// <summary>
   /// How many steps the placeholder generation loop runs before finishing.
-  /// Each run kind advances a different amount: All runs all remaining steps,
+  /// Each run kind advances a different number of steps: All runs all remaining steps,
   /// Area and Step run a single step and then pause. Must be at least 1.
   /// </summary>
   public int PlaceholderSteps { get; init; } = DefaultPlaceholderSteps;

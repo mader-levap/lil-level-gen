@@ -6,7 +6,7 @@ using LostInLimbo.LevelGen.Internal.Generator.Prepass;
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 
 /// <summary>
-/// <para>Generates abstract graph representing level and its features. Modifies <c>LilGraph</c>.</para>
+/// <para>Generates an abstract graph representing the level and its features. Modifies <c>LilGraph</c>.</para>
 /// Dispatches to the <see cref="AGraphBuilder"/> implementation selected by configuration
 /// (see <see cref="GraphBuilderFactory"/>).
 /// </summary>
@@ -21,11 +21,11 @@ internal sealed class GraphGenerator
   private LilWorld _world;
 
   /// <summary>
-  /// Prepares graph generator. Assumes the config was already validated by the API layer
+  /// Prepares the graph generator. Assumes the config was already validated by the API layer
   /// (see <see cref="CnfLevelGeneration.Validate"/>) before the run was claimed.
   /// </summary>
   /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
-  /// <param name="prepData">Preparatory data based on config..</param>
+  /// <param name="prepData">Preparatory data based on config.</param>
   /// <param name="world">World to modify.</param>
   public GraphGenerator(CnfLevelGeneration config, PrepData prepData, LilWorld world)
   {
@@ -35,7 +35,7 @@ internal sealed class GraphGenerator
   }
 
   /// <summary>
-  /// Creates whole graph. It is treated as single step.
+  /// Creates the whole graph. It is treated as a single step.
   /// </summary>
   /// <returns>True if graph generation was successful, otherwise false.</returns>
   public bool Execute()

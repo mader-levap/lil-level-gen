@@ -38,10 +38,10 @@ public sealed record LilEdge
   public EnPassageDirection Direction { get; init; } = EnPassageDirection.Bidirectional;
 
   /// <summary>If true, this relationship can represent only one physical passage.
-  /// False means multiple passages can exist (though it is up to map generator).</summary>
+  /// False means multiple passages can exist (though it is up to the map generator).</summary>
   public bool Chokepoint { get; init; } = false;
 
-  /// <summary>If true, this is secret passage.</summary>
+  /// <summary>If true, this is a secret passage.</summary>
   public bool Secret { get; init; } = false;
 
   /// <summary>

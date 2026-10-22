@@ -337,7 +337,7 @@ public sealed class LilGraphDataTests
       var condition1 = new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = poi };
       var condition2 = new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = poi };
 
-      // Act/Assert: Record equality holds for same-values instances.
+      // Act/Assert: Record equality holds for instances with the same values.
       Assert.Equal(condition1, condition2);
     }
   }

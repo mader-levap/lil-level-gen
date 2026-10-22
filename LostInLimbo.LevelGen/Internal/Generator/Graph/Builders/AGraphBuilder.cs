@@ -26,7 +26,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <item><b>Preconditions</b>: the target graph is guaranteed to be empty when
 /// <see cref="Build"/> is called (graph generation is a single phase step and the whole run's
 /// world is discarded when it is cancelled).</item>
-/// <item><b>Failsafe</b>: Graph build can fail, though builders should give best effort to make it as unlikely as possible.
+/// <item><b>Failsafe</b>: Graph build can fail, though builders should make a best effort to make it as unlikely as possible.
 /// Graph configuration variables are soft constraints: builders are allowed to ignore unreasonable values.</item>
 /// <item><b>MaxEdges cap</b>: every created node must receive a <see cref="LilNode.MaxEdges"/>
 /// value (negative means no limit), and the builder must never produce a node whose total
@@ -34,7 +34,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// </list>
 /// <para>
 /// Note: overly complex graphs might fail later during map generation. For example, it might be
-/// physically impossible to generate large amount of passages from one place to another.
+/// physically impossible to generate a large number of passages from one place to another.
 /// </para>
 /// </remarks>
 internal abstract class AGraphBuilder
@@ -52,7 +52,7 @@ internal abstract class AGraphBuilder
   protected SeededRandom Random = null!;
 
   /// <summary>
-  /// Setups and runs build.
+  /// Sets up and runs the build.
   /// </summary>
   /// <param name="config">Full generation configuration.</param>
   /// <param name="prepData">Preparatory data based on config.</param>

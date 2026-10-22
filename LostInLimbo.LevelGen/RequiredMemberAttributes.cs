@@ -1,7 +1,7 @@
 namespace System.Runtime.CompilerServices;
 
 // Compile-time marker needed to use `required` members when targeting netstandard2.1.
-// Never instantiated; the types shipped with C# 11 / .NET 7 and are not part of netstandard2.1.
+// Never instantiated; the types, which shipped with C# 11 / .NET 7, are not part of netstandard2.1.
 // Without this shim, marking a member `required` fails compilation.
 // The same applies to any target older than .NET 7 using modern syntax.
 

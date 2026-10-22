@@ -8,9 +8,9 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 /// <see cref="CnfGraph.ProcOpts"/> instead of the hardcoded defaults.
 /// </summary>
 /// <remarks>
-/// Both finalising builders run the same four processors, so the wiring tests cover
-/// <c>Simple</c> and <c>Linear</c> alike. Amount assertions only ever count up to the
-/// requested amount, because processor amounts are soft when eligible nodes run out.
+/// Both finalizing builders run the same four processors, so the wiring tests cover
+/// <c>Simple</c> and <c>Linear</c> alike. Count assertions only ever count up to the
+/// requested number, because processor counts are soft when eligible nodes run out.
 /// </remarks>
 public sealed class GraphBuilderProcOptsTests
 {
@@ -56,7 +56,7 @@ public sealed class GraphBuilderProcOptsTests
     // Act: Build through the factory like production dispatch does.
     var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
 
-    // Assert: The configured amount of secret nodes exists.
+    // Assert: The configured number of secret nodes exists.
     Assert.True(success);
     Assert.Equal(3, graph.Nodes.Count(node => node.Secret));
   }

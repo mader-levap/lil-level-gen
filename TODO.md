@@ -1,6 +1,8 @@
 Current tasks:
-- (none)
+- Review comments
+- Review code
+- Review tests
 
 Later:
 - Rework config data more.
-- We need config data generator that will generate config based on minimal set of settings.
+- We need a config data generator that will generate the config based on a minimal set of settings.

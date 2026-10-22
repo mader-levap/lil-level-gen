@@ -35,7 +35,7 @@ public sealed class LevelGeneratorTests
 
   /// <summary>
   /// Reads the world paired with the store's current snapshot, which exists once a run
-  /// published a paused or finished terminal state. The generator keeps its world private,
+  /// has published a paused or finished terminal state. The generator keeps its world private,
   /// so the store is the only observation point for tests. Fails the test when the
   /// snapshot does not carry a world.
   /// </summary>
@@ -146,7 +146,7 @@ public sealed class LevelGeneratorTests
     public void Execute_AfterClaimedRun_PublishesPaused()
     {
       // Arrange: Store already claims a run is in progress (as Start does before launching
-      // the thread) and a generator writing into it. Placeholder sleep is disabled.
+      // the thread) and a generator is writing into it. Placeholder sleep is disabled.
       var statusStore = new GenerationStatusStore();
       Assert.True(statusStore.TryBeginRun());
       var generator = new LevelGenerator(EnRunKind.Step, FastConfig(), statusStore);
@@ -232,7 +232,7 @@ public sealed class LevelGeneratorTests
     [Fact]
     public void Execute_WithAllRunKind_AdvancesPhaseFromGraphToMap()
     {
-      // Arrange: Claimed full run over a fresh world, which starts in the graph phase.
+      // Arrange: Claimed full run over a fresh world, which starts in the prepass phase.
       var statusStore = new GenerationStatusStore();
       Assert.True(statusStore.TryBeginRun());
       var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
@@ -289,7 +289,7 @@ public sealed class LevelGeneratorTests
       // Act: Run generation. The exception must not propagate; it is reported via status.
       generator.Execute();
 
-      // Assert: Status reports error carrying the deliberate failure, and is not stuck running.
+      // Assert: Status reports an error carrying the deliberate failure, and is not stuck running.
       Assert.Equal(EnGenResult.Error, statusStore.Current.Result);
       var error = Assert.IsType<Exception>(statusStore.Current.Error);
       Assert.Equal("Deliberate failure at start.", error.Message);

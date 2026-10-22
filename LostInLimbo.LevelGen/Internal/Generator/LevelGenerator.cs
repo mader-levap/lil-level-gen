@@ -13,11 +13,11 @@ using LostInLimbo.LevelGen.Internal.Status.Data;
 namespace LostInLimbo.LevelGen.Internal.Generator;
 
 /// <summary>
-/// <para>Main class managing entire generation and its passes. Should be run in its own thread.</para>
-/// <para>Updates status during execution, so consumer can show progress.</para>
+/// <para>Main class managing the entire generation and its passes. Should be run in its own thread.</para>
+/// <para>Updates the status during execution, so the consumer can show progress.</para>
 /// </summary>
 /// <remarks>
-/// NOTE: right now it is placeholder that pretends to do something: it advances a fixed number
+/// NOTE: right now it is a placeholder that pretends to do something: it advances a fixed number
 /// of steps, each imitating work by sleeping (see <see cref="MainLoop"/>).
 /// Mutates its world in place on the worker thread, so consumers never get it from a
 /// running run: terminal publishes pair it with a <see cref="EnGenResult.Paused"/> or
@@ -58,10 +58,10 @@ internal sealed class LevelGenerator
   private int _totalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
   /// <summary>
-  /// Prepares level generator. Assumes the config was already validated by the API layer
+  /// Prepares the level generator. Assumes the config was already validated by the API layer
   /// (see <see cref="CnfLevelGeneration.Validate"/>) before the run was claimed.
   /// </summary>
-  /// <param name="enRunKind">Kind of run.</param>
+  /// <param name="enRunKind">The kind of run.</param>
   /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
   /// <param name="statusStore">Store receiving status snapshots during execution.</param>
   /// <exception cref="ArgumentNullException">Status store is <see langword="null"/>.</exception>
@@ -81,7 +81,7 @@ internal sealed class LevelGenerator
   /// with a different run kind than the original run used. Must only be called after the run
   /// has been claimed, so no other thread can be executing this generator at the time.
   /// </summary>
-  /// <param name="enRunKind">Kind of run.</param>
+  /// <param name="enRunKind">The kind of run.</param>
   internal void SetRunKind(EnRunKind enRunKind)
   {
     _enRunKind = enRunKind;
@@ -153,7 +153,7 @@ internal sealed class LevelGenerator
   /// reported through the status store as <see cref="EnGenResult.Error"/> with the exception
   /// captured in <see cref="GenerationStatus.Error"/>.
   /// <para>
-  /// Cancellation is not a failure: when <paramref name="cancellationToken"/> is cancelled the run
+  /// Cancellation is not a failure: when <paramref name="cancellationToken"/> is cancelled, the run
   /// stops at its next checkpoint and reports <see cref="EnGenResult.Cancelled"/> with a
   /// <see langword="null"/> error instead. An explicit pause request (see
   /// <see cref="TryRequestPause"/>) has precedence over cancellation: a run with both pending
@@ -190,7 +190,7 @@ internal sealed class LevelGenerator
 
   /// <summary>
   /// Placeholder for generation passes: advances the placeholder step loop, where every step
-  /// imitates real work by sleeping. Number of steps comes from <see cref="CnfDebug.PlaceholderSteps"/>.
+  /// imitates real work by sleeping. The number of steps comes from <see cref="CnfDebug.PlaceholderSteps"/>.
   /// </summary>
   /// <param name="cancellationToken">Token checked at every step boundary.</param>
   /// <returns>Generation result. Finished when all steps are done, otherwise Paused.</returns>
@@ -219,12 +219,12 @@ internal sealed class LevelGenerator
   }
 
   /// <summary>
-  /// <para>Execute prepass generator. This is considered single step.</para>
+  /// <para>Execute the prepass generator. This is considered a single step.</para>
   /// </summary>
-  /// <returns>True if should continue, otherwise false.</returns>
+  /// <returns>True if the run should continue, otherwise false.</returns>
   private bool RunPrepass(CancellationToken cancellationToken)
   {
-    // Are we in correct phase?
+    // Are we in the correct phase?
     if (_world.Phase != EnPhase.Prepass) return true;
     // Pause checkpoint: a request pending before the next step starts ends the run.
     if (_pauseRequested) return false;
@@ -241,12 +241,12 @@ internal sealed class LevelGenerator
   }
 
   /// <summary>
-  /// <para>Execute graph generator. This is considered single step.</para>
+  /// <para>Execute the graph generator. This is considered a single step.</para>
   /// </summary>
-  /// <returns>True if should continue, otherwise false.</returns>
+  /// <returns>True if the run should continue, otherwise false.</returns>
   private bool RunGraph(CancellationToken cancellationToken)
   {
-    // Are we in correct phase?
+    // Are we in the correct phase?
     if (_world.Phase != EnPhase.Graph) return true;
     // Pause checkpoint: a request pending before the next step starts ends the run.
     if (_pauseRequested) return false;
@@ -260,7 +260,7 @@ internal sealed class LevelGenerator
   }
 
   /// <summary>
-  /// <para>Execute map generator. This can and will take many steps.</para>
+  /// <para>Execute the map generator. This can and will take many steps.</para>
   /// <para>
   /// Loops while generation is not complete yet (see <see cref="IsGenerationComplete"/>) and the
   /// run kind still allows more work: <c>EnRunKind.All</c> runs until generation completes, <c>Area</c>
@@ -279,7 +279,7 @@ internal sealed class LevelGenerator
   /// </summary>
   private void RunMap(CancellationToken cancellationToken)
   {
-    // Are we in correct phase?
+    // Are we in the correct phase?
     if (_world.Phase != EnPhase.Map) return;
 
     // Maximum number of steps this execution may add; real passes will budget work differently.

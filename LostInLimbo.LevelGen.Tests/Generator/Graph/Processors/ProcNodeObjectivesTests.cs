@@ -9,7 +9,7 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Processors;
 /// <summary>
 /// Tests <see cref="ProcNodeObjectives"/>: option validation, placement shape, the
 /// secret-node rules, one-goal-per-node, excess handling, determinism and the hand-off to
-/// the later finalisation passes.
+/// the later finalization passes.
 /// </summary>
 /// <remarks>
 /// The pass works on a finished <see cref="LilGraph"/>, so most tests construct graphs
@@ -22,7 +22,7 @@ public sealed class ProcNodeObjectivesTests
   /// <summary>Graph sub-seed used by all tests unless a test varies the seed itself.</summary>
   private const long Seed = GraphTestSupport.DefaultSeedGraph;
 
-  /// <summary>Amount of seeds the statistical tests average over.</summary>
+  /// <summary>Number of seeds the statistical tests average over.</summary>
   private const int StatisticalSeedCount = 20;
 
   /// <summary>Tests for the hard constraints: nulls and out-of-range values.</summary>
@@ -254,7 +254,7 @@ public sealed class ProcNodeObjectivesTests
   }
 
   /// <summary>Tests for the hand-off to the passes that run after this one.</summary>
-  public sealed class FinalisationTests
+  public sealed class FinalizationTests
   {
     [Fact]
     public void Execute_AfterSecretsAndBeforeRelSizeAndStyle_GraphStaysValid()
@@ -263,7 +263,7 @@ public sealed class ProcNodeObjectivesTests
       var graph = CreateStartExitChainGraph(5);
       var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 2, OptGoalAmount = 1 };
 
-      // Act: Run the finalisation passes in builder order.
+      // Act: Run the finalization passes in builder order.
       new ProcRelSecrets(graph, CnfProcRelSecretsOpts.Default, Seed).Execute();
       new ProcNodeObjectives(graph, options, Seed).Execute();
       new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpts.Default, Seed).Execute();

@@ -128,11 +128,11 @@ internal static class GraphTestCreate
   /// <summary>
   /// Creates a chain graph: node 0 - node 1 - ... with deterministic identifiers.
   /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 1.</param>
+  /// <param name="nodeCount">Number of nodes; at least 1.</param>
   /// <param name="secretEdges">When true, every relationship is a secret passage.</param>
   /// <param name="oneWayEdges">When true, every relationship only allows traversal forward.</param>
   /// <param name="poiNodeIndex">Node that receives POIs, or -1 for none.</param>
-  /// <param name="poiCount">Amount of POIs to place on <paramref name="poiNodeIndex"/>.</param>
+  /// <param name="poiCount">Number of POIs to place on <paramref name="poiNodeIndex"/>.</param>
   /// <returns>The constructed graph with <c>nodeCount - 1</c> edges.</returns>
   public static LilGraph CreateChainGraph(
     int nodeCount,
@@ -157,9 +157,9 @@ internal static class GraphTestCreate
   /// <summary>
   /// Creates a star graph: node 0 (the hub) connected to every other node.
   /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 2.</param>
+  /// <param name="nodeCount">Number of nodes; at least 2.</param>
   /// <param name="poiNodeIndex">Node that receives POIs, or -1 for none.</param>
-  /// <param name="poiCount">Amount of POIs to place on <paramref name="poiNodeIndex"/>.</param>
+  /// <param name="poiCount">Number of POIs to place on <paramref name="poiNodeIndex"/>.</param>
   /// <returns>The constructed graph with <c>nodeCount - 1</c> edges.</returns>
   public static LilGraph CreateStarGraph(int nodeCount, int poiNodeIndex = -1, int poiCount = 0)
   {
@@ -175,7 +175,7 @@ internal static class GraphTestCreate
   /// <summary>
   /// Creates a cycle graph: every node has exactly the same degree of two.
   /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 3.</param>
+  /// <param name="nodeCount">Number of nodes; at least 3.</param>
   /// <returns>The constructed graph with <c>nodeCount</c> edges.</returns>
   public static LilGraph CreateCycleGraph(int nodeCount)
   {
@@ -192,7 +192,7 @@ internal static class GraphTestCreate
   /// Creates a chain whose relationships cycle through the three restricted kinds:
   /// secret, one-way and conditional.
   /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 1.</param>
+  /// <param name="nodeCount">Number of nodes; at least 1.</param>
   /// <returns>The constructed graph with <c>nodeCount - 1</c> restricted edges.</returns>
   public static LilGraph CreateRestrictedChainGraph(int nodeCount)
   {
@@ -215,7 +215,7 @@ internal static class GraphTestCreate
   /// Creates a chain graph with real Start and Exit POIs: node 1 holds the Start POI, the
   /// last node the Exit POI, so the graph can be checked for beatability.
   /// </summary>
-  /// <param name="nodeCount">Amount of nodes; at least 1.</param>
+  /// <param name="nodeCount">Number of nodes; at least 1.</param>
   /// <returns>The constructed graph with <c>nodeCount - 1</c> open edges.</returns>
   public static LilGraph CreateStartExitChainGraph(int nodeCount)
   {
@@ -288,9 +288,9 @@ internal static class GraphTestCreate
   /// <summary>
   /// Creates the node list with deterministic identifiers and initial sizes of 1.
   /// </summary>
-  /// <param name="nodeCount">Amount of nodes.</param>
+  /// <param name="nodeCount">Number of nodes.</param>
   /// <param name="poiNodeIndex">Node that receives POIs, or -1 for none.</param>
-  /// <param name="poiCount">Amount of POIs to place on that node.</param>
+  /// <param name="poiCount">Number of POIs to place on that node.</param>
   /// <returns>A graph holding the nodes; no edges.</returns>
   private static LilGraph CreateNodes(int nodeCount, int poiNodeIndex, int poiCount)
   {

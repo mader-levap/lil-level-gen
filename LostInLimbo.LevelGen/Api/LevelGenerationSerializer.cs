@@ -46,7 +46,7 @@ public static class LevelGenerationSerializer
   /// <summary>
   /// Deserializes canonical JSON into a configuration and validates the result.
   /// </summary>
-  /// <param name="json">JSON text previously produced by <see cref="Serialize"/> or written by hand.</param>
+  /// <param name="json">JSON text previously produced by <see cref="SerializeConfig"/> or written by hand.</param>
   /// <returns>The deserialized, validated configuration. Properties missing from the JSON keep their defaults.</returns>
   /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
   /// <exception cref="ArgumentException">

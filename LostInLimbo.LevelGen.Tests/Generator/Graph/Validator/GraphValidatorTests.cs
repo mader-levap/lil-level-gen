@@ -61,7 +61,7 @@ public sealed class GraphValidatorTests
 
       // Assert: Failure with the dedicated reason.
       Assert.False(result.Success);
-      Assert.Equal("Graph has no Start PoI.", result.FailureReason);
+      Assert.Equal("Graph has no Start POI.", result.FailureReason);
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public sealed class GraphValidatorTests
 
       // Assert: Failure with the dedicated reason.
       Assert.False(result.Success);
-      Assert.Equal("Graph has no Exit PoI.", result.FailureReason);
+      Assert.Equal("Graph has no Exit POI.", result.FailureReason);
     }
 
     [Fact]
@@ -249,9 +249,9 @@ public sealed class GraphValidatorTests
       // Act: Validate the graph with an unreachable exit.
       var result = Validate(graph);
 
-      // Assert: Failure reports the unreachable exit. Note this error takes precedence over orphan node.
+      // Assert: Failure reports the unreachable exit. Note this error takes precedence over the orphan node.
       Assert.False(result.Success);
-      Assert.Equal("Exit PoI is not reachable from Start.", result.FailureReason);
+      Assert.Equal("Exit POI is not reachable from Start.", result.FailureReason);
     }
 
     [Fact]
@@ -351,7 +351,7 @@ public sealed class GraphValidatorTests
 
       // Assert: The player cannot walk 2 -> 1, so the exit is unreachable.
       Assert.False(result.Success);
-      Assert.Equal("Exit PoI is not reachable from Start.", result.FailureReason);
+      Assert.Equal("Exit POI is not reachable from Start.", result.FailureReason);
     }
   }
 
@@ -700,7 +700,7 @@ public sealed class GraphValidatorTests
 
       // Assert: Failure with the dedicated reason.
       Assert.False(result.Success);
-      Assert.Equal($"Goal PoI {Id(12)} is in secret node {Id(3)}.", result.FailureReason);
+      Assert.Equal($"Goal POI {Id(12)} is in secret node {Id(3)}.", result.FailureReason);
     }
 
     [Fact]
@@ -798,7 +798,7 @@ public sealed class GraphValidatorTests
 
       // Assert: The structural reason is reported first.
       Assert.False(result.Success);
-      Assert.Equal($"Goal PoI {Id(12)} is in secret node {Id(3)}.", result.FailureReason);
+      Assert.Equal($"Goal POI {Id(12)} is in secret node {Id(3)}.", result.FailureReason);
     }
   }
 

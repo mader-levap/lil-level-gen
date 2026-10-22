@@ -167,7 +167,7 @@ public sealed class SeededRandomTests
       // Arrange: Generator with a known seed.
       var random = new SeededRandom(42);
 
-      // Act: Draw ten bounded values. True has 100% chance.
+      // Act: Draw ten bounded values. True has a 100% chance.
       var draws = Enumerable.Range(0, 10).Select(_ => random.NextBool(1.0f)).ToArray();
 
       // Assert: All draws are true.
@@ -180,7 +180,7 @@ public sealed class SeededRandomTests
       // Arrange: Generator with a known seed.
       var random = new SeededRandom(42);
 
-      // Act: Draw ten bounded values. True has 0% chance.
+      // Act: Draw ten bounded values. True has a 0% chance.
       var draws = Enumerable.Range(0, 10).Select(_ => random.NextBool(0.0f)).ToArray();
 
       // Assert: All draws are false.
@@ -193,10 +193,10 @@ public sealed class SeededRandomTests
       // Arrange: Generator with a seed that rolls exactly 5 true and 5 false at even odds.
       var random = new SeededRandom(2);
 
-      // Act: Draw ten bounded values. True has 50% chance.
+      // Act: Draw ten bounded values. True has a 50% chance.
       var draws = Enumerable.Range(0, 10).Select(_ => random.NextBool(0.5f)).ToArray();
 
-      // Assert: Roughly half of results is true.
+      // Assert: Roughly half of the results are true.
       CountBools(draws, 5);
     }
 
@@ -289,7 +289,7 @@ public sealed class SeededRandomTests
     /// Counts true values.
     /// </summary>
     /// <param name="result">Array of boolean values.</param>
-    /// <param name="expectedTrueCount">How many true values is expected.</param>
+    /// <param name="expectedTrueCount">How many true values are expected.</param>
     private void CountBools(bool[] result, int expectedTrueCount)
     {
       int actualTrueCount = 0;

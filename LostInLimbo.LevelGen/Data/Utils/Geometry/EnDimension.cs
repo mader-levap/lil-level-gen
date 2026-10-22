@@ -1,7 +1,7 @@
 namespace LostInLimbo.LevelGen.Data.Utils.Geometry;
 
 /// <summary>
-/// Represents dimension.
+/// Represents a dimension.
 /// </summary>
 public enum EnDimension
 {

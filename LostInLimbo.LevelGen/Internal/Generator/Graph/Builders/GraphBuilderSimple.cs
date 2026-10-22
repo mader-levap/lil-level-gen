@@ -18,25 +18,25 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <para>Rules:</para>
 /// <list type="bullet">
 /// <item>Node count follows <c>CnfGraph.Size</c>.</item>
-/// <item><c>CnfGraph.Connectivity</c> is the amount of relationships above the minimum
-/// (the spanning structure). Builder can ignore excess Connectivity if it cannot make more
+/// <item><c>CnfGraph.Connectivity</c> is the number of relationships above the minimum
+/// (the spanning structure). The builder can ignore excess Connectivity if it cannot make more
 /// relationships.</item>
 /// <item><c>CnfGraph.Complexity</c> is ignored (no obstacles, conditions always empty).</item>
 /// </list>
 /// <para>The graph is built in four passes:</para>
 /// <list type="bullet">
-/// <item>Create minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
-/// <item>Add PoIs. Start and exit are random and same node is allowed.</item>
+/// <item>Create a minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
+/// <item>Add POIs. Start and exit are random and the same node is allowed.</item>
 /// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxEdges"/>.</item>
-/// <item>Finalisation: secret nodes, objective POIs, node relative size and grouping.</item>
+/// <item>Finalization: secret nodes, objective POIs, node relative size and grouping.</item>
 /// </list>
 /// </remarks>
 internal sealed class GraphBuilderSimple : AGraphBuilder
 {
-  /// <summary>Maximum amount of relationships a node may gain in the extra-relationships phase (inclusive).</summary>
+  /// <summary>Maximum number of relationships a node may gain in the extra-relationships phase (inclusive).</summary>
   internal const int MaxEdges = 4;
   /// <summary>
-  /// Maximum amount of relationships a node may gain in the skeleton phase (inclusive). A
+  /// Maximum number of relationships a node may gain in the skeleton phase (inclusive). A
   /// central node that reaches this cap hands its remaining nodes over to a new central.
   /// </summary>
   internal const int MaxEdgesStar = 7;
@@ -88,7 +88,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
     PlacePois();
     AddExtraRelationships(connectivity, degrees, adjacency, nodeIds);
 
-    // Finalisation.
+    // Finalization.
     var procOpts = Config.Graph.ProcOpts;
     new ProcRelSecrets(Graph, procOpts.RelSecrets, PrepData.SeedGraph).Execute();
     new ProcNodeObjectives(Graph, procOpts.NodeObjectives, PrepData.SeedGraph).Execute();
@@ -106,7 +106,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   /// <summary>
   /// Creates all nodes in index order with deterministic identifiers.
   /// </summary>
-  /// <param name="size">Amount of nodes to create.</param>
+  /// <param name="size">Number of nodes to create.</param>
   /// <returns>Node identifiers in index order.</returns>
   private Guid[] CreateNodes(int size)
   {
@@ -134,7 +134,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   /// <see cref="MaxEdgesStar"/>, a new central takes over so no node exceeds the skeleton
   /// cap. Uses exactly <c>size - 1</c> relationships - the minimum for a connected graph.
   /// </summary>
-  /// <param name="size">Total amount of nodes, from <c>CnfGraph.Size</c>.</param>
+  /// <param name="size">Total number of nodes, from <c>CnfGraph.Size</c>.</param>
   /// <param name="nodeIds">Node identifiers in index order.</param>
   /// <param name="degrees">Per-node relationship count, updated in place.</param>
   /// <param name="adjacency">Per-node-pair adjacency flags, updated in place.</param>
@@ -170,10 +170,10 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   }
 
   /// <summary>
-  /// Rolls the skeleton scenario with equal chance each. Mixed degenerates to a chain when
+  /// Rolls the skeleton scenario with an equal chance each. Mixed degenerates to a chain when
   /// there are too few nodes to tell the scenarios apart.
   /// </summary>
-  /// <param name="size">Total amount of nodes, from <c>CnfGraph.Size</c>.</param>
+  /// <param name="size">Total number of nodes, from <c>CnfGraph.Size</c>.</param>
   /// <returns>The scenario to build the skeleton from. Deterministic for the same generator state.</returns>
   private EnSkeletonScenario PickScenario(int size)
   {
@@ -228,7 +228,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   }
 
   //
-  // PoI pass.
+  // POI pass.
   //
 
   /// <summary>
@@ -266,7 +266,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   /// silently when no eligible pair remains - connectivity is a soft constraint.
   /// No self-loops or duplicate pairs can occur by construction.
   /// </remarks>
-  /// <param name="connectivity">Requested amount of extra relationships, from <c>CnfGraph.Connectivity</c>.</param>
+  /// <param name="connectivity">Requested number of extra relationships, from <c>CnfGraph.Connectivity</c>.</param>
   /// <param name="degrees">Per-node relationship count, updated in place.</param>
   /// <param name="adjacency">Per-node-pair adjacency flags, updated in place.</param>
   /// <param name="nodeIds">Node identifiers in index order.</param>

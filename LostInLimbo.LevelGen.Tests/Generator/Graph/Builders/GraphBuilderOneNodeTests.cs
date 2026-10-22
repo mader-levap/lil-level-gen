@@ -4,7 +4,7 @@ using LostInLimbo.LevelGen.Data.Result.Graph;
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 
 /// <summary>
-/// Tests <see cref="OneNodeGraphBuilder"/>: graph shape, identifier validity and
+/// Tests <see cref="GraphBuilderOneNode"/>: graph shape, identifier validity and
 /// determinism. The builder must ignore all graph config and never use randomness.
 /// </summary>
 /// <remarks>Shared build runner and POI queries live in <see cref="GraphTestSupport"/>.</remarks>

@@ -39,7 +39,7 @@ public sealed record CnfProcNodeRelSizeOpts
     BiasPois = 0.6f,
   };
 
-  /// <summary>Amount of distinct relative sizes to distribute; 1 disables variation.</summary>
+  /// <summary>Number of distinct relative sizes to distribute; 1 disables variation.</summary>
   public int Steps { get; init; } = 3;
 
   /// <summary>
@@ -98,7 +98,7 @@ public sealed record CnfProcNodeRelSizeOpts
   /// Checks that this config can be used for generation.
   /// </summary>
   /// <exception cref="ArgumentOutOfRangeException">
-  /// Some parameter has invalid value.
+  /// Some parameter has an invalid value.
   /// </exception>
   /// <exception cref="ArgumentException">
   /// The parameters contradict each other.

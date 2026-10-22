@@ -4,7 +4,7 @@ using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 using LostInLimbo.LevelGen.Internal.Generator.Prepass;
 
-namespace LostInLimbo.LevelGen.Tests.Generator.Graph;
+namespace LostInLimbo.LevelGen.Tests.Generator.Builders;
 
 /// <summary>
 /// Tests the <see cref="AGraphBuilder"/> setup contract: input guards and the

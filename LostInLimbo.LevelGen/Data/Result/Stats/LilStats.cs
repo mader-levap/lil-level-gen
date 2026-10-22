@@ -1,7 +1,7 @@
 namespace LostInLimbo.LevelGen.Data.Result.Stats;
 
 /// <summary>
-/// <para>Statistics about created world.</para>
+/// <para>Statistics about the created world.</para>
 /// </summary>
 public sealed record LilStats
 {

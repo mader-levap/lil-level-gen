@@ -6,11 +6,14 @@ using LostInLimbo.LevelGen.Data.Config.Style;
 namespace LostInLimbo.LevelGen.Data.Config;
 
 /// <summary>
-/// <para>Very detailed configuration for generating a level. This is lowest level. In future, you will be able to generate this config using less detailed settings.</para>
+/// <para>
+/// Very detailed configuration for generating a level. This is the lowest level. In the future, you will be
+/// able to generate this config using less detailed settings.
+/// </para>
 /// <para>This is the root of the JSON configuration file.</para>
 /// </summary>
 /// <remarks>
-/// <para>Same seed with the same configuration always produces the same level. The shape maps one-to-one to
+/// <para>The same seed with the same configuration always produces the same level. The shape maps one-to-one to
 /// JSON via <c>LostInLimbo.LevelGen.Api.LevelGenerationSerializer</c>.</para>
 /// </remarks>
 public sealed record CnfLevelGeneration
@@ -24,7 +27,7 @@ public sealed record CnfLevelGeneration
   public static CnfLevelGeneration Default { get; } = new();
 
   /// <summary>
-  /// Schema version of this configuration. Increment when the JSON format changes in way that
+  /// Schema version of this configuration. Increment when the JSON format changes in a way that
   /// introduces incompatibility so that older files can be detected and migrated.
   /// </summary>
   public int ConfigVersion { get; init; } = CurrentConfigVersion;

@@ -22,7 +22,7 @@ public sealed class ProcNodeStyleTests
   /// <summary>Graph sub-seed used by all tests unless a test varies the seed itself.</summary>
   private const long Seed = GraphTestSupport.DefaultSeedGraph;
 
-  /// <summary>Amount of seeds the statistical tests average over.</summary>
+  /// <summary>Number of seeds the statistical tests average over.</summary>
   private const int StatisticalSeedCount = 50;
 
   /// <summary>Tests for the hard constraints: nulls, out-of-range values and broken graphs.</summary>
@@ -231,7 +231,7 @@ public sealed class ProcNodeStyleTests
 
   /// <summary>
   /// Tests the fallback that unlocks secret, one-way and conditional relationships once
-  /// every group ran out of ordinary ones.
+  /// every group runs out of ordinary ones.
   /// </summary>
   public sealed class FallbackTests
   {

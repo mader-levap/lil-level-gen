@@ -4,7 +4,7 @@ using LostInLimbo.LevelGen.Internal.Utils;
 namespace LostInLimbo.LevelGen.Internal.Generator.Prepass;
 
 /// <summary>
-/// <para>Creates instance of <c>PrepData</c> based on configuration.</para>
+/// <para>Creates an instance of <c>PrepData</c> based on the configuration.</para>
 /// </summary>
 internal sealed class PrepassGenerator
 {
@@ -15,7 +15,7 @@ internal sealed class PrepassGenerator
   private readonly PrepData _prepData = new();
 
   /// <summary>
-  /// Prepares map generator.
+  /// Prepares the prepass generator.
   /// </summary>
   /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
   public PrepassGenerator(CnfLevelGeneration config)

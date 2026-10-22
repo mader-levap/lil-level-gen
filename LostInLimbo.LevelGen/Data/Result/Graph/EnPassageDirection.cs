@@ -5,8 +5,8 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// </summary>
 public enum EnPassageDirection
 {
-  /// <summary>Passage can be used in both directions. Most common case.</summary>
+  /// <summary>A passage can be used in both directions. Most common case.</summary>
   Bidirectional,
-  /// <summary>Passage can be used only from source (<see cref="LilEdge.From"/>) to destination (<see cref="LilEdge.To"/>).</summary>
+  /// <summary>A passage can be used only from source (<see cref="LilEdge.From"/>) to destination (<see cref="LilEdge.To"/>).</summary>
   OneWay,
 }

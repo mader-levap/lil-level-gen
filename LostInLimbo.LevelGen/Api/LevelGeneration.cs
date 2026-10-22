@@ -10,9 +10,15 @@ using LostInLimbo.LevelGen.Internal.Status.Data;
 namespace LostInLimbo.LevelGen.Api;
 
 /// <summary>
-/// <para>Entry point for entire level generator. Serves as layer between consumer and internals. There can be only one generation running at once.</para>
-/// <para>Commands like <see cref="Start"/>, <see cref="Resume"/>, <see cref="Cancel"/> and <see cref="Pause"/> are asynchronous and return immediately.
-/// <see cref="Clear"/> is the one exception: when a run is in flight it pauses the run and waits (up to a timeout) for the worker to stop before clearing.</para>
+/// <para>
+/// Entry point for the entire level generator. Serves as a layer between the consumer and the internals.
+/// There can be only one generation running at once.
+/// </para>
+/// <para>
+/// Commands like <see cref="Start"/>, <see cref="Resume"/>, <see cref="Cancel"/> and <see cref="Pause"/> are
+/// asynchronous and return immediately. <see cref="Clear"/> is the one exception: when a run is in flight,
+/// it pauses the run and waits (up to a timeout) for the worker to stop before clearing.
+/// </para>
 /// </summary>
 public static class LevelGeneration
 {
@@ -53,7 +59,7 @@ public static class LevelGeneration
   // TEST SEAMS
   //
   // Hooks used by tests to hold open otherwise unreachable interleaving windows. They are never
-  // set in production (always <see langword="null"/>), tests set them before and clear them
+  // set in production (always <see langword="null"/>); tests set them before and clear them
   // after the act they synchronize, and their bodies must not call back into commands that take
   // <see cref="RunSourceGate"/> on the same thread while the claim hook holds it.
 
@@ -81,10 +87,10 @@ public static class LevelGeneration
   // COMMANDS
 
   /// <summary>
-  /// Begin level generation based on given config. Will discard all and any partial data,
+  /// Begin level generation based on the given config. Will discard all and any partial data,
   /// including the world built by any previous run.
   /// </summary>
-  /// <param name="enRunKind">Kind of run.</param>
+  /// <param name="enRunKind">The kind of run.</param>
   /// <param name="config">Configuration data for level generation.</param>
   /// <param name="cancellationToken">
   /// Optional external token. When cancelled, the run stops at its next checkpoint and reports
@@ -98,7 +104,7 @@ public static class LevelGeneration
   /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
   public static bool Start(EnRunKind enRunKind, CnfLevelGeneration config, CancellationToken cancellationToken = default)
   {
-    // Validate before claiming so configuration errors cannot leave status stuck at "running".
+    // Validate before claiming so configuration errors cannot leave the status stuck at "running".
     // This is the only validation pass; the generator trusts its caller.
     ValidateConfig(config);
 
@@ -127,7 +133,7 @@ public static class LevelGeneration
     catch (Exception exception)
     {
       // Defensive: a failure after the claim (e.g. source creation on a disposed token)
-      // must not leave status stuck at "running".
+      // must not leave the status stuck at "running".
       _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Error = exception });
       return false;
     }
@@ -138,7 +144,7 @@ public static class LevelGeneration
   /// Works only if generation is paused (run kind budget exhausted or an explicit
   /// <see cref="Pause"/> request stopped the previous run).
   /// </summary>
-  /// <param name="enRunKind">Kind of run.</param>
+  /// <param name="enRunKind">The kind of run.</param>
   /// <param name="cancellationToken">
   /// Optional external token, honored exactly like in <see cref="Start"/>. A token given to a
   /// previous <see cref="Start"/> call does not carry over automatically; pass it again here if
@@ -175,7 +181,7 @@ public static class LevelGeneration
     }
     catch (Exception exception)
     {
-      // Defensive: a failure after the claim must not leave status stuck at "running".
+      // Defensive: a failure after the claim must not leave the status stuck at "running".
       _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Error = exception });
       return false;
     }
@@ -254,7 +260,7 @@ public static class LevelGeneration
   /// <see langword="null"/>. A subsequent <see cref="Start"/> begins from scratch.
   /// </summary>
   /// <remarks>
-  /// Unlike the other commands this one may block. When a run is in flight, the call first
+  /// Unlike the other commands, this one may block. When a run is in flight, the call first
   /// requests a pause (the same request <see cref="Pause"/> issues), then waits for the worker
   /// to stop at its next step boundary before clearing; the wait is bounded by
   /// <paramref name="timeout"/>. Callers that must never block can pause themselves, wait until
@@ -271,7 +277,7 @@ public static class LevelGeneration
   /// </remarks>
   /// <param name="timeout">
   /// Optional upper bound for waiting out an in-flight run. <see cref="TimeSpan.Zero"/> means
-  /// do not wait at all: while a run is in flight this call then always returns
+  /// not waiting at all: while a run is in flight this call then always returns
   /// <see langword="false"/> and clears nothing (the pause is still requested); only a state
   /// that is already terminal or idle is cleared. When <see langword="null"/>, a default of
   /// 10 seconds is used.
@@ -367,7 +373,7 @@ public static class LevelGeneration
   // DATA
 
   /// <summary>
-  /// Get status of generation.
+  /// Get the status of generation.
   /// </summary>
   /// <returns>Status of generation.</returns>
   public static GenerationStatus Status()
@@ -409,7 +415,7 @@ public static class LevelGeneration
 
   /// <summary>
   /// Validates a generation config before its run is claimed, so a bad config cannot leave
-  /// status stuck at <see cref="EnGenResult.Running"/>. The single validation pass for a run:
+  /// the status stuck at <see cref="EnGenResult.Running"/>. The single validation pass for a run:
   /// generators receive the config already validated by this method.
   /// </summary>
   /// <param name="config">Configuration to validate. Must not be <see langword="null"/>.</param>
@@ -464,7 +470,7 @@ public static class LevelGeneration
   /// <summary>
   /// Runs <see cref="LevelGenerator.Execute"/> on a dedicated background thread so that
   /// callers of commands like <see cref="Start"/> or <see cref="Resume"/> return immediately.
-  /// Background thread will not keep the process alive on shutdown.
+  /// The background thread will not keep the process alive on shutdown.
   /// </summary>
   /// <remarks>
   /// If the thread cannot be created or started after the run was already claimed, the failure

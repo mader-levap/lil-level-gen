@@ -8,7 +8,7 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 /// <remarks>
 /// <para>
 /// Many parameters here are soft constraints. Builders are allowed to reject them to a degree to minimize
-/// amount of failed builds. Also it is up to builder to interpret these variables, especially vaguer ones
+/// the number of failed builds. Also it is up to the builder to interpret these variables, especially vaguer ones
 /// like Connectivity.
 /// </para>
 /// </remarks>
@@ -40,23 +40,23 @@ public sealed record CnfGraph
   public EnGraphBuilder Builder { get; init; } = DefaultBuilder;
 
   /// <summary>
-  /// Size of graph. Usually just number of nodes. Hard cap is <see cref="MaxSize"/>.
+  /// Size of the graph. Usually just the number of nodes. The hard cap is <see cref="MaxSize"/>.
   /// </summary>
   public int Size { get; init; } = DefaultSize;
 
   /// <summary>
-  /// General connectivity of graph. It is not amount of relationships between nodes, at least not directly.
-  /// Zero simply means graph generator will try to make as few relationships as possible.
+  /// General connectivity of the graph. It is not the number of relationships between nodes, at least not directly.
+  /// Zero simply means the graph generator will try to make as few relationships as possible.
   /// </summary>
   public int Connectivity { get; init; } = DefaultConnectivity;
 
   /// <summary>
-  /// General complexity of graph. Usually number of obstacles. Ignored by builders that do not make obstacles.
+  /// General complexity of the graph. Usually the number of obstacles. Ignored by builders that do not make obstacles.
   /// </summary>
   public int Complexity { get; init; } = DefaultComplexity;
 
   /// <summary>
-  /// Options of the graph finalisation processors. Ignored by builders that run no processors.
+  /// Options of the graph finalization processors. Ignored by builders that run no processors.
   /// </summary>
   public CnfProcOpts ProcOpts { get; init; } = CnfProcOpts.Default;
 

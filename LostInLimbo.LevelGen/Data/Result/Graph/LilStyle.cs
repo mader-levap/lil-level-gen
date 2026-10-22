@@ -1,7 +1,7 @@
 namespace LostInLimbo.LevelGen.Data.Result.Graph;
 
 /// <summary>
-/// Styling data for given node.
+/// Styling data for a given node.
 /// </summary>
 /// <remarks>
 /// For now there is only Group.
@@ -9,7 +9,7 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 public sealed record LilStyle
 {
   /// <summary>
-  /// Group identifier. If null, node is not in any group.
+  /// Group identifier. If null, the node is not in any group.
   /// </summary>
   public string? Group { get; init; } = null;
 }

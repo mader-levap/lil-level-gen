@@ -88,7 +88,7 @@ internal sealed class ProcNodeRelSize
   {
     if (_graph.Nodes.Count == 0) return;
 
-    // One node: with no variation allowed by validation, every node gets the single step.
+    // One step: with no variation allowed by validation, every node gets the single step.
     if (_stepValues.Length == 1)
     {
       for (var i = 0; i < _graph.Nodes.Count; i++)
@@ -219,7 +219,7 @@ internal sealed class ProcNodeRelSize
   /// <summary>
   /// Samples one step index for a single node.
   /// </summary>
-  /// <param name="stepCount">Amount of step values; at least 2.</param>
+  /// <param name="stepCount">Number of step values; at least 2.</param>
   /// <param name="skew">Base concentration on the dominant step; within [0, 1].</param>
   /// <param name="dominant">Index of the step the skew pulls toward.</param>
   /// <param name="bias">Node's upward pull; 0 means no tilt.</param>

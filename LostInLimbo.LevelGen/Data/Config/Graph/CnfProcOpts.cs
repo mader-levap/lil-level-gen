@@ -3,7 +3,7 @@ using System;
 namespace LostInLimbo.LevelGen.Data.Config.Graph;
 
 /// <summary>
-/// <para>Options of the graph finalisation processors.</para>
+/// <para>Options of the graph finalization processors.</para>
 /// </summary>
 /// <remarks>
 /// One section per processor. Sections left out of a config keep their defaults.

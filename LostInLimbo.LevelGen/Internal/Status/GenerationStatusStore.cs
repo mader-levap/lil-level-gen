@@ -155,8 +155,8 @@ internal sealed class GenerationStatusStore
       if (current.Status.Result == EnGenResult.Running) return false;
 
       // Checked after the snapshot read: a completed claim updates the status before it
-      // bumps the id, so its terminal state is either seen here as Running or rejected by
-      // this id check - never CAS'd away.
+      // bumps the id, so its state is either seen here as Running or, once terminal, rejected
+      // by this id check - never CAS'd away.
       if (Interlocked.Read(ref _claimId) != expectedClaimId) return false;
 
       // Succeeds only if nobody else changed the snapshot since we read it.

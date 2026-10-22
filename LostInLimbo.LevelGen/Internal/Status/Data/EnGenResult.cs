@@ -17,7 +17,7 @@ public enum EnGenResult
   None,
   /// <summary>Generation is running at this moment.</summary>
   Running,
-  /// <summary>Generation paused. Can happen if run kind is not <c>All</c> or if pause was explicitly requested.</summary>
+  /// <summary>Generation paused. Can happen if the run kind is not <c>All</c> or if a pause was explicitly requested.</summary>
   Paused,
   /// <summary>Generation finished successfully.</summary>
   Finished,

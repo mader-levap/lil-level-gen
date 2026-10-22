@@ -25,7 +25,7 @@ internal static class GraphTestAssert
   /// <param name="graph">Graph to check.</param>
   /// <param name="allowDuplicates">
   /// When true, multiple passages between the same node pair are accepted (e.g. the
-  /// parallel passages of <c>LinearGraphBuilder</c>); otherwise the pair must be unique.
+  /// parallel passages of <c>GraphBuilderLinear</c>); otherwise the pair must be unique.
   /// </param>
   public static void AssertValidEdges(LilGraph graph, bool allowDuplicates = false)
   {
@@ -67,12 +67,12 @@ internal static class GraphTestAssert
   }
 
   /// <summary>
-  /// Asserts that no node touches more than the given amount of relationships.
+  /// Asserts that no node touches more than the given number of relationships.
   /// </summary>
   /// <param name="graph">Graph to check.</param>
   /// <param name="maxDegree">Allowed relationships per node, inclusive.</param>
   /// <param name="includeSecretEdges">
-  /// When false, secret relationships (appended by the finalisation pass) are not counted -
+  /// When false, secret relationships (appended by the finalization pass) are not counted -
   /// builder-owned degree caps only cover builder-created passages.
   /// </param>
   public static void AssertDegreeCap(LilGraph graph, int maxDegree, bool includeSecretEdges = true)
@@ -86,7 +86,7 @@ internal static class GraphTestAssert
   /// <summary>
   /// Asserts that every node respects its own <see cref="LilNode.MaxEdges"/> hard cap;
   /// a negative cap means no limit. Counts every relationship touching the node, including
-  /// secret relationships of the finalisation pass.
+  /// secret relationships of the finalization pass.
   /// </summary>
   /// <param name="graph">Graph to check.</param>
   public static void AssertMaxEdges(LilGraph graph)
@@ -117,7 +117,7 @@ internal static class GraphTestAssert
   /// </remarks>
   public static void AssertEqualGraphs(LilGraph expected, LilGraph actual)
   {
-    // Assert: Two given graphs are same.
+    // Assert: Two given graphs are the same.
     Assert.Equal(expected.Nodes.Count, actual.Nodes.Count);
     for (var i = 0; i < expected.Nodes.Count; i++)
     {
@@ -153,13 +153,13 @@ internal static class GraphTestAssert
   }
 
   /// <summary>
-  /// Asserts two provided PoIs are identical.
+  /// Asserts two provided POIs are identical.
   /// </summary>
-  /// <param name="expected">Reference PoI.</param>
-  /// <param name="actual">PoI under test.</param>
+  /// <param name="expected">Reference POI.</param>
+  /// <param name="actual">POI under test.</param>
   private static void AssertEqualPoi(LilPoi expected, LilPoi actual)
   {
-    // Assert: Same PoI properties.
+    // Assert: Same POI properties.
     Assert.Equal(expected.Id, actual.Id);
     Assert.Equal(expected.Type, actual.Type);
     Assert.Equal(expected.Name, actual.Name);

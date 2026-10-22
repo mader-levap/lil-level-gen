@@ -15,51 +15,51 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <para>Rules:</para>
 /// <list type="bullet">
 /// <item>Node count follows <c>CnfGraph.Size</c>.</item>
-/// <item><c>CnfGraph.Connectivity</c> is the amount of relationships above the minimum
-/// (the spanning structure). That allows multiple passages from previous node to next node
-/// and/or shortcuts (passage that skips one or more nodes in chain - must respect required
+/// <item><c>CnfGraph.Connectivity</c> is the number of relationships above the minimum
+/// (the spanning structure). That allows multiple passages from the previous node to the next node
+/// and/or shortcuts (a passage that skips one or more nodes in the chain - must respect required
 /// obstacles).
-/// Builder can ignore excess Connectivity if it cannot make more relationships.</item>
-/// <item><c>CnfGraph.Complexity</c> slightly indirectly determines amount of obstacles.
-/// Like Connectivity, it is soft constraint.</item>
+/// The builder can ignore excess Connectivity if it cannot make more relationships.</item>
+/// <item><c>CnfGraph.Complexity</c> slightly indirectly determines the number of obstacles.
+/// Like Connectivity, it is a soft constraint.</item>
 /// </list>
 /// <para>Even this simple shape allows different scenarios:</para>
 /// <list type="bullet">
 /// <item>Every node holding a solution for the conditional passage to the next node.</item>
-/// <item>Some passages are open, other require solution that may be found earlier.</item>
+/// <item>Some passages are open, others require a solution that may be found earlier.</item>
 /// <item>Every passage but the last one is unconditional with the last one requiring all solutions.</item>
 /// </list>
 /// <para>The graph is built in five passes:</para>
 /// <list type="bullet">
-/// <item>Create linearly connected skeleton.</item>
-/// <item>Add PoIs. Start and exit are at ends of linear graph.</item>
+/// <item>Create a linearly connected skeleton.</item>
+/// <item>Add POIs. Start and exit are at the ends of the linear graph.</item>
 /// <item>Extra relationships between nodes up to connectivity, <see cref="MaxExtraDegree"/>
 /// and the node <see cref="LilNode.MaxEdges"/> hard cap.</item>
 /// <item>Create obstacles for relationships up to complexity and
 /// <see cref="MaxConditionPerRel"/>: one shared solution condition per chosen node's
 /// incoming relationships, solution most likely near its guarded passage within
 /// <see cref="MaxConditionDistance"/>.</item>
-/// <item>Finalisation: secret nodes, objective POIs, node relative size and grouping.</item>
+/// <item>Finalization: secret nodes, objective POIs, node relative size and grouping.</item>
 /// </list>
 /// </remarks>
 internal sealed class GraphBuilderLinear : AGraphBuilder
 {
   /// <summary>
-  /// Maximum amount of relationships a node may have, counting skeleton and extra
+  /// Maximum number of relationships a node may have, counting skeleton and extra
   /// relationships together. Assigned to every node as its <see cref="LilNode.MaxEdges"/>
   /// hard cap and enforced by the extra-relationships pass.
   /// </summary>
   internal const int MaxEdges = 5;
   /// <summary>
-  /// Maximum amount of extra relationships a node may gain in the extra-relationships phase (inclusive).
+  /// Maximum number of extra relationships a node may gain in the extra-relationships phase (inclusive).
   /// Important: we count in and out relationships separately.
   /// </summary>
   internal const int MaxExtraDegree = 2;
-  /// <summary>Maximum amount of conditions that single relationship can have.</summary>
+  /// <summary>Maximum number of conditions that a single relationship can have.</summary>
   internal const int MaxConditionPerRel = 3;
-  /// <summary>Maximum distance between solution and node having relationship with relevant condition.</summary>
+  /// <summary>Maximum distance between the solution and the node having a relationship with a relevant condition.</summary>
   internal const int MaxConditionDistance = 3;
-  /// <summary>Maximum amount of nodes that can be skipped by extra relationship.</summary>
+  /// <summary>Maximum number of nodes that can be skipped by an extra relationship.</summary>
   internal const int MaxSkipDistance = 2;
 
   /// <summary>
@@ -101,7 +101,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
     AddExtraRelationships(connectivity, nodeIds, degrees, extraOutDegrees, extraInDegrees, extraPairs);
     AddObstacles(complexity, nodeIds);
 
-    // Finalisation.
+    // Finalization.
     var procOpts = Config.Graph.ProcOpts;
     new ProcRelSecrets(Graph, procOpts.RelSecrets, PrepData.SeedGraph).Execute();
     new ProcNodeObjectives(Graph, procOpts.NodeObjectives, PrepData.SeedGraph).Execute();
@@ -119,7 +119,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// <summary>
   /// Creates all nodes in chain order with deterministic identifiers.
   /// </summary>
-  /// <param name="size">Amount of nodes to create.</param>
+  /// <param name="size">Number of nodes to create.</param>
   /// <returns>Node identifiers in chain order.</returns>
   private Guid[] CreateNodes(int size)
   {
@@ -145,7 +145,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// Creates the linear skeleton: every node links to its next node, from the first up to the
   /// last one. Uses exactly <c>size - 1</c> relationships - the minimum for a connected graph.
   /// </summary>
-  /// <param name="size">Total amount of nodes, from <c>CnfGraph.Size</c>.</param>
+  /// <param name="size">Total number of nodes, from <c>CnfGraph.Size</c>.</param>
   /// <param name="nodeIds">Node identifiers in chain order.</param>
   /// <param name="degrees">Per-node relationship count, updated in place.</param>
   private void CreateSkeleton(int size, Guid[] nodeIds, int[] degrees)
@@ -155,7 +155,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   }
 
   //
-  // PoI pass.
+  // POI pass.
   //
 
   /// <summary>
@@ -203,7 +203,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// pair, so an adjacent pair holds at most two passages (skeleton plus extra) and a
   /// skipping pair at most one. No self-loops by construction.</para>
   /// </remarks>
-  /// <param name="connectivity">Requested amount of extra relationships, from <c>CnfGraph.Connectivity</c>.</param>
+  /// <param name="connectivity">Requested number of extra relationships, from <c>CnfGraph.Connectivity</c>.</param>
   /// <param name="nodeIds">Node identifiers in chain order.</param>
   /// <param name="degrees">Total relationships per node (skeleton plus extra), updated in place.</param>
   /// <param name="extraOutDegrees">Extra relationships per source node, updated in place.</param>
@@ -254,7 +254,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// <param name="degrees">Total relationships per node.</param>
   /// <param name="extraInDegrees">Extra relationships per target node.</param>
   /// <param name="extraPairs">Pairs that already carry an extra relationship.</param>
-  /// <param name="size">Total amount of nodes.</param>
+  /// <param name="size">Total number of nodes.</param>
   /// <returns>True when at least one target within the skip window is eligible.</returns>
   private bool HasEligibleTarget(int from, int[] degrees, int[] extraInDegrees, bool[,] extraPairs, int size)
   {
@@ -282,7 +282,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// <param name="degrees">Total relationships per node.</param>
   /// <param name="extraInDegrees">Extra relationships per target node.</param>
   /// <param name="extraPairs">Pairs that already carry an extra relationship.</param>
-  /// <param name="size">Total amount of nodes.</param>
+  /// <param name="size">Total number of nodes.</param>
   /// <returns>Index of the chosen target node.</returns>
   /// <exception cref="InvalidOperationException">No eligible target remains; unreachable while
   /// <see cref="HasEligibleTarget"/> agreed that one exists.</exception>
@@ -317,7 +317,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
 
   /// <summary>
   /// Adds one bidirectional edge between the two nodes in chain order and updates the
-  /// degree bookkeeping. It is always chokepoint.
+  /// degree bookkeeping. It is always a chokepoint.
   /// </summary>
   /// <param name="from">Index of the source node; must be earlier in the chain than <paramref name="to"/>.</param>
   /// <param name="to">Index of the target node; must differ from <paramref name="from"/>.</param>
@@ -385,7 +385,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// at or before the chain predecessor of its guarded node, so the chain reaches it before
   /// any guarded passage is needed.</para>
   /// </remarks>
-  /// <param name="complexity">Requested obstacle amount, from <c>CnfGraph.Complexity</c>.</param>
+  /// <param name="complexity">Requested number of obstacles, from <c>CnfGraph.Complexity</c>.</param>
   /// <param name="nodeIds">Node identifiers in chain order.</param>
   private void AddObstacles(int complexity, Guid[] nodeIds)
   {
@@ -428,7 +428,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// <remarks>Because <see cref="AddObstacles"/> always conditions a node's relationships
   /// together, they saturate together - a node either has full capacity on all of them or on
   /// none, and the check never splits a set of parallel passages.</remarks>
-  /// <param name="size">Total amount of nodes.</param>
+  /// <param name="size">Total number of nodes.</param>
   /// <param name="nodeIds">Node identifiers in chain order.</param>
   /// <returns>Target node indices in ascending chain order; empty when everything is saturated.</returns>
   private List<int> FindObstacleTargets(int size, Guid[] nodeIds)

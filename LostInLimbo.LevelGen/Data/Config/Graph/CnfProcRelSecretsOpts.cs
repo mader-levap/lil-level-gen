@@ -22,7 +22,7 @@ public sealed record CnfProcRelSecretsOpts
   };
 
   /// <summary>
-  /// Amount of secret nodes to append; 0 disables the processor. Must not be negative.
+  /// Number of secret nodes to append; 0 disables the processor. Must not be negative.
   /// </summary>
   public int Amount { get; init; } = 1;
 

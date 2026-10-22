@@ -166,7 +166,7 @@ internal sealed class ProcRelSecrets
         if (HasCapacity(secret, degrees)) eligibleSecrets.Add(secret);
       }
 
-      // Every secret is full - fall through to the ordinary hosts.
+      // Nest behind an eligible secret while any of them has capacity.
       if (eligibleSecrets.Count > 0)
         return eligibleSecrets[_random.NextInt(eligibleSecrets.Count)].Id;
     }
@@ -195,7 +195,7 @@ internal sealed class ProcRelSecrets
 
   /// <summary>
   /// Counts the relationships touching every node present on entry. Edges referencing a
-  /// node that does not exist are ignored - the validator reports those, this pass only
+  /// node that does not exist are ignored - the validator reports those; this pass only
   /// needs degrees for the capacity checks.
   /// </summary>
   /// <returns>Relationship count per node identifier; zero for edge-less graphs.</returns>

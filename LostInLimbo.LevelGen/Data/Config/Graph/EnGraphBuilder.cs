@@ -7,8 +7,8 @@ public enum EnGraphBuilder
 {
   /// <summary>Only one node with start and exit.</summary>
   OneNode,
-  /// <summary>Bunch of interconnected nodes without any obstacles.</summary>
+  /// <summary>A bunch of interconnected nodes without any obstacles.</summary>
   Simple,
-  /// <summary>Creates linear chain of nodes.</summary>
+  /// <summary>Creates a linear chain of nodes.</summary>
   Linear,
 }

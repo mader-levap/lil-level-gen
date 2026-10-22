@@ -16,7 +16,7 @@ public sealed record CnfProcNodeStyleOpts
   };
 
   /// <summary>
-  /// Requested amount of groups. Soft target: reduced to the node count when the graph
+  /// Requested number of groups. Soft target: reduced to the node count when the graph
   /// is smaller. Must be at least 1.
   /// </summary>
   public int GroupCount { get; init; } = 3;

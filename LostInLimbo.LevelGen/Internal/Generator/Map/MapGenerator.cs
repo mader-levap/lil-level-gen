@@ -8,7 +8,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Map;
 
 /// <summary>
 /// <para>Generates map data. Modifies <c>LilMap</c>.</para>
-/// NOTE: right now it is placeholder.
+/// NOTE: right now it is a placeholder.
 /// </summary>
 internal sealed class MapGenerator
 {
@@ -24,7 +24,7 @@ internal sealed class MapGenerator
   private int _totalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
   /// <summary>
-  /// Prepares map generator.
+  /// Prepares the map generator.
   /// </summary>
   /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
   /// <param name="prepData">Preparatory data based on config.</param>
@@ -39,7 +39,7 @@ internal sealed class MapGenerator
   /// <summary>
   /// Executes one step of map generation.
   /// </summary>
-  /// <returns>True if step was successful, otherwise false.</returns>
+  /// <returns>True if the step was successful, otherwise false.</returns>
   public bool ExecuteStep()
   {
     var sleepMilliseconds = _config.Debug?.PlaceholderSleep ?? CnfDebug.DefaultPlaceholderSleep;

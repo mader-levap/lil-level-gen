@@ -6,7 +6,7 @@ namespace LostInLimbo.LevelGen.Data.Config;
 /// General configuration data.
 /// </summary>
 /// <remarks>
-/// Data here has critical impact on generation.
+/// Data here has a critical impact on generation.
 /// </remarks>
 public sealed record CnfGeneral
 {
@@ -28,7 +28,7 @@ public sealed record CnfGeneral
   public long Seed { get; init; } = DefaultSeed;
 
   /// <summary>
-  /// Level of degeneration. The more world is degenerated, the worse are effects on map generation.
+  /// Level of degeneration. The more the world is degenerated, the worse are the effects on map generation.
   /// 0 means no corruption.
   /// </summary>
   public float Degeneration { get; init; } = DefaultDegeneration;
@@ -38,7 +38,7 @@ public sealed record CnfGeneral
   /// <summary>
   /// Checks that this config can be used for generation.
   /// </summary>
-  /// <exception cref="ArgumentOutOfRangeException">Number is outside range.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">The number is outside the range.</exception>
   public void Validate()
   {
     if (!float.IsFinite(Degeneration) || Degeneration < 0.0f)

@@ -152,7 +152,7 @@ public sealed class GraphBuilderSimpleTests
       });
 
       // Assert: No relationships are possible, yet both POIs and the mandatory goal live
-      // on the single ordinary node; the finalisation pass appends one secret node
+      // on the single ordinary node; the finalization pass appends one secret node
       // hanging off it, which hosts the optional goal (allowed in secret nodes).
       Assert.True(success);
       var ordinary = Assert.Single(graph.Nodes.Where(node => !node.Secret));
@@ -292,7 +292,7 @@ public sealed class GraphBuilderSimpleTests
     }
   }
 
-  /// <summary>Tests for the secret-node pass run first in the finalisation.</summary>
+  /// <summary>Tests for the secret-node pass run first in the finalization.</summary>
   public sealed class SecretTests
   {
     [Theory]
@@ -422,7 +422,7 @@ public sealed class GraphBuilderSimpleTests
       var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size });
 
       // Assert: Exactly one POI of each type exists across the graph - Start, Exit and
-      // the two objectives placed by the finalisation pass.
+      // the two objectives placed by the finalization pass.
       var pois = graph.Nodes.SelectMany(node => node.Pois).ToList();
       Assert.Equal(4, pois.Count);
       Assert.Single(pois.Where(poi => poi.Type == EnPoiType.Start));

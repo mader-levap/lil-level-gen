@@ -43,7 +43,7 @@ internal sealed class GraphValidator(LilGraph? graph)
   private HashSet<Guid> _startNodeIds = [];
   /// <summary>All end nodes.</summary>
   private HashSet<Guid> _exitNodeIds = [];
-  /// <summary>All PoIs.</summary>
+  /// <summary>All POIs.</summary>
   private HashSet<Guid> _poiIds = [];
   /// <summary>Flooded nodes.</summary>
   private HashSet<Guid> _flooded = [];
@@ -90,7 +90,7 @@ internal sealed class GraphValidator(LilGraph? graph)
   }
 
   /// <summary>
-  /// Set ups internal data. Note it can fail here too.
+  /// Sets up internal data. Note it can fail here too.
   /// </summary>
   /// <returns>Null if success, otherwise failure.</returns>
   private GraphValidationResult? Setup()
@@ -112,8 +112,8 @@ internal sealed class GraphValidator(LilGraph? graph)
       }
     }
 
-    if (_startNodeIds.Count == 0) return GraphValidationResult.Fail("Graph has no Start PoI.");
-    if (_exitNodeIds.Count == 0) return GraphValidationResult.Fail("Graph has no Exit PoI.");
+    if (_startNodeIds.Count == 0) return GraphValidationResult.Fail("Graph has no Start POI.");
+    if (_exitNodeIds.Count == 0) return GraphValidationResult.Fail("Graph has no Exit POI.");
 
     return null;
   }
@@ -135,7 +135,7 @@ internal sealed class GraphValidator(LilGraph? graph)
       foreach (var poi in node.Pois)
       {
         if (poi.Type == EnPoiType.Goal)
-          return GraphValidationResult.Fail($"Goal PoI {poi.Id} is in secret node {node.Id}.");
+          return GraphValidationResult.Fail($"Goal POI {poi.Id} is in secret node {node.Id}.");
       }
     }
 
@@ -253,7 +253,7 @@ internal sealed class GraphValidator(LilGraph? graph)
       }
     }
 
-    if (!exitReachable) return GraphValidationResult.Fail("Exit PoI is not reachable from Start.");
+    if (!exitReachable) return GraphValidationResult.Fail("Exit POI is not reachable from Start.");
 
     var unreachableCount = _graph!.Nodes.Count - _flooded.Count;
     if (unreachableCount > 0)
@@ -265,9 +265,9 @@ internal sealed class GraphValidator(LilGraph? graph)
   /// was already flooded. Collecting on flood models the player picking up everything
   /// inside a place as soon as the place becomes accessible.</summary>
   /// <param name="flooded">Set of ids of flooded nodes.</param>
-  /// <param name="collectedPois">Set of ids of found PoIs.</param>
+  /// <param name="collectedPois">Set of ids of found POIs.</param>
   /// <param name="nodeId">Node identifier.</param>
-  /// <returns>True if flood successful, otherwise false.</returns>
+  /// <returns>True if the flood was successful, otherwise false.</returns>
   private bool FloodNode(HashSet<Guid> flooded, HashSet<Guid> collectedPois, Guid nodeId)
   {
     if (!flooded.Add(nodeId)) return false;

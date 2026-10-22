@@ -13,7 +13,7 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 /// <remarks>
 /// Zero-valued behavior: <see cref="GoalAmount"/> 0 places no mandatory goals,
 /// <see cref="OptGoalAmount"/> 0 places no optional goals; both 0 disable the processor.
-/// Both amounts are soft: when fewer eligible nodes remain than requested, the excess
+/// Both counts are soft: when fewer eligible nodes remain than requested, the excess
 /// is ignored and the processor stops early.
 /// </remarks>
 public sealed record CnfProcNodeObjectivesOpts
@@ -28,13 +28,13 @@ public sealed record CnfProcNodeObjectivesOpts
   };
 
   /// <summary>
-  /// Amount of mandatory goal POIs to place; 0 disables mandatory goals. Must not be
+  /// Number of mandatory goal POIs to place; 0 disables mandatory goals. Must not be
   /// negative.
   /// </summary>
   public int GoalAmount { get; init; } = 1;
 
   /// <summary>
-  /// Amount of optional goal POIs to place; 0 disables optional goals. Must not be
+  /// Number of optional goal POIs to place; 0 disables optional goals. Must not be
   /// negative.
   /// </summary>
   public int OptGoalAmount { get; init; } = 1;

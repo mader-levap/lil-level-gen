@@ -123,7 +123,7 @@ internal sealed class ProcNodeStyle
       ungrouped -= grown;
     }
 
-    // Verify that all nodes have assigned group.
+    // Verify that all nodes have an assigned group.
     for (var i = 0; i < nodeCount; i++)
     {
       var name = groupOf[i];
@@ -149,7 +149,7 @@ internal sealed class ProcNodeStyle
   /// <param name="sources">Scratch buffer for candidate source nodes.</param>
   /// <param name="targets">Scratch buffer for eligible growth targets.</param>
   /// <param name="strict">When true, secret, one-way and conditional relationships are skipped.</param>
-  /// <returns>Amount of nodes grouped by this call.</returns>
+  /// <returns>Number of nodes grouped by this call.</returns>
   private int GrowCycle(
     List<(int Target, int EdgeIndex)>[] adjacency,
     List<int> idOrder,
@@ -291,7 +291,7 @@ internal sealed class ProcNodeStyle
       if (capacity[groupIndex] > 0) underCapacity.Add(groupIndex);
     }
 
-    // The split guarantees spare capacity equals ungrouped count; anything else is a bug.
+    // The split guarantees spare capacity equals the ungrouped count; anything else is a bug.
     if (ungrouped.Count == 0 || underCapacity.Count == 0)
       throw new InvalidOperationException("No group has spare capacity while nodes remain ungrouped.");
 
@@ -375,7 +375,7 @@ internal sealed class ProcNodeStyle
   /// <summary>
   /// Builds the group names <c>g1..gK</c>, zero-padded to the width of <paramref name="groupCount"/>.
   /// </summary>
-  /// <param name="groupCount">Actual amount of groups; at least 1.</param>
+  /// <param name="groupCount">Actual number of groups; at least 1.</param>
   /// <returns>One name per group index.</returns>
   private string[] BuildGroupNames(int groupCount)
   {
@@ -393,8 +393,8 @@ internal sealed class ProcNodeStyle
   /// Splits <paramref name="nodeCount"/> nodes into random positive per-group targets
   /// that sum up to the node count exactly.
   /// </summary>
-  /// <param name="nodeCount">Amount of nodes to distribute; at least 1.</param>
-  /// <param name="groupCount">Amount of groups; between 1 and <paramref name="nodeCount"/>.</param>
+  /// <param name="nodeCount">Number of nodes to distribute; at least 1.</param>
+  /// <param name="groupCount">Number of groups; between 1 and <paramref name="nodeCount"/>.</param>
   /// <returns>One positive target per group, summing to <paramref name="nodeCount"/>.</returns>
   private int[] SampleGroupCounts(int nodeCount, int groupCount)
   {

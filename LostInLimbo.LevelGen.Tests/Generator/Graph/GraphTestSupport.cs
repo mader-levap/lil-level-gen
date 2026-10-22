@@ -84,7 +84,7 @@ internal static class GraphTestSupport
   /// </summary>
   /// <param name="graph">Graph to inspect.</param>
   /// <param name="includeSecretEdges">
-  /// When false, secret relationships (appended by the finalisation pass) do not count -
+  /// When false, secret relationships (appended by the finalization pass) do not count -
   /// useful for asserting builder-owned degree caps.
   /// </param>
   /// <returns>Relationship count per node; zero for node-less graphs.</returns>

@@ -223,7 +223,7 @@ public sealed class GenerationStatusStoreTests
       var store = new GenerationStatusStore();
       var initialClaimId = store.ClaimId;
 
-      // Act: One refused claim (already running) and two successful claims with a publish between.
+      // Act: One refused claim (already running) and two successful claims with a publish between them.
       Assert.True(store.TryBeginRun());
       var firstClaimId = store.ClaimId;
       Assert.False(store.TryBeginRun()); // Refused: must not bump the id.
@@ -422,7 +422,7 @@ public sealed class GenerationStatusStoreTests
           if (claimed) store.Publish(new GenerationStatus { Result = EnGenResult.Finished });
         });
 
-        // Act: Wait until both racers finished.
+        // Act: Wait until both racers have finished.
         await Task.WhenAll(clearTask, claimTask);
 
         if (cleared)

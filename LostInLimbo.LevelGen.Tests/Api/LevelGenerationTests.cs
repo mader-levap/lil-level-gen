@@ -27,7 +27,7 @@ public sealed class LevelGenerationTests
   /// The sleep is split evenly across the placeholder steps (100 ms per step by default).
   /// </summary>
   /// <param name="sleep">Total ms the generator should sleep instead of doing generation.</param>
-  /// <param name="failAtStart">If true, generator fails at start.</param>
+  /// <param name="failAtStart">If true, the generator fails at start.</param>
   /// <param name="steps">How many placeholder steps the generation is split into.</param>
   private static CnfLevelGeneration Config(int sleep = 1000, bool failAtStart = false, int steps = CnfDebug.DefaultPlaceholderSteps)
   {
@@ -786,7 +786,7 @@ public sealed class LevelGenerationTests
 
       try
       {
-        // Act: Hold the claim window open until the racer reached its Cancel call, then give it
+        // Act: Hold the claim window open until the racer reaches its Cancel call, then give it
         // time to execute Cancel inside that window.
         LevelGeneration.AfterClaimTestHook = () =>
         {
@@ -795,7 +795,7 @@ public sealed class LevelGenerationTests
         };
         var cancelTask = Task.Run(() =>
         {
-          // Wait until the claim of the new run made the store report Running.
+          // Wait until the claim of the new run makes the store report Running.
           var deadline = Stopwatch.StartNew();
           while (LevelGeneration.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
             Thread.Sleep(1);
@@ -849,7 +849,7 @@ public sealed class LevelGenerationTests
 
       try
       {
-        // Act: Hold the claim window open until the racer reached its Cancel call, then give it
+        // Act: Hold the claim window open until the racer reaches its Cancel call, then give it
         // time to execute Cancel inside that window.
         LevelGeneration.AfterClaimTestHook = () =>
         {
@@ -858,7 +858,7 @@ public sealed class LevelGenerationTests
         };
         var cancelTask = Task.Run(() =>
         {
-          // Wait until the claim of the resumed run made the store report Running.
+          // Wait until the claim of the resumed run makes the store report Running.
           var deadline = Stopwatch.StartNew();
           while (LevelGeneration.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
             Thread.Sleep(1);
@@ -911,7 +911,7 @@ public sealed class LevelGenerationTests
 
       try
       {
-        // Act: Hold the claim window open until the racer reached its Pause call, then give it
+        // Act: Hold the claim window open until the racer reaches its Pause call, then give it
         // time to execute Pause inside that window.
         LevelGeneration.AfterClaimTestHook = () =>
         {
@@ -920,7 +920,7 @@ public sealed class LevelGenerationTests
         };
         var pauseTask = Task.Run(() =>
         {
-          // Wait until the claim of the new run made the store report Running.
+          // Wait until the claim of the new run makes the store report Running.
           var deadline = Stopwatch.StartNew();
           while (LevelGeneration.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
             Thread.Sleep(1);

@@ -11,10 +11,10 @@ namespace LostInLimbo.LevelGen.Data.Utils.Geometry;
 public record struct LilPoint(int X, int Y, int Z)
 {
   /// <summary>
-  /// Move point in given direction.
+  /// Move the point in the given direction.
   /// </summary>
-  /// <param name="dimension">Dimension.</param>
-  /// <param name="amount">Amount.</param>
+  /// <param name="dimension">The dimension.</param>
+  /// <param name="amount">The amount.</param>
   public void Move(EnDimension dimension, int amount)
   {
     switch (dimension)

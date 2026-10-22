@@ -38,7 +38,7 @@ public sealed class CnfGeneralTests
   [Fact]
   public void Validate_WithDefaultInstance_DoesNotThrow()
   {
-    // Arrange/Act: The default instance uses the default seed and corruption.
+    // Arrange/Act: The default instance uses the default seed and degeneration.
     var general = CnfGeneral.Default;
 
     // Assert: No invariant is violated, so validation completes normally.
