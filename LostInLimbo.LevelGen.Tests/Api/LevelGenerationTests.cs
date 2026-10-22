@@ -7,15 +7,13 @@ using LostInLimbo.LevelGen.Data.Status;
 namespace LostInLimbo.LevelGen.Tests.Api;
 
 /// <summary>
-/// Tests the static level generation API end to end, grouped into suites by command
+/// Tests the level generation session API end to end, grouped into suites by command
 /// (Start, Resume, Pause, Cancel, Clear) plus a suite for the command races.
 /// </summary>
 /// <remarks>
-/// The API keeps global state, so every suite is pinned to the
-/// <c>LevelGenerationApi</c> xunit collection: the suites never run in parallel with
-/// each other, and every test ends at a terminal state. Each suite's
-/// <see cref="IDisposable.Dispose"/> restores pristine state for the next test, so
-/// order and suite selection do not matter.
+/// Every test method gets a fresh <see cref="LevelGenerationSession"/> (xunit constructs a new
+/// test-class instance per test), so each test starts from the pristine never-ran state with
+/// no teardown, no shared global state, and no dependence on test order or suite selection.
 /// </remarks>
 public sealed class LevelGenerationTests
 {
@@ -48,11 +46,11 @@ public sealed class LevelGenerationTests
   /// </summary>
   private static CnfLevelGeneration InFlightConfig() => Config(sleep: 5_000, steps: 50);
 
-  /// <summary>Polls until no run is in flight; fails the test on timeout.</summary>
-  private static void WaitForTerminal()
+  /// <summary>Polls the given session until no run is in flight; fails the test on timeout.</summary>
+  private static void WaitForTerminal(LevelGenerationSession session)
   {
     var stopwatch = Stopwatch.StartNew();
-    while (LevelGeneration.Status().Result == EnGenResult.Running)
+    while (session.Status().Result == EnGenResult.Running)
     {
       if (stopwatch.Elapsed > TerminalTimeout)
         Assert.Fail($"Generation did not reach a terminal state within {TerminalTimeout}.");
@@ -60,83 +58,66 @@ public sealed class LevelGenerationTests
     }
   }
 
-  /// <summary>Restores pristine state so the next test starts from None with no world.</summary>
-  private static void ResetState()
-  {
-    // Clear every test seam first: a hook left behind by a failed test must never fire in a
-    // later test's commands.
-    LevelGeneration.AfterClaimTestHook = null;
-    LevelGeneration.BeforeClearPauseTestHook = null;
-    LevelGeneration.WorldSampleTestHook = null;
-    WaitForTerminal();
-    LevelGeneration.Clear();
-  }
-
   /// <summary>Tests the pristine never-ran state exposed before any command runs.</summary>
-  [Collection("LevelGenerationApi")]
-  public sealed class InitialStateTests : IDisposable
+  public sealed class InitialStateTests
   {
-    /// <inheritdoc cref="ResetState"/>
-    public void Dispose() => ResetState();
+    private readonly LevelGenerationSession _session = new();
 
     [Fact]
     public void Status_BeforeAnyRun_ReportsNoneWithNullWorld()
     {
-      // Arrange: Pristine state guaranteed by the previous test's Dispose (or by being
-      // the first test in a fresh process; both end at the same never-ran state).
+      // Arrange: A fresh session starts in the never-ran state.
 
-      // Assert: The API reports the never-ran status and exposes no world.
-      Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
-      Assert.Null(LevelGeneration.Status().Error);
-      Assert.Null(LevelGeneration.World());
+      // Assert: The session reports the never-ran status and exposes no world.
+      Assert.Equal(EnGenResult.None, _session.Status().Result);
+      Assert.Null(_session.Status().Error);
+      Assert.Null(_session.World());
     }
   }
 
-  /// <summary>Tests <see cref="LevelGeneration.Start(EnRunKind, CnfLevelGeneration, CancellationToken)"/>: claims, validation and start failures.</summary>
-  [Collection("LevelGenerationApi")]
-  public sealed class StartTests : IDisposable
+  /// <summary>Tests <see cref="LevelGenerationSession.Start(EnRunKind, CnfLevelGeneration, CancellationToken)"/>: claims, validation and start failures.</summary>
+  public sealed class StartTests
   {
-    /// <inheritdoc cref="ResetState"/>
-    public void Dispose() => ResetState();
+    private readonly LevelGenerationSession _session = new();
 
     [Fact]
     public void Start_WithStepKind_ReportsRunningWorldNull_ThenPausedWorldVisible()
     {
-      // Arrange: Pristine state guaranteed by the previous test's Dispose.
+      // Arrange: Fresh session in its never-ran state.
 
       // Act: Start a stepwise run.
-      var started = LevelGeneration.Start(EnRunKind.Step, Config());
+      var started = _session.Start(EnRunKind.Step, Config());
 
       // Assert: The run is in flight and its world stays hidden while being mutated.
       Assert.True(started);
-      Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
-      Assert.Null(LevelGeneration.World());
+      Assert.Equal(EnGenResult.Running, _session.Status().Result);
+      Assert.Null(_session.World());
 
       // Act: Wait for the placeholder work to end.
-      WaitForTerminal();
+      WaitForTerminal(_session);
 
       // Assert: A paused run exposes its partial world.
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
+      Assert.NotNull(_session.World());
     }
 
     [Fact]
     public void Start_WhileRunIsInProgress_ReturnsFalse()
     {
       // Arrange: A run is already in flight.
-      Assert.True(LevelGeneration.Start(EnRunKind.Step, Config()));
+      Assert.True(_session.Start(EnRunKind.Step, Config()));
 
       // Act: Attempting to start a second run.
-      var startedAgain = LevelGeneration.Start(EnRunKind.All, Config());
+      var startedAgain = _session.Start(EnRunKind.All, Config());
 
       // Assert: The second start is refused while the first run holds the claim.
       Assert.False(startedAgain);
 
       // Act: Let the first run finish.
-      WaitForTerminal();
+      WaitForTerminal(_session);
 
       // Assert: Only the first run ever executed.
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
     }
 
     [Fact]
@@ -149,15 +130,15 @@ public sealed class LevelGenerationTests
       };
 
       // Act/Assert: Start validates the config before claiming the run.
-      Assert.Throws<ArgumentOutOfRangeException>(() => LevelGeneration.Start(EnRunKind.All, invalid));
+      Assert.Throws<ArgumentOutOfRangeException>(() => _session.Start(EnRunKind.All, invalid));
 
       // Assert: The failed call left no claim behind.
-      Assert.NotEqual(EnGenResult.Running, LevelGeneration.Status().Result);
+      Assert.NotEqual(EnGenResult.Running, _session.Status().Result);
 
       // Assert: A subsequent valid start still works.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config()));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, Config()));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
     }
 
     [Fact]
@@ -165,11 +146,11 @@ public sealed class LevelGenerationTests
     {
       // Act/Assert: A null config is rejected before the run is claimed.
       var exception = Assert.Throws<ArgumentNullException>(
-        () => LevelGeneration.Start(EnRunKind.All, null!));
+        () => _session.Start(EnRunKind.All, null!));
 
       // Assert: The exception names the parameter and no claim was taken.
       Assert.Equal("config", exception.ParamName);
-      Assert.NotEqual(EnGenResult.Running, LevelGeneration.Status().Result);
+      Assert.NotEqual(EnGenResult.Running, _session.Status().Result);
     }
 
     [Fact]
@@ -180,11 +161,11 @@ public sealed class LevelGenerationTests
 
       // Act/Assert: Validation rejects the step count naming the offending parameter.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => LevelGeneration.Start(EnRunKind.All, invalid));
+        () => _session.Start(EnRunKind.All, invalid));
 
       // Assert: The failed call left no claim behind.
       Assert.Equal("PlaceholderSteps", exception.ParamName);
-      Assert.NotEqual(EnGenResult.Running, LevelGeneration.Status().Result);
+      Assert.NotEqual(EnGenResult.Running, _session.Status().Result);
     }
 
     [Fact]
@@ -194,87 +175,85 @@ public sealed class LevelGenerationTests
       var config = Config(failAtStart: true);
 
       // Act: Start the run and wait for the failure.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, config));
-      WaitForTerminal();
+      Assert.True(_session.Start(EnRunKind.All, config));
+      WaitForTerminal(_session);
 
       // Assert: The error is reported with details and the partial world stays hidden.
-      Assert.Equal(EnGenResult.Error, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.Status().Error);
-      Assert.Null(LevelGeneration.World());
+      Assert.Equal(EnGenResult.Error, _session.Status().Result);
+      Assert.NotNull(_session.Status().Error);
+      Assert.Null(_session.World());
     }
 
     [Fact]
     public void Start_AfterErrorRun_Succeeds()
     {
       // Arrange: A failed run; Error is terminal but a fresh Start may claim a new run.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(failAtStart: true)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Error, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, Config(failAtStart: true)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Error, _session.Status().Result);
 
       // Act: Starting a fresh run after the failure.
-      var started = LevelGeneration.Start(EnRunKind.All, Config(sleep: 0));
+      var started = _session.Start(EnRunKind.All, Config(sleep: 0));
 
       // Assert: The fresh run completes normally and replaces the failed run's state.
       Assert.True(started);
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.Null(LevelGeneration.Status().Error);
-      Assert.NotNull(LevelGeneration.World());
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.Null(_session.Status().Error);
+      Assert.NotNull(_session.World());
     }
   }
 
-  /// <summary>Tests <see cref="LevelGeneration.Resume(EnRunKind)"/>: stepwise and whole-level resumes.</summary>
-  [Collection("LevelGenerationApi")]
-  public sealed class ResumeTests : IDisposable
+  /// <summary>Tests <see cref="LevelGenerationSession.Resume(EnRunKind)"/>: stepwise and whole-level resumes.</summary>
+  public sealed class ResumeTests
   {
-    /// <inheritdoc cref="ResetState"/>
-    public void Dispose() => ResetState();
+    private readonly LevelGenerationSession _session = new();
 
     [Fact]
     public void Start_WithStepKind_ThenResumeWithAllKind_Finishes()
     {
       // Arrange: A stepwise run paused after its first segment.
-      Assert.True(LevelGeneration.Start(EnRunKind.Step, Config()));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.Step, Config()));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
 
       // Act: Resume as a full run.
-      var resumed = LevelGeneration.Resume(EnRunKind.All);
+      var resumed = _session.Resume(EnRunKind.All);
 
       // Assert: Resume honors the new run kind and completes the level.
       Assert.True(resumed);
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.NotNull(_session.World());
 
       // Assert: Resuming an already finished run is refused.
-      Assert.False(LevelGeneration.Resume(EnRunKind.Step));
+      Assert.False(_session.Resume(EnRunKind.Step));
     }
 
     [Fact]
     public void Resume_WithStepKind_RepeatedlyEventuallyFinishes()
     {
       // Arrange: A stepwise run over a three-step placeholder level.
-      Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 0, steps: 3)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.Step, Config(sleep: 0, steps: 3)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
 
       // Act: Resume one step at a time until no step remains (guard against an endless pause).
       var resumes = 0;
-      while (LevelGeneration.Status().Result == EnGenResult.Paused && resumes < 10)
+      while (_session.Status().Result == EnGenResult.Paused && resumes < 10)
       {
-        Assert.True(LevelGeneration.Resume(EnRunKind.Step));
-        WaitForTerminal();
+        Assert.True(_session.Resume(EnRunKind.Step));
+        WaitForTerminal(_session);
         resumes++;
       }
 
       // Assert: Three steps total, so the start plus two resumes finished the level.
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
       Assert.Equal(2, resumes);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.NotNull(_session.World());
 
       // Assert: The result data counted every completed step.
-      Assert.Equal(3L, LevelGeneration.World()!.Stats.Steps);
+      Assert.Equal(3L, _session.World()!.Stats.Steps);
     }
 
     [Fact]
@@ -282,188 +261,184 @@ public sealed class LevelGenerationTests
     {
       // Arrange: A whole-level run over a 100 ms-per-step placeholder level, long enough to
       // pause into but short enough that the resumed remainder still finishes well in time.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 1000, steps: 10)));
+      Assert.True(_session.Start(EnRunKind.All, Config(sleep: 1000, steps: 10)));
 
       // Act: Pause the run, wait for the boundary to be observed.
-      Assert.True(LevelGeneration.Pause());
-      WaitForTerminal();
+      Assert.True(_session.Pause());
+      WaitForTerminal(_session);
 
       // Assert: The whole-level run paused with its partial world preserved.
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
+      Assert.NotNull(_session.World());
 
       // Act: Resume the paused generation as a whole-level run again.
-      var resumed = LevelGeneration.Resume(EnRunKind.All);
+      var resumed = _session.Resume(EnRunKind.All);
 
       // Assert: The resumed run completes the level from where the pause stopped it.
       Assert.True(resumed);
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
-      Assert.Equal(10L, LevelGeneration.World()!.Stats.Steps);
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.NotNull(_session.World());
+      Assert.Equal(10L, _session.World()!.Stats.Steps);
     }
 
     [Fact]
     public void Resume_AfterErrorRun_ReturnsFalse()
     {
       // Arrange: A failed run; only a paused run can be resumed.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(failAtStart: true)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Error, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, Config(failAtStart: true)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Error, _session.Status().Result);
 
       // Act: Attempting to resume the failed run.
-      var resumed = LevelGeneration.Resume(EnRunKind.All);
+      var resumed = _session.Resume(EnRunKind.All);
 
       // Assert: Resuming is refused because failed runs cannot be continued, and the
       // error state is left untouched.
       Assert.False(resumed);
-      Assert.Equal(EnGenResult.Error, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.Status().Error);
+      Assert.Equal(EnGenResult.Error, _session.Status().Result);
+      Assert.NotNull(_session.Status().Error);
     }
   }
 
-  /// <summary>Tests <see cref="LevelGeneration.Pause()"/>: accepted pauses and no-op refusals.</summary>
-  [Collection("LevelGenerationApi")]
-  public sealed class PauseTests : IDisposable
+  /// <summary>Tests <see cref="LevelGenerationSession.Pause()"/>: accepted pauses and no-op refusals.</summary>
+  public sealed class PauseTests
   {
-    /// <inheritdoc cref="ResetState"/>
-    public void Dispose() => ResetState();
+    private readonly LevelGenerationSession _session = new();
 
     [Fact]
     public void Pause_WhileRunningAllKind_PublishesPausedAndWorldVisible()
     {
       // Arrange: A whole-level run long enough that it cannot finish before it is paused.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
-      Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, InFlightConfig()));
+      Assert.Equal(EnGenResult.Running, _session.Status().Result);
 
       // Act: Request pause of the in-flight whole-level run.
-      var paused = LevelGeneration.Pause();
+      var paused = _session.Pause();
 
       // Assert: The run accepted the pause and reports it as its terminal state.
       Assert.True(paused);
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
 
       // Assert: Pausing is not an error and the partial world is preserved for inspection.
-      Assert.Null(LevelGeneration.Status().Error);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.Null(_session.Status().Error);
+      Assert.NotNull(_session.World());
     }
 
     [Fact]
     public void Pause_WhenNoRunIsInFlight_ReturnsFalse()
     {
-      // Arrange: Pristine state with no run at all.
-      Assert.False(LevelGeneration.Pause());
+      // Arrange: Fresh session with no run at all.
+      Assert.False(_session.Pause());
 
       // Act: Pausing after the run already reached a terminal state (finished run arranged below).
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      var paused = LevelGeneration.Pause();
+      Assert.True(_session.Start(EnRunKind.All, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      var paused = _session.Pause();
 
       // Assert: The call is a no-op and does not disturb the finished run.
       Assert.False(paused);
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.NotNull(_session.World());
     }
 
     [Fact]
     public void Pause_AfterFinished_ReturnsFalse()
     {
       // Arrange: A completed run with a visible world.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
 
       // Act: Attempting to pause the finished run.
-      var paused = LevelGeneration.Pause();
+      var paused = _session.Pause();
 
       // Assert: There is nothing left to pause and the terminal state stands.
       Assert.False(paused);
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.NotNull(_session.World());
     }
 
     [Fact]
     public void Pause_AfterCancelledRun_ReturnsFalse()
     {
       // Arrange: A cancelled run; cancelled is terminal.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
-      Assert.True(LevelGeneration.Cancel());
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, InFlightConfig()));
+      Assert.True(_session.Cancel());
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
 
       // Act: Attempting to pause the cancelled run.
-      var paused = LevelGeneration.Pause();
+      var paused = _session.Pause();
 
       // Assert: There is nothing left to pause and the terminal state stands.
       Assert.False(paused);
-      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+      Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
     }
   }
 
-  /// <summary>Tests <see cref="LevelGeneration.Cancel()"/>: accepted cancellations, token cancellation and post-cancel recovery.</summary>
-  [Collection("LevelGenerationApi")]
-  public sealed class CancelTests : IDisposable
+  /// <summary>Tests <see cref="LevelGenerationSession.Cancel()"/>: accepted cancellations, token cancellation and post-cancel recovery.</summary>
+  public sealed class CancelTests
   {
-    /// <inheritdoc cref="ResetState"/>
-    public void Dispose() => ResetState();
+    private readonly LevelGenerationSession _session = new();
 
     [Fact]
     public void Cancel_WhileRunning_PublishesCancelledWorldNullErrorNull()
     {
       // Arrange: A run long enough that it cannot finish before it is cancelled.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
-      Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, InFlightConfig()));
+      Assert.Equal(EnGenResult.Running, _session.Status().Result);
 
       // Act: Request cancellation of the in-flight run.
-      var cancelled = LevelGeneration.Cancel();
+      var cancelled = _session.Cancel();
 
       // Assert: The run accepted the cancellation and reports it as its terminal state.
       Assert.True(cancelled);
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
 
       // Assert: Cancellation is not an error and the partial world is discarded.
-      Assert.Null(LevelGeneration.Status().Error);
-      Assert.Null(LevelGeneration.World());
+      Assert.Null(_session.Status().Error);
+      Assert.Null(_session.World());
     }
 
     [Fact]
     public void Cancel_WhenNoRunIsInFlight_ReturnsFalse()
     {
-      // Arrange: Pristine state with no run at all.
-      Assert.False(LevelGeneration.Cancel());
+      // Arrange: Fresh session with no run at all.
+      Assert.False(_session.Cancel());
 
       // Arrange: A completed run with a visible world.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
 
       // Act: Cancelling after the run already reached a terminal state.
-      var cancelled = LevelGeneration.Cancel();
+      var cancelled = _session.Cancel();
 
       // Assert: The call is a no-op and does not disturb the finished run.
       Assert.False(cancelled);
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.NotNull(_session.World());
     }
 
     [Fact]
     public void Cancel_AfterPausedRun_ReturnsFalse()
     {
       // Arrange: A paused run; it is no longer in flight, so there is nothing to cancel.
-      Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 0)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.Step, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
 
       // Act: Cancelling the paused run.
-      var cancelled = LevelGeneration.Cancel();
+      var cancelled = _session.Cancel();
 
       // Assert: The call is a no-op; cancelling a paused run goes through a fresh Start.
       Assert.False(cancelled);
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
+      Assert.NotNull(_session.World());
     }
 
     [Fact]
@@ -474,14 +449,14 @@ public sealed class LevelGenerationTests
       cancellationTokenSource.Cancel();
 
       // Act: Start the run with the cancelled token.
-      var started = LevelGeneration.Start(EnRunKind.All, InFlightConfig(), cancellationTokenSource.Token);
+      var started = _session.Start(EnRunKind.All, InFlightConfig(), cancellationTokenSource.Token);
 
       // Assert: The run is accepted, then ends at its first checkpoint instead of generating.
       Assert.True(started);
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
-      Assert.Null(LevelGeneration.Status().Error);
-      Assert.Null(LevelGeneration.World());
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
+      Assert.Null(_session.Status().Error);
+      Assert.Null(_session.World());
     }
 
     [Fact]
@@ -489,195 +464,191 @@ public sealed class LevelGenerationTests
     {
       // Arrange: A caller-owned token linked into the run.
       using var cancellationTokenSource = new CancellationTokenSource();
-      Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig(), cancellationTokenSource.Token));
-      Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, InFlightConfig(), cancellationTokenSource.Token));
+      Assert.Equal(EnGenResult.Running, _session.Status().Result);
 
-      // Act: The caller cancels through its own token, not through LevelGeneration.Cancel().
+      // Act: The caller cancels through its own token, not through the session's Cancel().
       cancellationTokenSource.Cancel();
 
       // Assert: The linked source forwards the cancellation to the run.
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
-      Assert.Null(LevelGeneration.World());
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
+      Assert.Null(_session.World());
     }
 
     [Fact]
     public void Resume_AfterCancelledRun_ReturnsFalse()
     {
       // Arrange: A cancelled run. Cancelled is terminal, so only a fresh Start is allowed.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
-      Assert.True(LevelGeneration.Cancel());
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, InFlightConfig()));
+      Assert.True(_session.Cancel());
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
 
       // Act: Attempting to resume the cancelled run.
-      var resumed = LevelGeneration.Resume(EnRunKind.All);
+      var resumed = _session.Resume(EnRunKind.All);
 
       // Assert: Resuming is refused because cancelled runs cannot be continued.
       Assert.False(resumed);
-      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+      Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
     }
 
     [Fact]
     public void Start_AfterCancelledRun_Succeeds()
     {
       // Arrange: A cancelled run that discarded its partial data.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
-      Assert.True(LevelGeneration.Cancel());
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, InFlightConfig()));
+      Assert.True(_session.Cancel());
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
 
       // Act: Starting a fresh run after the cancellation.
-      var started = LevelGeneration.Start(EnRunKind.All, Config(sleep: 0));
+      var started = _session.Start(EnRunKind.All, Config(sleep: 0));
 
       // Assert: The fresh run completes normally and produces a world again.
       Assert.True(started);
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.NotNull(_session.World());
     }
   }
 
-  /// <summary>Tests <see cref="LevelGeneration.Clear()"/>: resets of idle, running and terminal state.</summary>
-  [Collection("LevelGenerationApi")]
-  public sealed class ClearTests : IDisposable
+  /// <summary>Tests <see cref="LevelGenerationSession.Clear()"/>: resets of idle, running and terminal state.</summary>
+  public sealed class ClearTests
   {
-    /// <inheritdoc cref="ResetState"/>
-    public void Dispose() => ResetState();
+    private readonly LevelGenerationSession _session = new();
 
     [Fact]
     public void Clear_WhenIdle_RestoresPristineState()
     {
       // Arrange: A completed run with a visible world.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config()));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.True(_session.Start(EnRunKind.All, Config()));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.NotNull(_session.World());
 
-      // Act: Clear the static API.
-      var cleared = LevelGeneration.Clear();
+      // Act: Clear the session.
+      var cleared = _session.Clear();
 
       // Assert: Back to the never-ran state.
       Assert.True(cleared);
-      Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
-      Assert.Null(LevelGeneration.Status().Error);
-      Assert.Null(LevelGeneration.World());
+      Assert.Equal(EnGenResult.None, _session.Status().Result);
+      Assert.Null(_session.Status().Error);
+      Assert.Null(_session.World());
     }
 
     [Fact]
     public void Clear_WhileRunning_PausesStopsAndClears()
     {
       // Arrange: A whole-level run long enough that it cannot finish before it is cleared.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
-      Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, InFlightConfig()));
+      Assert.Equal(EnGenResult.Running, _session.Status().Result);
 
-      // Act: Clear the API while the run is in flight.
-      var cleared = LevelGeneration.Clear();
+      // Act: Clear the session while the run is in flight.
+      var cleared = _session.Clear();
 
       // Assert: The run was paused, stopped, and the state was reset to pristine.
       Assert.True(cleared);
-      Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
-      Assert.Null(LevelGeneration.Status().Error);
-      Assert.Null(LevelGeneration.World());
+      Assert.Equal(EnGenResult.None, _session.Status().Result);
+      Assert.Null(_session.Status().Error);
+      Assert.Null(_session.World());
     }
 
     [Fact]
     public void Clear_WhileRunning_WithZeroTimeout_ReturnsFalseAndKeepsState()
     {
       // Arrange: A whole-level run whose first step is still sleeping.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
-      Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, InFlightConfig()));
+      Assert.Equal(EnGenResult.Running, _session.Status().Result);
 
       // Act: Clear with no patience for the in-flight run.
-      var cleared = LevelGeneration.Clear(TimeSpan.Zero);
+      var cleared = _session.Clear(TimeSpan.Zero);
 
       // Assert: Nothing was cleared; the run is still in flight (or just paused).
       Assert.False(cleared);
-      Assert.NotEqual(EnGenResult.None, LevelGeneration.Status().Result);
+      Assert.NotEqual(EnGenResult.None, _session.Status().Result);
 
       // Act: The pause request landed, so the run stops on its own; clear again without rush.
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
-      var clearedAfterStop = LevelGeneration.Clear();
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
+      var clearedAfterStop = _session.Clear();
 
       // Assert: With the worker stopped, clearing succeeds.
       Assert.True(clearedAfterStop);
-      Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
-      Assert.Null(LevelGeneration.World());
+      Assert.Equal(EnGenResult.None, _session.Status().Result);
+      Assert.Null(_session.World());
     }
 
-  [Fact]
-  public void Clear_OnTerminalRun_WithZeroTimeout_Clears()
-  {
-    // Arrange: A completed run that is terminal but not yet cleared.
-    Assert.True(LevelGeneration.Start(EnRunKind.All, Config()));
-    WaitForTerminal();
-    Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+    [Fact]
+    public void Clear_OnTerminalRun_WithZeroTimeout_Clears()
+    {
+      // Arrange: A completed run that is terminal but not yet cleared.
+      Assert.True(_session.Start(EnRunKind.All, Config()));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
 
-    // Act: Clear the settled state with no patience.
-    var cleared = LevelGeneration.Clear(TimeSpan.Zero);
+      // Act: Clear the settled state with no patience.
+      var cleared = _session.Clear(TimeSpan.Zero);
 
-    // Assert: Zero timeout only refuses an in-flight run; an already terminal state clears.
-    Assert.True(cleared);
-    Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
-    Assert.Null(LevelGeneration.World());
-  }
+      // Assert: Zero timeout only refuses an in-flight run; an already terminal state clears.
+      Assert.True(cleared);
+      Assert.Equal(EnGenResult.None, _session.Status().Result);
+      Assert.Null(_session.World());
+    }
 
-  [Fact]
-  public void Clear_WithNegativeTimeout_ThrowsArgumentOutOfRangeException()
+    [Fact]
+    public void Clear_WithNegativeTimeout_ThrowsArgumentOutOfRangeException()
     {
       // Act/Assert: A negative timeout is rejected before any state is touched.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => LevelGeneration.Clear(TimeSpan.FromMilliseconds(-1)));
+        () => _session.Clear(TimeSpan.FromMilliseconds(-1)));
       Assert.Equal("timeout", exception.ParamName);
-      Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
+      Assert.Equal(EnGenResult.None, _session.Status().Result);
     }
 
     [Fact]
     public void Clear_AfterCancelledRun_ClearsState()
     {
       // Arrange: A cancelled run; cancelled is terminal but not yet cleared.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
-      Assert.True(LevelGeneration.Cancel());
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, InFlightConfig()));
+      Assert.True(_session.Cancel());
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
 
       // Act: Clear the terminal-but-dirty state.
-      var cleared = LevelGeneration.Clear();
+      var cleared = _session.Clear();
 
       // Assert: Back to pristine, with no lingering error or world.
       Assert.True(cleared);
-      Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
-      Assert.Null(LevelGeneration.Status().Error);
-      Assert.Null(LevelGeneration.World());
+      Assert.Equal(EnGenResult.None, _session.Status().Result);
+      Assert.Null(_session.Status().Error);
+      Assert.Null(_session.World());
     }
 
     [Fact]
     public void Start_AfterClear_Succeeds()
     {
       // Arrange: A paused run with a partial world, then cleared.
-      Assert.True(LevelGeneration.Start(EnRunKind.Step, Config()));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
-      Assert.True(LevelGeneration.Clear());
+      Assert.True(_session.Start(EnRunKind.Step, Config()));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
+      Assert.True(_session.Clear());
 
       // Act: Starting a fresh run after the clear.
-      var started = LevelGeneration.Start(EnRunKind.All, Config(sleep: 0));
+      var started = _session.Start(EnRunKind.All, Config(sleep: 0));
 
       // Assert: The fresh run completes normally from scratch.
       Assert.True(started);
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.NotNull(_session.World());
     }
   }
 
   /// <summary>Tests command races through the test seams: Clear/Start, Cancel/Pause during claim windows and World sampling.</summary>
-  [Collection("LevelGenerationApi")]
-  public sealed class RaceTests : IDisposable
+  public sealed class RaceTests
   {
-    /// <inheritdoc cref="ResetState"/>
-    public void Dispose() => ResetState();
+    private readonly LevelGenerationSession _session = new();
 
     [Fact]
     public async Task Clear_And_Start_WhenRaced_NeverLeaveInconsistentState()
@@ -695,12 +666,12 @@ public sealed class LevelGenerationTests
         var startTask = Task.Run(() =>
         {
           barrier.SignalAndWait();
-          started = LevelGeneration.Start(EnRunKind.All, Config(sleep: 100));
+          started = _session.Start(EnRunKind.All, Config(sleep: 100));
         });
         var clearTask = Task.Run(() =>
         {
           barrier.SignalAndWait();
-          cleared = LevelGeneration.Clear(TimeSpan.Zero);
+          cleared = _session.Clear(TimeSpan.Zero);
         });
         await Task.WhenAll(startTask, clearTask);
 
@@ -708,32 +679,32 @@ public sealed class LevelGenerationTests
         Assert.True(started);
 
         // Act: Let whatever run won the race reach its terminal state.
-        WaitForTerminal();
-        var result = LevelGeneration.Status().Result;
+        WaitForTerminal(_session);
+        var result = _session.Status().Result;
 
         // Assert: Any stable state must expose its world - a state that reports Finished or
         // Paused with a null world means Clear wiped the run's generator mid-flight.
         if (result is EnGenResult.Finished or EnGenResult.Paused)
-          Assert.NotNull(LevelGeneration.World());
+          Assert.NotNull(_session.World());
 
         // Assert: The winning run's state is coherent with what the clear could have done.
         Assert.True(result is EnGenResult.Finished or EnGenResult.Paused,
           $"Unexpected terminal state {result} after clear={cleared}, start={started}.");
 
         // Act: Settle back to pristine for the next iteration.
-        var settled = LevelGeneration.Clear();
+        var settled = _session.Clear();
 
         // Assert: Once the run reached a terminal state, clearing always succeeds.
         Assert.True(settled);
-        Assert.Equal(EnGenResult.None, LevelGeneration.Status().Result);
-        Assert.Null(LevelGeneration.World());
+        Assert.Equal(EnGenResult.None, _session.Status().Result);
+        Assert.Null(_session.World());
       }
 
       // Assert: After the storm, a full run still starts and completes normally.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.True(_session.Start(EnRunKind.All, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.NotNull(_session.World());
     }
 
     [Fact]
@@ -741,20 +712,20 @@ public sealed class LevelGenerationTests
     {
       // Arrange: A long-running first run; Clear runs in the background, so it pauses run 1
       // and then races its reset against the fresh Start below while run 1 stops.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, InFlightConfig()));
-      var clearTask = Task.Run(() => LevelGeneration.Clear());
+      Assert.True(_session.Start(EnRunKind.All, InFlightConfig()));
+      var clearTask = Task.Run(() => _session.Clear());
 
       // Act: Wait for the pause to stop run 1, then claim the next run while Clear is
       // between observing the terminal state and publishing the reset.
-      WaitForTerminal();
-      var startedNew = LevelGeneration.Start(EnRunKind.All, Config(sleep: 0));
+      WaitForTerminal(_session);
+      var startedNew = _session.Start(EnRunKind.All, Config(sleep: 0));
 
       // Act: Let the background clear reach its decision.
       var cleared = await clearTask.WaitAsync(TerminalTimeout);
 
       // Act: Run 2 (or the run started after a successful clear) completes on its own.
-      WaitForTerminal();
-      var result = LevelGeneration.Status().Result;
+      WaitForTerminal(_session);
+      var result = _session.Status().Result;
 
       // Assert: The fresh start was never refused: the state was non-running when claimed.
       Assert.True(startedNew);
@@ -763,11 +734,11 @@ public sealed class LevelGenerationTests
       // visible world. A Clear that waited out run 2 and then wiped it would end in None with
       // a null world instead.
       Assert.Equal(EnGenResult.Finished, result);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.NotNull(_session.World());
 
       // Assert: The clear either reset before the claim (startedNew then ran from scratch)
       // or correctly refused once the new claim appeared - never both disturbed states.
-      if (!cleared) Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+      if (!cleared) Assert.Equal(EnGenResult.Finished, _session.Status().Result);
     }
 
     [Fact]
@@ -775,9 +746,9 @@ public sealed class LevelGenerationTests
     {
       // Arrange: A paused run, so the previous run's cancellation source is still installed when
       // the next run claims the state.
-      Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 0)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.Step, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
 
       using var cancelReachedCall = new ManualResetEventSlim(false);
       var startReturned = false;
@@ -788,7 +759,7 @@ public sealed class LevelGenerationTests
       {
         // Act: Hold the claim window open until the racer reaches its Cancel call, then give it
         // time to execute Cancel inside that window.
-        LevelGeneration.AfterClaimTestHook = () =>
+        _session.AfterClaimTestHook = () =>
         {
           cancelReachedCall.Wait(TimeSpan.FromSeconds(5));
           Thread.Sleep(20);
@@ -797,17 +768,17 @@ public sealed class LevelGenerationTests
         {
           // Wait until the claim of the new run makes the store report Running.
           var deadline = Stopwatch.StartNew();
-          while (LevelGeneration.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
+          while (_session.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
             Thread.Sleep(1);
           cancelReachedCall.Set();
-          try { cancelReturned = LevelGeneration.Cancel(); }
+          try { cancelReturned = _session.Cancel(); }
           catch (Exception exception) { cancelFailure = exception; }
         });
-        var startTask = Task.Run(() => startReturned = LevelGeneration.Start(EnRunKind.All, Config(sleep: 2000)));
+        var startTask = Task.Run(() => startReturned = _session.Start(EnRunKind.All, Config(sleep: 2000)));
 
         // Act: Let both commands and the run they targeted settle.
         await Task.WhenAll(startTask, cancelTask);
-        WaitForTerminal();
+        WaitForTerminal(_session);
 
         // Assert: Both calls reported success, and no command threw.
         Assert.Null(cancelFailure);
@@ -817,18 +788,18 @@ public sealed class LevelGenerationTests
         // Assert: The cancellation reached the run that held the claim when Cancel ran. Cancelling
         // the previous run's retired source instead would leave this run untouched, so it would
         // run its full budget and report Finished.
-        Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
-        Assert.Null(LevelGeneration.World());
+        Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
+        Assert.Null(_session.World());
       }
       finally
       {
-        LevelGeneration.AfterClaimTestHook = null;
+        _session.AfterClaimTestHook = null;
 
-        // Act: Never leave a running state behind for Dispose, whatever the outcome above was.
-        if (LevelGeneration.Status().Result == EnGenResult.Running)
+        // Act: Never leave a running state behind, whatever the outcome above was.
+        if (_session.Status().Result == EnGenResult.Running)
         {
-          LevelGeneration.Cancel();
-          WaitForTerminal();
+          _session.Cancel();
+          WaitForTerminal(_session);
         }
       }
     }
@@ -838,9 +809,9 @@ public sealed class LevelGenerationTests
     {
       // Arrange: A paused stepwise run whose full placeholder sleep is paid on resume, so the
       // resumed segment is long enough to observe and the paused run's source is still installed.
-      Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 2000)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.Step, Config(sleep: 2000)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
 
       using var cancelReachedCall = new ManualResetEventSlim(false);
       var resumeReturned = false;
@@ -851,7 +822,7 @@ public sealed class LevelGenerationTests
       {
         // Act: Hold the claim window open until the racer reaches its Cancel call, then give it
         // time to execute Cancel inside that window.
-        LevelGeneration.AfterClaimTestHook = () =>
+        _session.AfterClaimTestHook = () =>
         {
           cancelReachedCall.Wait(TimeSpan.FromSeconds(5));
           Thread.Sleep(20);
@@ -860,17 +831,17 @@ public sealed class LevelGenerationTests
         {
           // Wait until the claim of the resumed run makes the store report Running.
           var deadline = Stopwatch.StartNew();
-          while (LevelGeneration.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
+          while (_session.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
             Thread.Sleep(1);
           cancelReachedCall.Set();
-          try { cancelReturned = LevelGeneration.Cancel(); }
+          try { cancelReturned = _session.Cancel(); }
           catch (Exception exception) { cancelFailure = exception; }
         });
-        var resumeTask = Task.Run(() => resumeReturned = LevelGeneration.Resume(EnRunKind.All));
+        var resumeTask = Task.Run(() => resumeReturned = _session.Resume(EnRunKind.All));
 
         // Act: Let both commands and the run they targeted settle.
         await Task.WhenAll(resumeTask, cancelTask);
-        WaitForTerminal();
+        WaitForTerminal(_session);
 
         // Assert: Both calls reported success, and no command threw.
         Assert.Null(cancelFailure);
@@ -879,18 +850,18 @@ public sealed class LevelGenerationTests
 
         // Assert: The cancellation reached the resumed run. Cancelling the paused run's retired
         // source instead would leave the resumed segment untouched, so it would report Finished.
-        Assert.Equal(EnGenResult.Cancelled, LevelGeneration.Status().Result);
-        Assert.Null(LevelGeneration.World());
+        Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
+        Assert.Null(_session.World());
       }
       finally
       {
-        LevelGeneration.AfterClaimTestHook = null;
+        _session.AfterClaimTestHook = null;
 
-        // Act: Never leave a running state behind for Dispose, whatever the outcome above was.
-        if (LevelGeneration.Status().Result == EnGenResult.Running)
+        // Act: Never leave a running state behind, whatever the outcome above was.
+        if (_session.Status().Result == EnGenResult.Running)
         {
-          LevelGeneration.Cancel();
-          WaitForTerminal();
+          _session.Cancel();
+          WaitForTerminal(_session);
         }
       }
     }
@@ -900,9 +871,9 @@ public sealed class LevelGenerationTests
     {
       // Arrange: A paused run, so the previous run's generator is still installed when the next
       // run claims the state.
-      Assert.True(LevelGeneration.Start(EnRunKind.Step, Config(sleep: 0)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.Step, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
 
       using var pauseReachedCall = new ManualResetEventSlim(false);
       var startReturned = false;
@@ -913,7 +884,7 @@ public sealed class LevelGenerationTests
       {
         // Act: Hold the claim window open until the racer reaches its Pause call, then give it
         // time to execute Pause inside that window.
-        LevelGeneration.AfterClaimTestHook = () =>
+        _session.AfterClaimTestHook = () =>
         {
           pauseReachedCall.Wait(TimeSpan.FromSeconds(5));
           Thread.Sleep(20);
@@ -922,17 +893,17 @@ public sealed class LevelGenerationTests
         {
           // Wait until the claim of the new run makes the store report Running.
           var deadline = Stopwatch.StartNew();
-          while (LevelGeneration.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
+          while (_session.Status().Result != EnGenResult.Running && deadline.Elapsed < TimeSpan.FromSeconds(5))
             Thread.Sleep(1);
           pauseReachedCall.Set();
-          try { pauseReturned = LevelGeneration.Pause(); }
+          try { pauseReturned = _session.Pause(); }
           catch (Exception exception) { pauseFailure = exception; }
         });
-        var startTask = Task.Run(() => startReturned = LevelGeneration.Start(EnRunKind.All, Config(sleep: 2000)));
+        var startTask = Task.Run(() => startReturned = _session.Start(EnRunKind.All, Config(sleep: 2000)));
 
         // Act: Let both commands and the run they targeted settle.
         await Task.WhenAll(startTask, pauseTask);
-        WaitForTerminal();
+        WaitForTerminal(_session);
 
         // Assert: Both calls reported success, and no command threw.
         Assert.Null(pauseFailure);
@@ -941,19 +912,19 @@ public sealed class LevelGenerationTests
 
         // Assert: The accepted request stopped the new run. Acknowledging the previous run's dead
         // generator instead would leave this run untouched, so it would report Finished.
-        Assert.Equal(EnGenResult.Paused, LevelGeneration.Status().Result);
-        Assert.True(LevelGeneration.World()!.Stats.Steps < 10,
-          $"Expected a partially stepped run, got {LevelGeneration.World()!.Stats.Steps} steps.");
+        Assert.Equal(EnGenResult.Paused, _session.Status().Result);
+        Assert.True(_session.World()!.Stats.Steps < 10,
+          $"Expected a partially stepped run, got {_session.World()!.Stats.Steps} steps.");
       }
       finally
       {
-        LevelGeneration.AfterClaimTestHook = null;
+        _session.AfterClaimTestHook = null;
 
-        // Act: Never leave a running state behind for Dispose, whatever the outcome above was.
-        if (LevelGeneration.Status().Result == EnGenResult.Running)
+        // Act: Never leave a running state behind, whatever the outcome above was.
+        if (_session.Status().Result == EnGenResult.Running)
         {
-          LevelGeneration.Cancel();
-          WaitForTerminal();
+          _session.Cancel();
+          WaitForTerminal(_session);
         }
       }
     }
@@ -963,8 +934,8 @@ public sealed class LevelGenerationTests
     {
       // Arrange: A run long enough that Clear observes it as Running and enters its pause path
       // (60 ms per step: still in flight when Clear checks, yet cancelled from the hook fast).
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 600)));
-      Assert.Equal(EnGenResult.Running, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, Config(sleep: 600)));
+      Assert.Equal(EnGenResult.Running, _session.Status().Result);
 
       var cleared = false;
       var nextRunStarted = false;
@@ -974,17 +945,17 @@ public sealed class LevelGenerationTests
         // Act: Inside Clear's window between capturing the claim and requesting the pause, the
         // observed run terminates by itself and the next run claims the state - so Clear no
         // longer owns the run it is about to pause.
-        LevelGeneration.BeforeClearPauseTestHook = () =>
+        _session.BeforeClearPauseTestHook = () =>
         {
-          Assert.True(LevelGeneration.Cancel());
-          WaitForTerminal();
-          nextRunStarted = LevelGeneration.Start(EnRunKind.All, Config(sleep: 400));
+          Assert.True(_session.Cancel());
+          WaitForTerminal(_session);
+          nextRunStarted = _session.Start(EnRunKind.All, Config(sleep: 400));
         };
 
-        cleared = LevelGeneration.Clear(TimeSpan.FromSeconds(10));
+        cleared = _session.Clear(TimeSpan.FromSeconds(10));
 
         // Act: Let the run that claimed during Clear settle.
-        WaitForTerminal();
+        WaitForTerminal(_session);
 
         // Assert: Clear refused because a newer run claimed the state it captured.
         Assert.True(nextRunStarted);
@@ -992,18 +963,18 @@ public sealed class LevelGenerationTests
 
         // Assert: The newer run was never disturbed by the refused Clear: it ran its full step
         // budget instead of stopping at a pause nobody requested for it.
-        Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-        Assert.Equal(10L, LevelGeneration.World()!.Stats.Steps);
+        Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+        Assert.Equal(10L, _session.World()!.Stats.Steps);
       }
       finally
       {
-        LevelGeneration.BeforeClearPauseTestHook = null;
+        _session.BeforeClearPauseTestHook = null;
 
-        // Act: Never leave a running state behind for Dispose, whatever the outcome above was.
-        if (LevelGeneration.Status().Result == EnGenResult.Running)
+        // Act: Never leave a running state behind, whatever the outcome above was.
+        if (_session.Status().Result == EnGenResult.Running)
         {
-          LevelGeneration.Cancel();
-          WaitForTerminal();
+          _session.Cancel();
+          WaitForTerminal(_session);
         }
       }
     }
@@ -1012,19 +983,19 @@ public sealed class LevelGenerationTests
     public void World_WhenNextRunClaimsDuringCall_ReturnsTheObservedRunsWorld()
     {
       // Arrange: A finished run whose world holds every completed step.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
+      Assert.True(_session.Start(EnRunKind.All, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
 
       try
       {
         // Act: Claim and install the next run between World()'s state sample and its return.
         // The next run sleeps long enough (100 ms per step) that its own world still shows zero
         // steps while the call is in flight, so the two worlds are distinguishable.
-        LevelGeneration.WorldSampleTestHook = () =>
-          Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 1000)));
+        _session.WorldSampleTestHook = () =>
+          Assert.True(_session.Start(EnRunKind.All, Config(sleep: 1000)));
 
-        var world = LevelGeneration.World();
+        var world = _session.World();
 
         // Assert: The returned world belongs to the run whose status the call observed (finished,
         // all steps), never to the run that claimed while the call was in flight (no steps yet).
@@ -1033,13 +1004,13 @@ public sealed class LevelGenerationTests
       }
       finally
       {
-        LevelGeneration.WorldSampleTestHook = null;
+        _session.WorldSampleTestHook = null;
 
-        // Act: Stop the long-running claim the hook started so Dispose never waits for it.
-        if (LevelGeneration.Status().Result == EnGenResult.Running)
+        // Act: Stop the long-running claim the hook started so the session is never left running.
+        if (_session.Status().Result == EnGenResult.Running)
         {
-          LevelGeneration.Cancel();
-          WaitForTerminal();
+          _session.Cancel();
+          WaitForTerminal(_session);
         }
       }
     }
@@ -1054,8 +1025,8 @@ public sealed class LevelGenerationTests
       {
         // Arrange: A finished run whose source is linked to a caller-owned token.
         using var cancellationTokenSource = new CancellationTokenSource();
-        Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0), cancellationTokenSource.Token));
-        WaitForTerminal();
+        Assert.True(_session.Start(EnRunKind.All, Config(sleep: 0), cancellationTokenSource.Token));
+        WaitForTerminal(_session);
 
         using var barrier = new Barrier(2);
         Exception? cancelFailure = null;
@@ -1080,11 +1051,11 @@ public sealed class LevelGenerationTests
           barrier.SignalAndWait();
           if (iteration % 2 == 0)
           {
-            nextRunStarted = LevelGeneration.Start(EnRunKind.All, Config(sleep: 0));
+            nextRunStarted = _session.Start(EnRunKind.All, Config(sleep: 0));
           }
           else
           {
-            cleared = LevelGeneration.Clear();
+            cleared = _session.Clear();
           }
         });
         await Task.WhenAll(cancelTask, disposalTask);
@@ -1098,16 +1069,16 @@ public sealed class LevelGenerationTests
         else Assert.True(cleared);
 
         // Act: Settle back to pristine for the next iteration.
-        WaitForTerminal();
-        if (LevelGeneration.Status().Result != EnGenResult.None)
-          Assert.True(LevelGeneration.Clear());
+        WaitForTerminal(_session);
+        if (_session.Status().Result != EnGenResult.None)
+          Assert.True(_session.Clear());
       }
 
       // Assert: After the storm, a full run still starts and completes normally.
-      Assert.True(LevelGeneration.Start(EnRunKind.All, Config(sleep: 0)));
-      WaitForTerminal();
-      Assert.Equal(EnGenResult.Finished, LevelGeneration.Status().Result);
-      Assert.NotNull(LevelGeneration.World());
+      Assert.True(_session.Start(EnRunKind.All, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.NotNull(_session.World());
     }
   }
 }

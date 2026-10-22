@@ -11,8 +11,11 @@ namespace LostInLimbo.LevelGen.Api;
 
 /// <summary>
 /// <para>
-/// Entry point for the entire level generator. Serves as a layer between the consumer and the internals.
-/// There can be only one generation running at once.
+/// Session-scoped entry point for the entire level generator. Serves as a layer between the
+/// consumer and the internals. Each session owns its own run state (status, generator and
+/// cancellation source), so sessions are fully independent: a consumer holds one session for
+/// its generation pipeline, or creates separate sessions for concurrent, isolated pipelines
+/// (e.g. a live level and a preview).
 /// </para>
 /// <para>
 /// Commands like <see cref="Start"/>, <see cref="Resume"/>, <see cref="Cancel"/> and <see cref="Pause"/> are
@@ -20,20 +23,20 @@ namespace LostInLimbo.LevelGen.Api;
 /// it pauses the run and waits (up to a timeout) for the worker to stop before clearing.
 /// </para>
 /// </summary>
-public static class LevelGeneration
+public sealed class LevelGenerationSession
 {
   /// <summary>
-  /// Single source of truth for generation status. Owned here; generators receive it
-  /// and publish their transitions from the worker thread.
+  /// Single source of truth for generation status of this session. Owned here; generators
+  /// receive it and publish their transitions from the worker thread.
   /// </summary>
-  private static readonly GenerationStatusStore _statusStore = new();
+  private readonly GenerationStatusStore _statusStore = new();
 
   /// <summary>
   /// Generator instance owned by the current or last run. Every read and write holds
-  /// <see cref="RunSourceGate"/>; volatile so the pairing with the status store's snapshots
+  /// <see cref="_runGate"/>; volatile so the pairing with the status store's snapshots
   /// stays safe against out-of-thin-air staleness on weak memory models.
   /// </summary>
-  private static volatile LevelGenerator? _generator;
+  private volatile LevelGenerator? _generator;
 
   /// <summary>
   /// Serializes the claim + install of a run's state and its replacement/disposal against
@@ -42,13 +45,13 @@ public static class LevelGeneration
   /// runs under it, so those fields always belong to the run the status currently reports - and
   /// a source is never disposed while <see cref="Cancel"/> is invoking it.
   /// </summary>
-  private static readonly object RunSourceGate = new();
+  private readonly object _runGate = new();
 
   /// <summary>
   /// Cancellation source of the run that currently holds the claim, or of the last run.
   /// Retired (disposed and replaced) when a new run claims, and by <see cref="Clear"/>.
   /// </summary>
-  private static CancellationTokenSource? _runSource;
+  private CancellationTokenSource? _runSource;
 
   /// <summary>Default upper bound <see cref="Clear"/> waits for an in-flight run to stop.</summary>
   private static readonly TimeSpan DefaultClearTimeout = TimeSpan.FromSeconds(10);
@@ -61,28 +64,29 @@ public static class LevelGeneration
   // Hooks used by tests to hold open otherwise unreachable interleaving windows. They are never
   // set in production (always <see langword="null"/>); tests set them before and clear them
   // after the act they synchronize, and their bodies must not call back into commands that take
-  // <see cref="RunSourceGate"/> on the same thread while the claim hook holds it.
+  // <see cref="_runGate"/> on the same thread while the claim hook holds it. Because the hooks
+  // are per-session, a hook can only ever fire in commands issued on its own session.
 
   /// <summary>
   /// Test-only hook invoked inside <see cref="Start"/> and <see cref="Resume"/> after the run was
   /// claimed but before its generator and cancellation source are installed - the window in which
   /// <see cref="Cancel"/>/<see cref="Pause"/> must not resolve a retired run's state.
   /// </summary>
-  internal static volatile Action? AfterClaimTestHook;
+  internal volatile Action? AfterClaimTestHook;
 
   /// <summary>
   /// Test-only hook invoked inside <see cref="Clear(TimeSpan?)"/> after it captured the claim id
   /// and observed a running run, but before it requests the pause - the window in which a newer
   /// run may claim, which <see cref="Clear"/> then must not disturb.
   /// </summary>
-  internal static volatile Action? BeforeClearPauseTestHook;
+  internal volatile Action? BeforeClearPauseTestHook;
 
   /// <summary>
   /// Test-only hook invoked inside <see cref="World"/> after the call sampled the state it will
   /// report and before it resolves the world reference - the window in which a newer run may
   /// claim, which must not change which run's world is returned.
   /// </summary>
-  internal static volatile Action? WorldSampleTestHook;
+  internal volatile Action? WorldSampleTestHook;
 
   // COMMANDS
 
@@ -102,7 +106,7 @@ public static class LevelGeneration
   /// <exception cref="ArgumentNullException">Config is <see langword="null"/>.</exception>
   /// <exception cref="ArgumentOutOfRangeException">A numeric config setting is out of range.</exception>
   /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
-  public static bool Start(EnRunKind enRunKind, CnfLevelGeneration config, CancellationToken cancellationToken = default)
+  public bool Start(EnRunKind enRunKind, CnfLevelGeneration config, CancellationToken cancellationToken = default)
   {
     // Validate before claiming so configuration errors cannot leave the status stuck at "running".
     // This is the only validation pass; the generator trusts its caller.
@@ -116,7 +120,7 @@ public static class LevelGeneration
       // refused start neither touches the active run's source nor builds a throwaway generator.
       LevelGenerator generator;
       CancellationTokenSource source;
-      lock (RunSourceGate)
+      lock (_runGate)
       {
         if (!_statusStore.TryBeginRun()) return false;
 
@@ -155,7 +159,7 @@ public static class LevelGeneration
   /// or a violated internal invariant (see <see cref="EnGenResult.Error"/>) all return false;
   /// use <see cref="Status"/> to tell them apart.
   /// </returns>
-  public static bool Resume(EnRunKind enRunKind, CancellationToken cancellationToken = default)
+  public bool Resume(EnRunKind enRunKind, CancellationToken cancellationToken = default)
   {
     try
     {
@@ -163,7 +167,7 @@ public static class LevelGeneration
       // Pause or Clear can resolve the previous run's source or generator for this claim.
       LevelGenerator generator;
       CancellationTokenSource source;
-      lock (RunSourceGate)
+      lock (_runGate)
       {
         if (!_statusStore.TryBeginResume()) return false;
 
@@ -203,12 +207,12 @@ public static class LevelGeneration
   /// <see langword="true"/> if a running generation was asked to cancel;
   /// <see langword="false"/> otherwise.
   /// </returns>
-  public static bool Cancel()
+  public bool Cancel()
   {
     // Fast path: nothing to cancel outside of a running claim.
     if (_statusStore.Current.Result != EnGenResult.Running) return false;
 
-    lock (RunSourceGate)
+    lock (_runGate)
     {
       // Re-check under the gate: while waiting for it the run may have reached a terminal state
       // and Clear may have retired the source, so the fast-path observation can go stale.
@@ -243,12 +247,12 @@ public static class LevelGeneration
   /// <see langword="true"/> if a running generation was asked to pause;
   /// <see langword="false"/> otherwise.
   /// </returns>
-  public static bool Pause()
+  public bool Pause()
   {
     // Resolving the generator under the gate pairs it with the claim: a run that is claimed but
     // has not installed its state yet can no longer be acknowledged against the previous run's
     // generator, and a request can never be credited to a run that is already retired.
-    lock (RunSourceGate)
+    lock (_runGate)
     {
       return _generator?.TryRequestPause() ?? false;
     }
@@ -290,7 +294,7 @@ public static class LevelGeneration
   /// in both cases nothing was cleared.
   /// </returns>
   /// <exception cref="ArgumentOutOfRangeException"><paramref name="timeout"/> is negative.</exception>
-  public static bool Clear(TimeSpan? timeout = null)
+  public bool Clear(TimeSpan? timeout = null)
   {
     if (timeout.HasValue && timeout.Value < TimeSpan.Zero)
       throw new ArgumentOutOfRangeException(nameof(timeout), timeout, "Clear timeout must not be negative.");
@@ -312,7 +316,7 @@ public static class LevelGeneration
       // Pause only the run this call captured: the claim id is re-checked in the same gate
       // section that resolves the generator, and claims run under that gate too, so a run that
       // claimed since the capture above is never disturbed by a pause meant for another run.
-      lock (RunSourceGate)
+      lock (_runGate)
       {
         if (_statusStore.ClaimId != claimId) return false; // A newer run claimed; it must not be paused by a clear meant for an older one.
 
@@ -330,7 +334,7 @@ public static class LevelGeneration
 
     // Retire the source and the generator under the gate so neither can be observed (or the
     // source disposed) while a concurrent claim installs fresh run state.
-    lock (RunSourceGate)
+    lock (_runGate)
     {
       // The compare-and-swap closes the race where a concurrent Start or Resume claims a run
       // between the check above and this point: a run that wins the claim is never disturbed.
@@ -355,7 +359,7 @@ public static class LevelGeneration
   /// <see langword="true"/> if the observed run reached a terminal state;
   /// <see langword="false"/> if a newer run claimed in the meantime (do not clear) or on timeout.
   /// </returns>
-  private static bool WaitForTerminal(long claimId, TimeSpan timeout)
+  private bool WaitForTerminal(long claimId, TimeSpan timeout)
   {
     var stopwatch = Stopwatch.StartNew();
     while (true)
@@ -376,7 +380,7 @@ public static class LevelGeneration
   /// Get the status of generation.
   /// </summary>
   /// <returns>Status of generation.</returns>
-  public static GenerationStatus Status()
+  public GenerationStatus Status()
   {
     return _statusStore.Current;
   }
@@ -398,7 +402,7 @@ public static class LevelGeneration
   /// <returns>
   /// World of the current or last run when its state is stable, otherwise <see langword="null"/>.
   /// </returns>
-  public static LilWorld? World()
+  public LilWorld? World()
   {
     // One atomic sample carries both the status and the world it exposes, so the two halves can
     // never come from two different runs while a concurrent claim, clear or terminal publish
@@ -446,7 +450,7 @@ public static class LevelGeneration
   /// the previous run's source, as one atomic step.
   /// </summary>
   /// <remarks>
-  /// Must only be called while holding <see cref="RunSourceGate"/> and after a successful
+  /// Must only be called while holding <see cref="_runGate"/> and after a successful
   /// claim: the claim guarantees no worker is still using the previous source, and callers
   /// already hold the gate <see cref="Cancel"/> serializes on (the nested lock is reentrant),
   /// so the disposal below can never race an in-flight cancellation. Because the claim runs
@@ -456,9 +460,9 @@ public static class LevelGeneration
   /// </remarks>
   /// <param name="generator">Generator of the run that holds the claim.</param>
   /// <param name="source">Cancellation source of the run that holds the claim.</param>
-  private static void InstallRunState(LevelGenerator generator, CancellationTokenSource source)
+  private void InstallRunState(LevelGenerator generator, CancellationTokenSource source)
   {
-    lock (RunSourceGate)
+    lock (_runGate)
     {
       var previous = _runSource;
       _runSource = source;
@@ -486,7 +490,7 @@ public static class LevelGeneration
   /// <see langword="true"/> if the worker thread was started;
   /// <see langword="false"/> if launching failed (status reports the error).
   /// </returns>
-  private static bool TryRunOnNewThread(LevelGenerator generator, CancellationToken cancellationToken)
+  private bool TryRunOnNewThread(LevelGenerator generator, CancellationToken cancellationToken)
   {
     try
     {

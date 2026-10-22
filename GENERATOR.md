@@ -124,7 +124,7 @@ TODO
 
 ## Cancellation
 
-Runs are cancellable through `LevelGeneration.Cancel()` or an optional token passed to `Start`/`Resume`. Convention for generator passes:
+Runs are cancellable through `LevelGenerationSession.Cancel()` or an optional token passed to `Start`/`Resume`. Convention for generator passes:
 
 - Every pass takes a `CancellationToken` parameter (never a stored field) and calls `ThrowIfCancellationRequested()` at pass boundaries.
 - Inside a pass, cancellation happens at a step boundary. Note some passes are fast enough that they are considered a single step.
