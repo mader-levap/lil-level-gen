@@ -27,6 +27,11 @@ public sealed record CnfDebug
   public bool FailAtStart { get; init; } = false;
 
   /// <summary>
+  /// If true, the graph build reports failure, which fails the whole run.
+  /// </summary>
+  public bool FailGraphBuild { get; init; } = false;
+
+  /// <summary>
   /// How long the placeholder generation pretends to work, in milliseconds.
   /// 0 means it returns immediately. Debug only; real passes will not sleep.
   /// The value is split evenly across <see cref="PlaceholderSteps"/> steps, so the

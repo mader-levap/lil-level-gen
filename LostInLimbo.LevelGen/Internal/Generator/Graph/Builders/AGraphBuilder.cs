@@ -26,8 +26,11 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <item><b>Preconditions</b>: the target graph is guaranteed to be empty when
 /// <see cref="Build"/> is called (graph generation is a single phase step and the whole run's
 /// world is discarded when it is cancelled).</item>
-/// <item><b>Failsafe</b>: Graph build can fail, though builders should make a best effort to make it as unlikely as possible.
-/// Graph configuration variables are soft constraints: builders are allowed to ignore unreasonable values.</item>
+  /// <item><b>Failsafe</b>: Graph build can fail, though builders should make a best effort to make it as unlikely as possible.
+  /// Graph configuration variables are soft constraints: builders are allowed to ignore unreasonable values.
+  /// A failed build (a false return or an exception) fails the whole run: the world is discarded
+  /// and never published, so a partially mutated graph is never resumed or re-run - builders need
+  /// no rollback.</item>
 /// <item><b>MaxEdges cap</b>: every created node must receive a <see cref="LilNode.MaxEdges"/>
 /// value (negative means no limit), and the builder must never produce a node whose total
 /// relationship count - skeleton, extras and parallel passages alike - exceeds that cap.</item>
@@ -62,6 +65,8 @@ internal abstract class AGraphBuilder
   public bool Run(CnfLevelGeneration config, PrepData prepData, LilGraph graph)
   {
     Setup(config, prepData, graph);
+    // Debug-only deliberate failure, mirroring CnfDebug.FailAtStart at the run level.
+    if (Config.Debug?.FailGraphBuild == true) return false;
     return Build();
   }
 

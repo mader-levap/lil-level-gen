@@ -242,7 +242,12 @@ internal sealed class LevelGenerator
   /// <summary>
   /// <para>Execute the graph generator. This is considered a single step.</para>
   /// </summary>
-  /// <returns>True if the run should continue, otherwise false.</returns>
+  /// <exception cref="InvalidOperationException">
+  /// The graph build reported failure. The world's graph may be partially mutated at that
+  /// point, so the run fails instead of pausing: the partial world is never published and
+  /// the build is never re-run against the non-empty graph on resume.
+  /// </exception>
+  /// <returns>True. A failed build throws instead of returning false.</returns>
   private bool RunGraph(CancellationToken cancellationToken)
   {
     // Are we in the correct phase?
@@ -253,9 +258,14 @@ internal sealed class LevelGenerator
     cancellationToken.ThrowIfCancellationRequested();
 
     GraphGenerator graphGenerator = new GraphGenerator(_config, _prepData!, _world);
-    bool result = graphGenerator.Execute();
-    if (result) _world.Phase = EnPhase.Map; // move to next phase
-    return result;
+    if (!graphGenerator.Execute())
+    {
+      // A failed build leaves the graph partially mutated; fail the whole run so the
+      // partial world is never published and the build is never re-run on resume.
+      throw new InvalidOperationException("Graph generation failed.");
+    }
+    _world.Phase = EnPhase.Map; // move to next phase
+    return true;
   }
 
   /// <summary>

@@ -56,4 +56,27 @@ public sealed class AGraphBuilderTests
       () => builder.Setup(CnfLevelGeneration.Default, new PrepData(), null!));
     Assert.Equal("graph", exception.ParamName);
   }
+
+  [Theory]
+  [InlineData(EnGraphBuilder.OneNode)]
+  [InlineData(EnGraphBuilder.Simple)]
+  [InlineData(EnGraphBuilder.Linear)]
+  public void Run_WithFailGraphBuildDebugConfig_ReturnsFalseWithoutMutatingGraph(EnGraphBuilder builderKind)
+  {
+    // Arrange: Builder and a config whose debug section requests a deliberate build failure.
+    var builder = GraphBuilderFactory.Create(builderKind);
+    var config = CnfLevelGeneration.Default with
+    {
+      Debug = new CnfDebug { FailGraphBuild = true },
+    };
+    var graph = new LilGraph();
+
+    // Act: Run the build with the failure hook enabled.
+    var success = builder.Run(config, new PrepData(), graph);
+
+    // Assert: The build reports failure and leaves the target graph untouched.
+    Assert.False(success);
+    Assert.Empty(graph.Nodes);
+    Assert.Empty(graph.Edges);
+  }
 }

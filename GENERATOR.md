@@ -84,6 +84,8 @@ Configuration must be (de)serializable to/from JSON.
 
 All builders share the `AGraphBuilder` abstract base class, which stores the setup inputs in protected fields (`Config`, `PrepData`, `Graph`). Every builder must be deterministic for the same configuration (IDs derived from the seed, never random GUIDs) and must produce a solvable graph (no softlock).
 
+Graph build can fail (a false return or an exception), though builders should make it as unlikely as possible. A failed build fails the whole run: the world is discarded and never published, and the run cannot be resumed, so a partially mutated graph is never re-run - builders need no rollback.
+
 `Simple` and `Linear` finish with the same four finalization processors in the fixed order - secrets, objectives, relative size, grouping - each parameterized by its section of `CnfGraph.ProcOpts`.
 
 ### Map

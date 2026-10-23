@@ -27,7 +27,8 @@ public sealed class LevelGenerationTests
   /// <param name="sleep">Total ms the generator should sleep instead of doing generation.</param>
   /// <param name="failAtStart">If true, the generator fails at start.</param>
   /// <param name="steps">How many placeholder steps the generation is split into.</param>
-  private static CnfLevelGeneration Config(int sleep = 1000, bool failAtStart = false, int steps = CnfDebug.DefaultPlaceholderSteps)
+  /// <param name="failGraphBuild">If true, the graph build reports failure.</param>
+  private static CnfLevelGeneration Config(int sleep = 1000, bool failAtStart = false, int steps = CnfDebug.DefaultPlaceholderSteps, bool failGraphBuild = false)
   {
     return CnfLevelGeneration.Default with
     {
@@ -36,6 +37,7 @@ public sealed class LevelGenerationTests
         PlaceholderSleep = sleep,
         PlaceholderSteps = steps,
         FailAtStart = failAtStart,
+        FailGraphBuild = failGraphBuild,
       },
     };
   }
@@ -179,6 +181,22 @@ public sealed class LevelGenerationTests
       WaitForTerminal(_session);
 
       // Assert: The error is reported with details and the partial world stays hidden.
+      Assert.Equal(EnGenResult.Error, _session.Status().Result);
+      Assert.NotNull(_session.Status().Error);
+      Assert.Null(_session.World());
+    }
+
+    [Fact]
+    public void Start_WithFailGraphBuild_PublishesErrorAndWorldIsNull()
+    {
+      // Arrange: Debug config that fails the graph build.
+      var config = Config(failGraphBuild: true);
+
+      // Act: Start the run and wait for the failure.
+      Assert.True(_session.Start(EnRunKind.All, config));
+      WaitForTerminal(_session);
+
+      // Assert: The failed build fails the run; the partially built graph stays hidden.
       Assert.Equal(EnGenResult.Error, _session.Status().Result);
       Assert.NotNull(_session.Status().Error);
       Assert.Null(_session.World());

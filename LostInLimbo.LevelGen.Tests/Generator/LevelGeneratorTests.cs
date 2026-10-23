@@ -296,6 +296,29 @@ public sealed class LevelGeneratorTests
     }
 
     [Fact]
+    public void Execute_WithFailingGraphBuild_PublishesErrorWithoutWorld()
+    {
+      // Arrange: Generator whose graph build reports failure via the debug hook.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var config = CnfLevelGeneration.Default with
+      {
+        Debug = new CnfDebug { FailGraphBuild = true, PlaceholderSleep = 0 },
+      };
+      var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
+
+      // Act: Run generation. The failed build must fail the run, not pause it.
+      generator.Execute();
+
+      // Assert: Status reports the failure and hides the partially built world, so a
+      // consumer can never observe the invalid graph and resume cannot re-run the build.
+      Assert.Equal(EnGenResult.Error, statusStore.Current.Result);
+      var error = Assert.IsType<InvalidOperationException>(statusStore.Current.Error);
+      Assert.Equal("Graph generation failed.", error.Message);
+      Assert.Null(statusStore.CurrentSnapshot.World);
+    }
+
+    [Fact]
     public void Execute_WithPreCancelledToken_PublishesCancelledWithoutError()
     {
       // Arrange: A claimed run and a token cancelled before Execute is entered.
