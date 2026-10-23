@@ -7,8 +7,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 
 /// <summary>
 /// Verifies that a level graph is beatable - an abstract simulation of a player who starts
-/// at the start POI, walks through passages, collects solutions and reaches the exit without
-/// ever getting softlocked.
+/// at the start POI, walks through passages, collects solutions, fulfills objectives and
+/// reaches the exit without ever getting softlocked.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,18 +19,27 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// solutions and unlock further passages. The loop stops when nothing new floods.
 /// </para>
 /// <para>
-/// Failure reasons are reported from most specific to least specific, so the message points
-/// at the root cause: a conditioned passage the player can reach but can never satisfy
-/// (softlock) first, a mandatory goal stranded behind a one-way passage leading toward the
-/// exit second, an unreachable exit third, and leftover unreachable nodes last as the
-/// catch-all (e.g. a disconnected dead-end branch while the exit itself is fine). A
-/// conditioned edge wholly inside an unreachable branch is never a softlock - the player
-/// cannot stand at it - so it falls through to the unreachable-region reasons. Structural
-/// problems (empty or duplicate identifiers, missing nodes, dangling references, conditions
-/// pointing at missing or non-Solution POIs, nodes over their
-/// <see cref="LilNode.MaxEdges"/> hard cap, a Goal POI inside a secret node) are reported
-/// before any traversal. Each reason
-/// is reported only for the first failing check.
+/// Failure reasons are reported from most specific to least specific, so the message
+/// points at the root cause. Each reason is reported only for the first failing check,
+/// in this order:
+/// </para>
+/// <list type="bullet">
+/// <item>Structural problems (null or empty graph, empty or duplicate identifiers, missing
+/// nodes, missing Start or Exit POIs, dangling references, conditions pointing at missing
+/// or non-Solution POIs, nodes over their <see cref="LilNode.MaxEdges"/> hard cap, a Goal
+/// POI inside a secret node) - reported before any traversal.</item>
+/// <item>A conditioned passage the player can reach but can never satisfy (softlock).</item>
+/// <item>A mandatory objective trapped behind a one-way passage whose far side never
+/// reaches an exit, or stranded behind a one-way passage leading toward the exit. The
+/// one-way checks bail out entirely when no exit is reachable at all, so their reasons
+/// never compete with the unreachable-exit reason.</item>
+/// <item>An unreachable exit.</item>
+/// <item>Leftover unreachable nodes as the catch-all (e.g. a disconnected dead-end branch
+/// while the exit itself is fine).</item>
+/// </list>
+/// <para>
+/// A conditioned edge wholly inside an unreachable branch is never a softlock - the player
+/// cannot stand at it - so it falls through to the unreachable-region reasons.
 /// </para>
 /// <para>Instances hold per-call state, so create a new instance per validation
 /// (or use <see cref="LevelGraphValidation"/>); one instance must not be shared across
@@ -47,6 +56,8 @@ internal sealed class GraphValidator(LilGraph? graph)
   private HashSet<Guid> _startNodeIds = [];
   /// <summary>All end nodes.</summary>
   private HashSet<Guid> _exitNodeIds = [];
+  /// <summary>All nodes holding a mandatory <see cref="EnPoiType.Goal"/> POI.</summary>
+  private HashSet<Guid> _goalNodeIds = [];
   /// <summary>All POI types mapped by POI id.</summary>
   private Dictionary<Guid, EnPoiType> _poiTypes = [];
   /// <summary>Flooded nodes.</summary>
@@ -96,7 +107,8 @@ internal sealed class GraphValidator(LilGraph? graph)
 
   /// <summary>
   /// Sets up internal data: builds the node and POI indexes, rejecting empty or duplicate
-  /// node/POI identifiers, and requires at least one Start and one Exit POI.
+  /// node/POI identifiers, records which nodes carry a mandatory Goal POI, and requires at
+  /// least one Start and one Exit POI.
   /// </summary>
   /// <returns>Null if success, otherwise failure.</returns>
   private GraphValidationResult? Setup()
@@ -119,6 +131,7 @@ internal sealed class GraphValidator(LilGraph? graph)
 
         if (poi.Type == EnPoiType.Start) _startNodeIds.Add(node.Id);
         else if (poi.Type == EnPoiType.Exit) _exitNodeIds.Add(node.Id);
+        else if (poi.Type == EnPoiType.Goal) _goalNodeIds.Add(node.Id);
       }
     }
 
@@ -273,28 +286,54 @@ internal sealed class GraphValidator(LilGraph? graph)
   }
 
   /// <summary>
-  /// Checks that no mandatory goal is stranded behind a one-way passage leading toward the
-  /// exit: for every reachable one-way passage whose far side can still reach an
-  /// <see cref="EnPoiType.Exit"/> POI, every <see cref="EnPoiType.Goal"/> POI must remain
-  /// reachable from that far side. Visiting a goal node does not complete its objective -
-  /// the player may walk through without doing it - so crossing the point of no return can
-  /// leave an incomplete mandatory objective out of reach while the exit refuses to work.
-  /// An <see cref="EnPoiType.OptionalGoal"/> POI is not checked (only non-optional
-  /// objectives gate the exit), and a one-way that does not lead toward the exit cannot
-  /// lock an objective out of the level.
+  /// Checks that crossing a reachable one-way passage can never softlock the player. For
+  /// every reachable one-way passage the level must stay beatable in at least one of two
+  /// ways: the whole level can still be won without ever crossing it (a voluntary dead
+  /// end stays legal), or the far side alone still holds everything a winning playthrough
+  /// needs - every mandatory <see cref="EnPoiType.Goal"/> POI and an
+  /// <see cref="EnPoiType.Exit"/> POI. A forced crossing whose far side never reaches an
+  /// exit is reported as a trapped mandatory POI; a forced crossing that leaves a
+  /// reachable mandatory goal on the near side keeps the stranded report. Visiting a goal
+  /// node does not complete its objective - the player may walk through without doing it -
+  /// so crossing the point of no return can leave an incomplete mandatory objective out of
+  /// reach while the exit refuses to work.
+  /// An <see cref="EnPoiType.OptionalGoal"/> POI never forces a crossing (only non-optional
+  /// objectives gate the exit), so one-ways into exit-less dead ends holding only optional
+  /// content are allowed.
   /// </summary>
   /// <remarks>
   /// Runs after <see cref="CheckTraversals"/>, so the flooded set holds every
-  /// start-reachable node, and before <see cref="CheckExits"/>, so a stranded goal is
-  /// reported ahead of the unreachable-region reasons. Conditions are ignored on purpose:
-  /// an openable door only opens more routes, and a gate that can never be satisfied is
-  /// already reported by <see cref="CheckTraversals"/>. Edges, nodes and POIs are scanned
-  /// in list order, so the first reported problem is deterministic.
+  /// start-reachable node, and before <see cref="CheckExits"/>, so a trapped or stranded
+  /// goal is reported ahead of the unreachable-region reasons; the whole check bails out
+  /// when no exit is reachable at all, so its reasons never compete with the
+  /// unreachable-exit reason. Conditions are respected while deciding whether the level is
+  /// winnable without the far side (an openable door matters to a player who stays behind)
+  /// but ignored when mapping the far side itself - a gate inside the point of no return
+  /// only opens more routes, and a gate that can never be satisfied is already reported by
+  /// <see cref="CheckTraversals"/>. That winnable-without-crossing shortfall is only
+  /// blamed on the passage when the missed exit or goal is reachable in the main flood but
+  /// not without the far side; content unreachable either way belongs to the
+  /// <see cref="CheckExits"/> reasons. Edges, nodes and POIs are scanned in list order, so
+  /// the first reported problem is deterministic. The cost is linear in the number of
+  /// reachable one-way passages, so bulk seed loops stay cheap.
   /// </remarks>
   /// <returns>Null if success, otherwise failure.</returns>
   private GraphValidationResult? CheckGoalBeatability()
   {
+    // Without a reachable exit every reason below is moot: CheckExits' unreachable-exit
+    // report is the root cause and must own it. This also keeps the reasons of this check
+    // mutually exclusive with the unreachable-exit reason.
+    if (!ContainsAnyExit(_flooded)) return null;
+
+    // POIs any passage condition points at; only those count as must-collect content.
+    var referencedSolutions = new HashSet<Guid>();
     foreach (var edge in _graph!.Edges)
+    {
+      foreach (var condition in edge.Conditions)
+        referencedSolutions.Add(condition.RequiresPoi);
+    }
+
+    foreach (var edge in _graph.Edges)
     {
       if (edge.Direction != EnPassageDirection.OneWay) continue;
       if (!_flooded.Contains(edge.From)) continue;
@@ -304,22 +343,28 @@ internal sealed class GraphValidator(LilGraph? graph)
       var farSide = new HashSet<Guid>();
       FloodStructural(farSide, edge.To);
 
-      var reachesExit = false;
-      foreach (var nodeId in farSide)
-      {
-        if (_exitNodeIds!.Contains(nodeId))
-        {
-          reachesExit = true;
-          break;
-        }
-      }
+      // What stays winnable without ever crossing: condition-aware, with the far side off
+      // limits for both standing around and picking anything up.
+      var canWin = FloodExcluding(farSide);
 
-      // Only one-way passages leading toward the exit can strand an objective.
-      if (!reachesExit) continue;
+      // The level stays winnable without crossing: a voluntary dead end is legal.
+      if (IsWinning(canWin)) continue;
 
+      // The shortfall must come from far-side content the main flood could only get by
+      // crossing; anything unreachable either way is CheckExits' root cause, not this
+      // passage's.
+      if (!IsShortfallFromFarSide(canWin)) continue;
+
+      if (!ContainsAnyExit(farSide))
+        return TrappedFailure(edge, farSide, referencedSolutions);
+
+      // The far side holds the exit, so crossing it is forced to finish the level: every
+      // mandatory goal the player can currently reach must stay reachable from there.
       foreach (var node in _graph.Nodes)
       {
         if (farSide.Contains(node.Id)) continue;
+        // A goal unreachable either way is an unreachable region, not a stranded one.
+        if (!_flooded.Contains(node.Id)) continue;
 
         foreach (var poi in node.Pois)
         {
@@ -358,23 +403,157 @@ internal sealed class GraphValidator(LilGraph? graph)
     }
   }
 
+  /// <summary>Floods everything a player can reach without ever entering an excluded
+  /// node: starts first, then a fixpoint over the passages with the same traversal rules
+  /// as the main pass (bidirectional both ways, one-way forward only), conditions enforced
+  /// and POIs collected only from non-excluded nodes. Models a playthrough that stays on
+  /// the near side of a point of no return.</summary>
+  /// <param name="excluded">Node ids the flood must never enter; the far side of a one-way.</param>
+  /// <returns>
+  /// Ids of the reached nodes; empty when every start node sits inside
+  /// <paramref name="excluded"/>. Deterministic: edges are scanned in list order and the
+  /// reached set does not depend on hash-set iteration order.
+  /// </returns>
+  private HashSet<Guid> FloodExcluding(HashSet<Guid> excluded)
+  {
+    var reached = new HashSet<Guid>();
+    var collectedPois = new HashSet<Guid>();
+
+    foreach (var nodeId in _startNodeIds)
+    {
+      if (excluded.Contains(nodeId)) continue;
+      FloodNode(reached, collectedPois, nodeId);
+    }
+
+    var changed = true;
+    while (changed)
+    {
+      changed = false;
+      foreach (var edge in _graph!.Edges)
+      {
+        if (!IsPassable(edge, collectedPois)) continue;
+
+        // Forward direction: From -> To, valid for both passage directions.
+        if (reached.Contains(edge.From) && !excluded.Contains(edge.To)
+            && FloodNode(reached, collectedPois, edge.To))
+          changed = true;
+
+        // Backward direction: only bidirectional passages can be walked against their sense.
+        if (edge.Direction == EnPassageDirection.Bidirectional
+            && reached.Contains(edge.To)
+            && !excluded.Contains(edge.From)
+            && FloodNode(reached, collectedPois, edge.From))
+          changed = true;
+      }
+    }
+
+    return reached;
+  }
+
+  /// <summary>Checks whether a flood state wins the level: at least one exit node was
+  /// reached and every mandatory goal node is inside the state.</summary>
+  /// <param name="reached">Node ids reached by a flood.</param>
+  /// <returns>True when the state can finish the level.</returns>
+  private bool IsWinning(HashSet<Guid> reached)
+  {
+    if (!ContainsAnyExit(reached)) return false;
+
+    foreach (var nodeId in _goalNodeIds)
+    {
+      if (!reached.Contains(nodeId)) return false;
+    }
+
+    return true;
+  }
+
+  /// <summary>
+  /// Checks whether a flood that excludes the far side falls short because of the far
+  /// side: the missed exit or mandatory goal is reachable in the main flood - the main
+  /// traversal could only get it by crossing the one-way - yet unreachable without the far
+  /// side. Content unreachable in both floods belongs to the unreachable-region reasons of
+  /// <see cref="CheckExits"/> and must not be blamed on the passage.
+  /// </summary>
+  /// <param name="excludedReached">Node ids reached while excluding the far side.</param>
+  /// <returns>True when the far side is load-bearing for a winning playthrough.</returns>
+  private bool IsShortfallFromFarSide(HashSet<Guid> excludedReached)
+  {
+    foreach (var nodeId in _exitNodeIds)
+    {
+      if (_flooded.Contains(nodeId) && !excludedReached.Contains(nodeId)) return true;
+    }
+
+    foreach (var nodeId in _goalNodeIds)
+    {
+      if (_flooded.Contains(nodeId) && !excludedReached.Contains(nodeId)) return true;
+    }
+
+    return false;
+  }
+
+  /// <summary>Builds the trapped-POI failure for a point of no return whose far side
+  /// never reaches an exit: names the first mandatory goal inside the far side in node
+  /// list order, else the first condition-referenced solution inside it - the shortfall
+  /// attribution guarantees the far side holds at least one of the two - else the passage
+  /// alone for degenerate shapes such as a start node sitting beyond the one-way.</summary>
+  /// <param name="edge">One-way passage that traps the player.</param>
+  /// <param name="farSide">Node ids structurally reachable beyond the passage.</param>
+  /// <param name="referencedSolutions">Ids of all POIs referenced by passage conditions.</param>
+  /// <returns>A failed result naming the trapped POI.</returns>
+  private GraphValidationResult TrappedFailure(
+    LilEdge edge,
+    HashSet<Guid> farSide,
+    HashSet<Guid> referencedSolutions)
+  {
+    foreach (var node in _graph!.Nodes)
+    {
+      if (!farSide.Contains(node.Id)) continue;
+
+      foreach (var poi in node.Pois)
+      {
+        if (poi.Type == EnPoiType.Goal)
+          return GraphValidationResult.Fail(
+            $"Goal POI {poi.Id} is trapped behind one-way passage {edge.Id} (far side cannot reach the Exit).");
+      }
+    }
+
+    foreach (var node in _graph.Nodes)
+    {
+      if (!farSide.Contains(node.Id)) continue;
+
+      foreach (var poi in node.Pois)
+      {
+        if (poi.Type == EnPoiType.Solution && referencedSolutions.Contains(poi.Id))
+          return GraphValidationResult.Fail(
+            $"Solution POI {poi.Id} is trapped behind one-way passage {edge.Id} (far side cannot reach the Exit).");
+      }
+    }
+
+    return GraphValidationResult.Fail(
+      $"One-way passage {edge.Id} is a point of no return: the far side cannot reach the Exit.");
+  }
+
+  /// <summary>Checks whether any node holding an <see cref="EnPoiType.Exit"/> POI is
+  /// contained in the given node id set.</summary>
+  /// <param name="nodeIds">Node ids to test.</param>
+  /// <returns>True when at least one exit node is present.</returns>
+  private bool ContainsAnyExit(HashSet<Guid> nodeIds)
+  {
+    foreach (var exitId in _exitNodeIds)
+    {
+      if (nodeIds.Contains(exitId)) return true;
+    }
+
+    return false;
+  }
+
   /// <summary>
   /// Check exits.
   /// </summary>
   /// <returns>Null if success, otherwise failure.</returns>
   private GraphValidationResult? CheckExits()
   {
-    var exitReachable = false;
-    foreach (var nodeId in _exitNodeIds!)
-    {
-      if (_flooded.Contains(nodeId))
-      {
-        exitReachable = true;
-        break;
-      }
-    }
-
-    if (!exitReachable) return GraphValidationResult.Fail("Exit POI is not reachable from Start.");
+    if (!ContainsAnyExit(_flooded))
+      return GraphValidationResult.Fail("Exit POI is not reachable from Start.");
 
     var unreachableCount = _graph!.Nodes.Count - _flooded.Count;
     if (unreachableCount > 0)

@@ -12,7 +12,7 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Validator;
 /// <remarks>
 /// Grouped into suites: structure (references, POIs), the MaxEdges hard cap, connectivity
 /// (flood-fill reachability), conditions (key/door solvability) and goal beatability
-/// (one-way passages vs. mandatory goals). Test graphs are
+/// (one-way passages vs. mandatory objectives). Test graphs are
 /// hand-built so each failure shape can be isolated; positive cases are additionally
 /// cross-checked against real builder output in <c>LevelGraphValidationTests</c>.
 /// </remarks>
@@ -1034,10 +1034,14 @@ public sealed class GraphValidatorTests
   }
 
   /// <summary>
-  /// Tests that a mandatory goal stays completable: a one-way passage leading toward the
-  /// exit must not strand a <see cref="EnPoiType.Goal"/> POI on its near side, because the
-  /// player may cross without completing the objective and the exit only works once every
-  /// non-optional objective is done. Visiting a goal node does not count as completing it.
+  /// Tests that a mandatory objective stays completable around one-way passages: a
+  /// passage leading toward the exit must not strand a <see cref="EnPoiType.Goal"/> POI on
+  /// its near side, and a passage into a region holding mandatory content must not lead
+  /// past the point of no return with no exit beyond it, because the exit only works once
+  /// every non-optional objective is done. Visiting a goal node does not count as
+  /// completing it. Voluntary dead ends holding only optional content stay legal, and
+  /// content that is unreachable with or without the crossing keeps the CheckExits
+  /// reasons.
   /// </summary>
   public sealed class GoalBeatabilityTests
   {
@@ -1240,6 +1244,242 @@ public sealed class GraphValidatorTests
       Assert.Equal(
         $"Goal POI {Id(12)} is stranded behind one-way passage {Id(101)}.",
         result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_MandatoryGoalBeyondOneWayWithoutExitPath_Fails()
+    {
+      // Arrange: Start <-> exit room, plus a one-way into the room holding the mandatory
+      // goal. The goal forces the player across the point of no return, the one-way
+      // forbids leaving it, and no exit lies beyond - a forced softlock the near-side
+      // exit cannot rescue.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Goal)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2, EnPassageDirection.OneWay),
+          Edge(101, from: 1, to: 3),
+        ],
+      };
+
+      // Act: Validate the graph with the trapped mandatory goal.
+      var result = Validate(graph);
+
+      // Assert: Failure names the trapped goal and the locking one-way passage.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Goal POI {Id(12)} is trapped behind one-way passage {Id(100)} (far side cannot reach the Exit).",
+        result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_ReferencedSolutionBeyondOneWayWithoutExitPath_Fails()
+    {
+      // Arrange: The key behind a one-way is the only thing that opens the only door to
+      // the exit. CheckTraversals crosses the passage, picks the key up and opens the
+      // door, so the graph looks fine there - but the player can never come back to use
+      // it, which is exactly the softlock this check exists for.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Solution)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2, EnPassageDirection.OneWay),
+          Edge(101, from: 1, to: 3, conditions: [Condition(12)]),
+        ],
+      };
+
+      // Act: Validate the graph whose exit key sits beyond the point of no return.
+      var result = Validate(graph);
+
+      // Assert: Failure names the trapped solution and the locking one-way passage.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Solution POI {Id(12)} is trapped behind one-way passage {Id(100)} (far side cannot reach the Exit).",
+        result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_SolutionBeyondOneWayGatesNearSideGoal_Fails()
+    {
+      // Arrange: The exit sits right next to the start, but the mandatory goal lies
+      // behind a door whose key sits beyond a one-way. Getting the key is forced, using
+      // it is impossible; since no goal lies beyond the passage, the trapped solution is
+      // the POI to name.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Solution)),
+          Node(3, Poi(13, EnPoiType.Goal)),
+          Node(4, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 4),
+          Edge(101, from: 1, to: 2, EnPassageDirection.OneWay),
+          Edge(102, from: 1, to: 3, conditions: [Condition(12)]),
+        ],
+      };
+
+      // Act: Validate the graph whose goal key sits beyond the point of no return.
+      var result = Validate(graph);
+
+      // Assert: Failure names the trapped solution and the locking one-way passage.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Solution POI {Id(12)} is trapped behind one-way passage {Id(101)} (far side cannot reach the Exit).",
+        result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_SolutionBeyondOneWayGatingOnlyRedundantPassage_Succeeds()
+    {
+      // Arrange: A key beyond a one-way only opens a second, redundant passage to the
+      // exit - the open one already wins the level. The crossing is never necessary, so
+      // even a condition-referenced solution out there must not be mistaken for
+      // must-collect content.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Solution), Poi(13, EnPoiType.OptionalGoal)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2, EnPassageDirection.OneWay),
+          Edge(101, from: 1, to: 3),
+          Edge(102, from: 1, to: 3, conditions: [Condition(12)]),
+        ],
+      };
+
+      // Act: Validate the graph with a non-essential key beyond the one-way.
+      var result = Validate(graph);
+
+      // Assert: The level is winnable without ever crossing, so the dead end stays legal.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_OptionalGoalBeyondOneWayWithoutExitPath_Succeeds()
+    {
+      // Arrange: The one-way leads into an exit-less dead end holding only an optional
+      // objective; the exit stays reachable without crossing, so nothing forces the
+      // player into the trap.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.OptionalGoal)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2, EnPassageDirection.OneWay),
+          Edge(101, from: 1, to: 3),
+        ],
+      };
+
+      // Act: Validate the graph with only an optional objective beyond the one-way.
+      var result = Validate(graph);
+
+      // Assert: Optional objectives never gate the exit, so the dead end stays legal.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_GapOneWayWithDisconnectedGoal_ReportsUnreachable()
+    {
+      // Arrange: An innocent exit-less dead end next to a totally disconnected goal node.
+      // The winnable-without-crossing flood fails because of the orphan, not the one-way,
+      // so the shortfall must not be blamed on the passage.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3, Poi(12, EnPoiType.Goal)),
+          Node(4),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 4, EnPassageDirection.OneWay),
+          Edge(101, from: 1, to: 2),
+        ],
+      };
+
+      // Act: Validate the graph where the orphan is the real root cause.
+      var result = Validate(graph);
+
+      // Assert: The unreachable region keeps the report instead of the innocent passage.
+      Assert.False(result.Success);
+      Assert.Equal("1 node(s) unreachable from Start.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_GapOneWayWithUnreachableExit_ReportsUnreachableExit()
+    {
+      // Arrange: The trapped-goal shape, but the exit itself is a disconnected island.
+      // The unreachable exit is the root cause of everything and must own the report, so
+      // the one-way check bails out before it can claim a trap.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Goal)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges = [Edge(100, from: 1, to: 2, EnPassageDirection.OneWay)],
+      };
+
+      // Act: Validate the graph whose exit is broken outright.
+      var result = Validate(graph);
+
+      // Assert: The guard lets CheckExits report the unreachable exit first.
+      Assert.False(result.Success);
+      Assert.Equal("Exit POI is not reachable from Start.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_GoalDisconnectedBeyondExitBoundOneWay_ReportsUnreachable()
+    {
+      // Arrange: A one-way leads straight to the exit, but the only mandatory goal is a
+      // disconnected island - unreachable with or without crossing. The stranded report
+      // must only consider goals the player can actually reach today.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3, Poi(12, EnPoiType.Goal)),
+        ],
+        Edges = [Edge(100, from: 1, to: 2, EnPassageDirection.OneWay)],
+      };
+
+      // Act: Validate the graph with an orphaned goal behind an exit-bound one-way.
+      var result = Validate(graph);
+
+      // Assert: The orphan keeps the unreachable report instead of a false strand claim.
+      Assert.False(result.Success);
+      Assert.Equal("1 node(s) unreachable from Start.", result.FailureReason);
     }
   }
 
