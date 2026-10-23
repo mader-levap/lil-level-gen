@@ -21,7 +21,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// <para>
 /// Failure reasons are reported from most specific to least specific, so the message points
 /// at the root cause: a conditioned passage the player can reach but can never satisfy
-/// (softlock) first, an unreachable exit second, and leftover unreachable nodes last as the
+/// (softlock) first, a mandatory goal stranded behind a one-way passage leading toward the
+/// exit second, an unreachable exit third, and leftover unreachable nodes last as the
 /// catch-all (e.g. a disconnected dead-end branch while the exit itself is fine). A
 /// conditioned edge wholly inside an unreachable branch is never a softlock - the player
 /// cannot stand at it - so it falls through to the unreachable-region reasons. Structural
@@ -72,6 +73,8 @@ internal sealed class GraphValidator(LilGraph? graph)
     result = CheckMaxEdges();
     if (result != null) return result;
     result = CheckTraversals();
+    if (result != null) return result;
+    result = CheckGoalBeatability();
     if (result != null) return result;
     result = CheckExits();
     if (result != null) return result;
@@ -267,6 +270,92 @@ internal sealed class GraphValidator(LilGraph? graph)
       return GraphValidationResult.Fail($"Conditioned edge {edge.Id} can never be satisfied.");
     }
     return null;
+  }
+
+  /// <summary>
+  /// Checks that no mandatory goal is stranded behind a one-way passage leading toward the
+  /// exit: for every reachable one-way passage whose far side can still reach an
+  /// <see cref="EnPoiType.Exit"/> POI, every <see cref="EnPoiType.Goal"/> POI must remain
+  /// reachable from that far side. Visiting a goal node does not complete its objective -
+  /// the player may walk through without doing it - so crossing the point of no return can
+  /// leave an incomplete mandatory objective out of reach while the exit refuses to work.
+  /// An <see cref="EnPoiType.OptionalGoal"/> POI is not checked (only non-optional
+  /// objectives gate the exit), and a one-way that does not lead toward the exit cannot
+  /// lock an objective out of the level.
+  /// </summary>
+  /// <remarks>
+  /// Runs after <see cref="CheckTraversals"/>, so the flooded set holds every
+  /// start-reachable node, and before <see cref="CheckExits"/>, so a stranded goal is
+  /// reported ahead of the unreachable-region reasons. Conditions are ignored on purpose:
+  /// an openable door only opens more routes, and a gate that can never be satisfied is
+  /// already reported by <see cref="CheckTraversals"/>. Edges, nodes and POIs are scanned
+  /// in list order, so the first reported problem is deterministic.
+  /// </remarks>
+  /// <returns>Null if success, otherwise failure.</returns>
+  private GraphValidationResult? CheckGoalBeatability()
+  {
+    foreach (var edge in _graph!.Edges)
+    {
+      if (edge.Direction != EnPassageDirection.OneWay) continue;
+      if (!_flooded.Contains(edge.From)) continue;
+
+      // Flood the far side structurally to see what a player crossing the point of no
+      // return could still reach.
+      var farSide = new HashSet<Guid>();
+      FloodStructural(farSide, edge.To);
+
+      var reachesExit = false;
+      foreach (var nodeId in farSide)
+      {
+        if (_exitNodeIds!.Contains(nodeId))
+        {
+          reachesExit = true;
+          break;
+        }
+      }
+
+      // Only one-way passages leading toward the exit can strand an objective.
+      if (!reachesExit) continue;
+
+      foreach (var node in _graph.Nodes)
+      {
+        if (farSide.Contains(node.Id)) continue;
+
+        foreach (var poi in node.Pois)
+        {
+          if (poi.Type == EnPoiType.Goal)
+            return GraphValidationResult.Fail(
+              $"Goal POI {poi.Id} is stranded behind one-way passage {edge.Id}.");
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /// <summary>Floods a node and everything structurally reachable from it: bidirectional
+  /// passages both ways, one-way passages forward only, conditions ignored and no POIs
+  /// collected. Used by the goal-beatability check to model the region beyond a
+  /// point of no return.</summary>
+  /// <param name="reached">Set of ids of reached nodes.</param>
+  /// <param name="startNodeId">Node to flood from.</param>
+  private void FloodStructural(HashSet<Guid> reached, Guid startNodeId)
+  {
+    var pending = new Stack<Guid>();
+    pending.Push(startNodeId);
+
+    while (pending.Count > 0)
+    {
+      var nodeId = pending.Pop();
+      if (!reached.Add(nodeId)) continue;
+
+      foreach (var edge in _graph!.Edges)
+      {
+        if (edge.From == nodeId) pending.Push(edge.To);
+        else if (edge.To == nodeId && edge.Direction == EnPassageDirection.Bidirectional)
+          pending.Push(edge.From);
+      }
+    }
   }
 
   /// <summary>

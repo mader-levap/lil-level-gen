@@ -11,7 +11,8 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Validator;
 /// </summary>
 /// <remarks>
 /// Grouped into suites: structure (references, POIs), the MaxEdges hard cap, connectivity
-/// (flood-fill reachability) and conditions (key/door solvability). Test graphs are
+/// (flood-fill reachability), conditions (key/door solvability) and goal beatability
+/// (one-way passages vs. mandatory goals). Test graphs are
 /// hand-built so each failure shape can be isolated; positive cases are additionally
 /// cross-checked against real builder output in <c>LevelGraphValidationTests</c>.
 /// </remarks>
@@ -1029,6 +1030,216 @@ public sealed class GraphValidatorTests
       // Assert: The structural reason is reported first.
       Assert.False(result.Success);
       Assert.Equal($"Goal POI {Id(12)} is in secret node {Id(3)}.", result.FailureReason);
+    }
+  }
+
+  /// <summary>
+  /// Tests that a mandatory goal stays completable: a one-way passage leading toward the
+  /// exit must not strand a <see cref="EnPoiType.Goal"/> POI on its near side, because the
+  /// player may cross without completing the objective and the exit only works once every
+  /// non-optional objective is done. Visiting a goal node does not count as completing it.
+  /// </summary>
+  public sealed class GoalBeatabilityTests
+  {
+    [Fact]
+    public void Validate_GoalBehindOneWayTowardExit_Fails()
+    {
+      // Arrange: Start <-> goal room -> one-way -> exit. The player can walk through the
+      // goal room without completing its objective, cross the point of no return and find
+      // an exit that will not work - with no way back to finish the objective.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Goal)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 2, to: 3, EnPassageDirection.OneWay),
+        ],
+      };
+
+      // Act: Validate the graph with the stranded mandatory goal.
+      var result = Validate(graph);
+
+      // Assert: Failure names the stranded goal and the one-way passage that locks it out.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Goal POI {Id(12)} is stranded behind one-way passage {Id(101)}.",
+        result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_GoalOnExitSideOfOneWay_Succeeds()
+    {
+      // Arrange: The same shape, but the mandatory goal sits with the exit beyond the
+      // one-way, so crossing the point of no return strands nothing.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2),
+          Node(3, Poi(11, EnPoiType.Exit), Poi(12, EnPoiType.Goal)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 2, to: 3, EnPassageDirection.OneWay),
+        ],
+      };
+
+      // Act: Validate the graph whose goal lies beyond the one-way.
+      var result = Validate(graph);
+
+      // Assert: The goal remains reachable from the far side, so the graph is fine.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_ReturnPathRescuesGoal_Succeeds()
+    {
+      // Arrange: Start <-> goal room, one-way to the exit room, plus a backlink from the
+      // exit room to the start. Crossing the one-way does not lock the goal out because
+      // the player can walk back and complete it.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Goal)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 2, to: 3, EnPassageDirection.OneWay),
+          Edge(102, from: 3, to: 1),
+        ],
+      };
+
+      // Act: Validate the graph with a way back after the one-way.
+      var result = Validate(graph);
+
+      // Assert: The goal is reachable from the far side via the return path.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_OptionalGoalBehindOneWay_Succeeds()
+    {
+      // Arrange: The stranded shape, but the objective is optional - only non-optional
+      // objectives gate the exit, so skipping it is the player's choice.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.OptionalGoal)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 2, to: 3, EnPassageDirection.OneWay),
+        ],
+      };
+
+      // Act: Validate the graph with only an optional goal behind the one-way.
+      var result = Validate(graph);
+
+      // Assert: An optional goal may be left behind without softlocking the level.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_GoalOnStartNodeBehindOneWay_Fails()
+    {
+      // Arrange: The mandatory goal sits on the start node itself and a one-way leads to
+      // the exit. There is no exception for start-side goals.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start), Poi(12, EnPoiType.Goal)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges = [Edge(100, from: 1, to: 2, EnPassageDirection.OneWay)],
+      };
+
+      // Act: Validate the graph with the goal stranded on the start side.
+      var result = Validate(graph);
+
+      // Assert: Failure names the stranded goal and the locking one-way passage.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Goal POI {Id(12)} is stranded behind one-way passage {Id(100)}.",
+        result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_OneWayNotTowardExit_WithStrandedGoal_Succeeds()
+    {
+      // Arrange: A one-way from the goal room into an exit-less dead end. Crossing it
+      // strands the player away from the goal, but no exit lies beyond, so the exit rule
+      // does not fire - one-ways that do not lead toward the exit are allowed.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Goal)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+          Node(4),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 1, to: 3),
+          Edge(102, from: 2, to: 4, EnPassageDirection.OneWay),
+        ],
+      };
+
+      // Act: Validate the graph with the exit-less one-way dead end.
+      var result = Validate(graph);
+
+      // Assert: Only exit-bound one-way passages are checked, so this graph is fine.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_GoalStrandedByFirstOfTwoOneWays_Fails()
+    {
+      // Arrange: Two chained one-way passages lead to the exit; the goal lies behind both.
+      // The first one-way in edge-list order strands it and must be the one reported.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Goal)),
+          Node(3),
+          Node(4, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 2, to: 3, EnPassageDirection.OneWay),
+          Edge(102, from: 3, to: 4, EnPassageDirection.OneWay),
+        ],
+      };
+
+      // Act: Validate the graph with the chained one-way passages.
+      var result = Validate(graph);
+
+      // Assert: The first offending one-way passage is reported, pinning list-order determinism.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Goal POI {Id(12)} is stranded behind one-way passage {Id(101)}.",
+        result.FailureReason);
     }
   }
 

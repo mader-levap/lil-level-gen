@@ -6,8 +6,9 @@ namespace LostInLimbo.LevelGen.Api;
 
 /// <summary>
 /// Public entry point for verifying that a generated world's level graph is beatable:
-/// start and exit exist, the player can reach every place and every conditioned passage
-/// can be opened, without softlocks.
+/// start and exit exist, the player can reach every place, every conditioned passage
+/// can be opened, and mandatory goals stay completable behind one-way passages,
+/// without softlocks.
 /// </summary>
 /// <remarks>
 /// Only <see cref="LilWorld.Graph"/> is read; map, stats and phase are ignored. Intended for
