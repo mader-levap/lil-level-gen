@@ -20,10 +20,12 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// </para>
 /// <para>
 /// Failure reasons are reported from most specific to least specific, so the message points
-/// at the root cause: a conditioned passage that can never be satisfied (softlock) first,
-/// an unreachable exit second, and leftover unreachable nodes last as the catch-all (e.g. a
-/// disconnected dead-end branch while the exit itself is fine). Structural problems
-/// (missing nodes, dangling references, duplicate identifiers, nodes over their
+/// at the root cause: a conditioned passage the player can reach but can never satisfy
+/// (softlock) first, an unreachable exit second, and leftover unreachable nodes last as the
+/// catch-all (e.g. a disconnected dead-end branch while the exit itself is fine). A
+/// conditioned edge wholly inside an unreachable branch is never a softlock - the player
+/// cannot stand at it - so it falls through to the unreachable-region reasons. Structural
+/// problems (missing nodes, dangling references, duplicate identifiers, nodes over their
 /// <see cref="LilNode.MaxEdges"/> hard cap, a Goal POI inside a secret node) are reported
 /// before any traversal. Each reason
 /// is reported only for the first failing check.
@@ -198,7 +200,8 @@ internal sealed class GraphValidator(LilGraph? graph)
   }
 
   /// <summary>
-  /// Traversal pass: flood from every start node until no new node becomes reachable.
+  /// Traversal pass: flood from every start node until no new node becomes reachable, then
+  /// report the first conditioned passage the player can reach but can never satisfy.
   /// </summary>
   /// <returns>Null if success, otherwise failure.</returns>
   private GraphValidationResult? CheckTraversals()
@@ -230,8 +233,14 @@ internal sealed class GraphValidator(LilGraph? graph)
     // Outcome pass, most specific failure first (see type remarks).
     foreach (var edge in _graph!.Edges)
     {
-      if (edge.Conditions.Count > 0 && !IsPassable(edge, collectedPois))
-        return GraphValidationResult.Fail($"Conditioned edge {edge.Id} can never be satisfied.");
+      if (edge.Conditions.Count == 0 || IsPassable(edge, collectedPois)) continue;
+
+      // Only a gate the player can actually stand at is a softlock. A conditioned edge with
+      // both sides outside the flooded region lives inside an unreachable branch - there the
+      // unreachable-region reasons of CheckExits are the root cause, not the gate.
+      if (!IsAtReachableFrontier(edge)) continue;
+
+      return GraphValidationResult.Fail($"Conditioned edge {edge.Id} can never be satisfied.");
     }
     return null;
   }
@@ -276,6 +285,17 @@ internal sealed class GraphValidator(LilGraph? graph)
 
     return true;
   }
+
+  /// <summary>
+  /// Checks whether the player can reach an entrance of the given passage, mirroring the
+  /// traversal rules of the flood pass: the source node always counts, and only a
+  /// bidirectional passage can also be encountered from its destination side.
+  /// </summary>
+  /// <param name="edge">Passage to check.</param>
+  /// <returns>True when at least one reachable side of the passage was flooded.</returns>
+  private bool IsAtReachableFrontier(LilEdge edge) =>
+    _flooded.Contains(edge.From)
+    || (edge.Direction == EnPassageDirection.Bidirectional && _flooded.Contains(edge.To));
 
   /// <summary>
   /// Checks whether a passage can be used given the POIs collected so far.

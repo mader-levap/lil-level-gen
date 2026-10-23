@@ -518,6 +518,107 @@ public sealed class GraphValidatorTests
       Assert.True(result.Success);
       Assert.Null(result.FailureReason);
     }
+
+    [Fact]
+    public void Validate_ConditionedEdgeInsideDisconnectedBranch_ReportsUnreachableNodes()
+    {
+      // Arrange: Start and exit share node 1; a dead branch (nodes 2 and 3) carries a gated
+      // edge whose solution lives inside that same branch, so nothing in it is ever reached.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start), Poi(11, EnPoiType.Exit)),
+          Node(2),
+          Node(3, Poi(12, EnPoiType.Solution)),
+        ],
+        Edges = [Edge(100, from: 2, to: 3, conditions: [Condition(12)])],
+      };
+
+      // Act: Validate the graph with a conditioned edge inside the unreachable branch.
+      var result = Validate(graph);
+
+      // Assert: The disconnected branch is the root cause; the gate is not a softlock
+      // because the player can never stand at it.
+      Assert.False(result.Success);
+      Assert.Equal("2 node(s) unreachable from Start.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_ConditionedEdgeBesideUnreachableExit_ReportsUnreachableExit()
+    {
+      // Arrange: The exit sits in a dead branch whose internal edge is conditioned on a
+      // solution from that same branch; the player reaches neither side of the gate.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3, Poi(12, EnPoiType.Solution)),
+        ],
+        Edges = [Edge(100, from: 2, to: 3, conditions: [Condition(12)])],
+      };
+
+      // Act: Validate the graph whose unreachable region contains a gated edge.
+      var result = Validate(graph);
+
+      // Assert: The unreachable exit wins over the gate the player never encounters.
+      Assert.False(result.Success);
+      Assert.Equal("Exit POI is not reachable from Start.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_FrontierGateWithKeyInOrphanComponent_ReportsSoftlock()
+    {
+      // Arrange: Node 2 is reachable from the start, but its gate needs a key parked in the
+      // disconnected node 4 - the player stands at the gate and can never open it.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start), Poi(11, EnPoiType.Exit)),
+          Node(2),
+          Node(3),
+          Node(4, Poi(12, EnPoiType.Solution)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 2, to: 3, conditions: [Condition(12)]),
+        ],
+      };
+
+      // Act: Validate the graph with a reachable but unsatisfiable gate.
+      var result = Validate(graph);
+
+      // Assert: A gate on the reachable frontier keeps the softlock diagnosis.
+      Assert.False(result.Success);
+      Assert.Equal($"Conditioned edge {Id(101)} can never be satisfied.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_OneWayGateWithUnreachableEntrance_ReportsUnreachableNodes()
+    {
+      // Arrange: A one-way passage leaves the orphan node 2 towards the start, yet its
+      // solution sits in node 2 itself - the player can never approach the entrance.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start), Poi(11, EnPoiType.Exit)),
+          Node(2, Poi(12, EnPoiType.Solution)),
+        ],
+        Edges = [Edge(100, from: 2, to: 1, EnPassageDirection.OneWay, conditions: [Condition(12)])],
+      };
+
+      // Act: Validate the graph with a one-way gated edge behind the player.
+      var result = Validate(graph);
+
+      // Assert: One-way direction matters: only the unreachable node is reported.
+      Assert.False(result.Success);
+      Assert.Equal("1 node(s) unreachable from Start.", result.FailureReason);
+    }
   }
 
   /// <summary>Tests the <see cref="LilNode.MaxEdges"/> hard cap: over-cap failures and unlimited negative caps.</summary>
