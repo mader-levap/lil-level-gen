@@ -83,8 +83,8 @@ public sealed class LevelGenerationSession
 
   /// <summary>
   /// Test-only hook invoked inside <see cref="World"/> after the call sampled the state it will
-  /// report and before it resolves the world reference - the window in which a newer run may
-  /// claim, which must not change which run's world is returned.
+  /// report and before it copies the world - the window in which a newer run may
+  /// claim, which must not change which run's world is copied.
   /// </summary>
   internal volatile Action? WorldSampleTestHook;
 
@@ -386,11 +386,10 @@ public sealed class LevelGenerationSession
   }
 
   /// <summary>
-  /// Get the world built by the current or last run.
+  /// Get a copy of the world built by the current or last run.
   /// </summary>
   /// <remarks>
-  /// The generator mutates the world in place on the worker thread while generation is
-  /// <see cref="EnGenResult.Running"/>, so this method returns it only for stable states:
+  /// The method returns a world only for stable states:
   /// <see cref="EnGenResult.Paused"/> (partial results of an Area or Step run) and
   /// <see cref="EnGenResult.Finished"/> (complete world). It returns <see langword="null"/>
   /// while running, after <see cref="EnGenResult.Error"/> (partial world must not be used),
@@ -398,20 +397,28 @@ public sealed class LevelGenerationSession
   /// and before the first run. Status and world are sampled as one pair, so a returned world
   /// always belongs to the status this call observed (and that snapshot's publish guarantees
   /// the final data is visible to the caller), never to a run that claimed in the meantime.
+  /// <para>
+  /// Each call returns a fresh deep copy (see <see cref="LilWorldCopy"/>) owned by the caller:
+  /// the generator's own data can never be reached through it. Mutating the returned world is
+  /// safe and has no effect on the generator, on the store, or on what any later call returns.
+  /// </para>
   /// </remarks>
   /// <returns>
-  /// World of the current or last run when its state is stable, otherwise <see langword="null"/>.
+  /// A deep copy of the world of the current or last run when its state is stable,
+  /// otherwise <see langword="null"/>.
   /// </returns>
   public LilWorld? World()
   {
     // One atomic sample carries both the status and the world it exposes, so the two halves can
     // never come from two different runs while a concurrent claim, clear or terminal publish
-    // lands between reading the status and resolving the world.
+    // lands between reading the status and resolving the world. The stored world is a frozen
+    // copy published at the run's terminal state, so deep-copying it needs no gate: nothing
+    // ever mutates it, neither the generator nor other consumers.
     var snapshot = _statusStore.CurrentSnapshot;
     WorldSampleTestHook?.Invoke();
     var result = snapshot.Status.Result;
     return result == EnGenResult.Paused || result == EnGenResult.Finished
-      ? snapshot.World
+      ? LilWorldCopy.Copy(snapshot.World)
       : null;
   }
 

@@ -72,7 +72,7 @@ public sealed class LevelGeneratorTests
   public sealed class ExecuteTests
   {
     [Fact]
-    public void Execute_KeepsSameWorldInstance()
+    public void Execute_AcrossPauseAndResume_PublishesDetachedWorldCopies()
     {
       // Arrange: Generator and a first run paused after one step, so its world is published.
       var statusStore = new GenerationStatusStore();
@@ -81,15 +81,21 @@ public sealed class LevelGeneratorTests
       generator.Execute();
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
       LilWorld worldBefore = PublishedWorld(statusStore);
+      Assert.Equal(1L, worldBefore.Stats.Steps);
 
       // Act: Claim and run the remainder to completion the way Resume does.
       Assert.True(statusStore.TryBeginRun());
       generator.SetRunKind(EnRunKind.All);
       generator.Execute();
 
-      // Assert: World is mutated in place, never replaced across pause and resume.
+      // Assert: Each terminal state published a fresh frozen copy: the resumed run finished
+      // with the full step budget in its own copy, while the earlier copy still shows the
+      // partial state it was published with (proof it was detached from the live world).
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
-      Assert.Same(worldBefore, PublishedWorld(statusStore));
+      LilWorld worldAfter = PublishedWorld(statusStore);
+      Assert.NotSame(worldBefore, worldAfter);
+      Assert.Equal((long)CnfDebug.DefaultPlaceholderSteps, worldAfter.Stats.Steps);
+      Assert.Equal(1L, worldBefore.Stats.Steps);
     }
 
     [Fact]

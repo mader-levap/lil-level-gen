@@ -64,8 +64,9 @@ internal sealed class GenerationStatusStore
   /// <param name="status">New status.</param>
   /// <param name="world">
   /// World to pair with the status, or <see langword="null"/> (default) when the status must
-  /// not expose one. Terminal publishes of a paused or finished run pass their world here so
-  /// consumers can read status and world as one unit.
+  /// not expose one. Terminal publishes of a paused or finished run pass a frozen deep copy of
+  /// the generator's world here so consumers can read status and world as one unit; the store
+  /// treats the paired world as immutable and never mutates it.
   /// </param>
   public void Publish(GenerationStatus status, LilWorld? world = null)
   {

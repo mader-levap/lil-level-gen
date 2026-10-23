@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
+using LostInLimbo.LevelGen.Data.Result.Stats;
 using LostInLimbo.LevelGen.Data.Status;
 
 namespace LostInLimbo.LevelGen.Tests.Api;
@@ -660,6 +661,103 @@ public sealed class LevelGenerationTests
       WaitForTerminal(_session);
       Assert.Equal(EnGenResult.Finished, _session.Status().Result);
       Assert.NotNull(_session.World());
+    }
+  }
+
+  /// <summary>
+  /// Tests that <see cref="LevelGenerationSession.World()"/> hands out defensive copies:
+  /// consumers can never affect the generator or later reads by mutating the returned world.
+  /// </summary>
+  public sealed class WorldIsolationTests
+  {
+    private readonly LevelGenerationSession _session = new();
+
+    [Fact]
+    public void World_AfterFinished_ReturnsFreshCopyEachCall()
+    {
+      // Arrange: A completed run with a visible world containing a built graph.
+      Assert.True(_session.Start(EnRunKind.All, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+
+      // Act: Read the world twice.
+      var first = _session.World();
+      var second = _session.World();
+
+      // Assert: Each call hands out its own instance carrying the same generated data.
+      Assert.NotNull(first);
+      Assert.NotNull(second);
+      Assert.NotSame(first, second);
+      Assert.NotSame(first!.Graph, second!.Graph);
+      Assert.NotSame(first.Stats, second.Stats);
+      Assert.NotSame(first.Graph.Nodes, second.Graph.Nodes);
+      Assert.NotSame(first.Graph.Edges, second.Graph.Edges);
+      Assert.Equal(first.Phase, second.Phase);
+      Assert.Equal(first.Stats.Steps, second.Stats.Steps);
+      Assert.Equal(first.Graph.Nodes.Count, second.Graph.Nodes.Count);
+      Assert.Equal(first.Graph.Edges.Count, second.Graph.Edges.Count);
+    }
+
+    [Fact]
+    public void World_MutatingReturnedWorld_DoesNotAffectSubsequentCalls()
+    {
+      // Arrange: A completed run with a visible world containing a built graph.
+      Assert.True(_session.Start(EnRunKind.All, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+
+      // Act: Mutate every mutable surface of the handed-out world the way a misbehaving
+      // consumer would: top-level sections and the nested node/edge containers.
+      var world = _session.World();
+      Assert.NotNull(world);
+      foreach (var node in world!.Graph.Nodes)
+        node.Pois.Clear();
+      foreach (var edge in world.Graph.Edges)
+        edge.Conditions.Clear();
+      world.Graph.Nodes.Clear();
+      world.Graph.Edges.Clear();
+      world.Graph = new();
+      world.Stats.Steps = 999;
+      world.Stats = new();
+      world.Phase = EnPhase.Prepass;
+
+      // Assert: The next call still reports the consistent generated world.
+      var next = _session.World();
+      Assert.NotNull(next);
+      Assert.Equal(EnPhase.Map, next!.Phase);
+      Assert.Equal(10L, next.Stats.Steps);
+      Assert.NotEmpty(next.Graph.Nodes);
+      Assert.Contains(next.Graph.Nodes, node => node.Pois.Count > 0);
+    }
+
+    [Fact]
+    public void World_PausedWorldMutatedBeforeResume_DoesNotCorruptGeneration()
+    {
+      // Arrange: A stepwise run paused after its first segment: the graph is built and one
+      // map step completed, so both the graph and the step counter carry real data.
+      Assert.True(_session.Start(EnRunKind.Step, Config(sleep: 0)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
+
+      // Act: Mutate the handed-out world the way a misbehaving consumer would.
+      var world = _session.World();
+      Assert.NotNull(world);
+      world!.Stats.Steps = 999;
+      world.Graph.Nodes.Clear();
+      world.Phase = EnPhase.Prepass;
+
+      // Act: Continue generation from the paused state.
+      Assert.True(_session.Resume(EnRunKind.All));
+      WaitForTerminal(_session);
+
+      // Assert: The resumed run completes against its own untouched data, not the mutated
+      // copy: full step budget, intact graph, correct final phase.
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      var finalWorld = _session.World();
+      Assert.NotNull(finalWorld);
+      Assert.Equal(10L, finalWorld!.Stats.Steps);
+      Assert.NotEmpty(finalWorld.Graph.Nodes);
+      Assert.Equal(EnPhase.Map, finalWorld.Phase);
     }
   }
 

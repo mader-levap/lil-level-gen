@@ -13,8 +13,8 @@ namespace LostInLimbo.LevelGen.Internal.Status.Data;
 /// how a claim, a terminal publish or a reset interleaves with the read.
 /// </remarks>
 /// <param name="Status">Status snapshot of the run that published this pair.</param>
-/// <param name="World">World the status exposes, or <see langword="null"/> while the status hides it
-/// (pristine, running, cancelled or failed runs).</param>
+/// <param name="World">Frozen copy of the world the status exposes, or <see langword="null"/> while the status
+/// hides it (pristine, running, cancelled or failed runs). Never mutated after publication.</param>
 internal sealed record GenerationSnapshot(GenerationStatus Status, LilWorld? World)
 {
   /// <summary>Pristine instance: never ran, no world.</summary>

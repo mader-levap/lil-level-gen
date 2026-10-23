@@ -20,8 +20,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// Prepass and graph runs are real passes that complete within a single execution; only the
 /// map phase is still a placeholder that advances a fixed number of steps, each imitating
 /// work by sleeping (see <see cref="MainLoop"/>).
-/// Mutates its world in place on the worker thread, so consumers never get it from a
-/// running run: terminal publishes pair it with a <see cref="EnGenResult.Paused"/> or
+/// Mutates its world in place on the worker thread; the live instance never leaves the worker:
+/// terminal publishes pair a frozen deep copy of it with a <see cref="EnGenResult.Paused"/> or
 /// <see cref="EnGenResult.Finished"/> status in the store, and every other outcome pairs with
 /// no world at all (see <see cref="PublishTerminal"/>).
 /// </remarks>
@@ -39,8 +39,9 @@ internal sealed class LevelGenerator
   /// <summary>Shared, thread-safe status sink owned by the API layer.</summary>
   private readonly GenerationStatusStore _statusStore;
 
-  /// <summary>World: partial or complete result of generation. Published to consumers only
-  /// through <see cref="PublishTerminal"/>, never exposed while a run is in flight.</summary>
+  /// <summary>World: partial or complete result of generation. Only a frozen deep copy of it
+  /// reaches consumers, through <see cref="PublishTerminal"/>; the live instance stays on the
+  /// worker thread for the whole lifetime of the run.</summary>
   private readonly LilWorld _world = new();
 
   /// <summary>
@@ -125,9 +126,10 @@ internal sealed class LevelGenerator
   /// Must be called while holding <see cref="_pauseGate"/> semantics (this method takes it):
   /// the pause flag is rewritten and cleared together with the publish, so a request accepted
   /// by <see cref="TryRequestPause"/> always belongs to the run that publishes next, and no
-  /// stale pause leaks into a later run. Paused and finished results carry this generator's
-  /// world into the store, so <c>World</c> reads status and world as one unit; every other
-  /// result hides the world by pairing with <see langword="null"/>.
+  /// stale pause leaks into a later run. Paused and finished results carry a frozen deep copy
+  /// of this generator's world into the store (see <see cref="LilWorldCopy"/>), so the live
+  /// instance is never handed out and <c>World</c> reads status and world as one unit; every
+  /// other result hides the world by pairing with <see langword="null"/>.
   /// </remarks>
   /// <param name="result">Terminal result to publish.</param>
   /// <param name="error">Exception to attach when publishing <see cref="EnGenResult.Error"/>.</param>
@@ -139,7 +141,9 @@ internal sealed class LevelGenerator
       if (_pauseRequested && result == EnGenResult.Cancelled) result = EnGenResult.Paused;
 
       _pauseRequested = false;
-      var world = result is EnGenResult.Paused or EnGenResult.Finished ? _world : null;
+      var world = result is EnGenResult.Paused or EnGenResult.Finished
+        ? LilWorldCopy.Copy(_world)
+        : null;
       _statusStore.Publish(new GenerationStatus { Result = result, Error = error }, world);
     }
   }
