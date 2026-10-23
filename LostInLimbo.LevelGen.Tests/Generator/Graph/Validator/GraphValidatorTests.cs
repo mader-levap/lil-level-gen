@@ -199,6 +199,135 @@ public sealed class GraphValidatorTests
         $"Condition on edge {Id(100)} references missing POI {Id(999)}.",
         result.FailureReason);
     }
+
+    [Fact]
+    public void Validate_EmptyNodeId_Fails()
+    {
+      // Arrange: Single node whose identifier is Guid.Empty (Id(0) maps to the empty Guid).
+      var graph = new LilGraph
+      {
+        Nodes = [Node(0, Poi(10, EnPoiType.Start), Poi(11, EnPoiType.Exit))],
+      };
+
+      // Act: Validate the graph with an unassigned node id.
+      var result = Validate(graph);
+
+      // Assert: Failure naming the empty node identifier.
+      Assert.False(result.Success);
+      Assert.Equal($"Node {Id(0)} has an empty id.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_EmptyPoiId_Fails()
+    {
+      // Arrange: Node holds a POI whose identifier is Guid.Empty.
+      var graph = new LilGraph
+      {
+        Nodes = [Node(1, Poi(0, EnPoiType.Start), Poi(11, EnPoiType.Exit))],
+      };
+
+      // Act: Validate the graph with an unassigned POI id.
+      var result = Validate(graph);
+
+      // Assert: Failure naming the empty POI identifier, not a duplicate-id complaint.
+      Assert.False(result.Success);
+      Assert.Equal($"POI {Id(0)} has an empty id.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_EmptyEdgeId_Fails()
+    {
+      // Arrange: Edge whose identifier is Guid.Empty.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges = [Edge(0, from: 1, to: 2)],
+      };
+
+      // Act: Validate the graph with an unassigned edge id.
+      var result = Validate(graph);
+
+      // Assert: Failure naming the empty edge identifier.
+      Assert.False(result.Success);
+      Assert.Equal($"Edge {Id(0)} has an empty id.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_DuplicateEdgeId_Fails()
+    {
+      // Arrange: Two distinct parallel passages sharing one identifier.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(100, from: 1, to: 2),
+        ],
+      };
+
+      // Act: Validate the graph with ambiguous edge identity.
+      var result = Validate(graph);
+
+      // Assert: Failure naming the duplicated identifier.
+      Assert.False(result.Success);
+      Assert.Equal($"Duplicate edge id {Id(100)}.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_ConditionWithEmptyRequiresPoi_Fails()
+    {
+      // Arrange: Condition whose RequiresPoi is Guid.Empty instead of a real POI reference.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges = [Edge(100, from: 1, to: 2, conditions: [Condition(0)])],
+      };
+
+      // Act: Validate the graph with the empty condition requirement.
+      var result = Validate(graph);
+
+      // Assert: Failure reports the empty id directly instead of calling it missing.
+      Assert.False(result.Success);
+      Assert.Equal($"Condition on edge {Id(100)} has an empty RequiresPoi.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_ConditionOnNonSolutionPoi_Fails()
+    {
+      // Arrange: A collectible Goal POI satisfies the passage in traversal terms, but a
+      // RequiresSolution condition may only reference a Solution POI.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start), Poi(12, EnPoiType.Goal)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges = [Edge(100, from: 1, to: 2, conditions: [Condition(12)])],
+      };
+
+      // Act: Validate the graph whose condition targets a Goal instead of a Solution.
+      var result = Validate(graph);
+
+      // Assert: Failure naming the edge, the POI and its offending type.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Condition on edge {Id(100)} references non-Solution POI {Id(12)} (type Goal).",
+        result.FailureReason);
+    }
   }
 
   /// <summary>Tests flood-fill reachability: open passages, one-way passages and leftovers.</summary>

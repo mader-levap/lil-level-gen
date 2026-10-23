@@ -17,9 +17,10 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// blue keys. See <see cref="LilCondition"/> for how conditions reference POIs.
 /// </para>
 /// <para>
-/// Immutable once created and added to <see cref="LilGraph.Edges"/>. Invariants (documented,
-/// not yet enforced): <see cref="Id"/> should not be <see cref="Guid.Empty"/>; <see cref="From"/>
-/// and <see cref="To"/> should reference existing nodes and should differ from each other.
+/// Immutable once created and added to <see cref="LilGraph.Edges"/>. Invariants (enforced by
+/// <see cref="LostInLimbo.LevelGen.Api.LevelGraphValidation"/>): <see cref="Id"/> must not be
+/// <see cref="Guid.Empty"/> and must be unique; <see cref="From"/>
+/// and <see cref="To"/> must reference existing nodes and must differ from each other.
 /// </para>
 /// </remarks>
 public sealed record LilEdge

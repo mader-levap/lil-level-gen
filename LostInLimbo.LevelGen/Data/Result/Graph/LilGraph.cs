@@ -41,8 +41,9 @@ public sealed record LilGraph
 
   /// <summary>
   /// All edges (passages) of this level graph. May be empty before graph generation runs.
-  /// Every <see cref="LilEdge.From"/> and <see cref="LilEdge.To"/> should reference an
-  /// existing node in <see cref="Nodes"/> (documented, not yet enforced).
+  /// Every <see cref="LilEdge.From"/> and <see cref="LilEdge.To"/> must reference an
+  /// existing node in <see cref="Nodes"/> (enforced by
+  /// <see cref="LostInLimbo.LevelGen.Api.LevelGraphValidation"/>).
   /// </summary>
   public List<LilEdge> Edges { get; set; } = new();
 }

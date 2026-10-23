@@ -13,9 +13,9 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// the map. The player has access to everything within a given place.
 /// </para>
 /// <para>
-/// Immutable once created and added to <see cref="LilGraph.Nodes"/>. Invariant (documented,
-/// not yet enforced): <see cref="Id"/> should not be <see cref="Guid.Empty"/>; it is assigned
-/// by the generator.
+/// Immutable once created and added to <see cref="LilGraph.Nodes"/>. Invariant (enforced by
+/// <see cref="LostInLimbo.LevelGen.Api.LevelGraphValidation"/>): <see cref="Id"/> must not be
+/// <see cref="Guid.Empty"/>; it is assigned by the generator.
 /// </para>
 /// </remarks>
 public sealed record LilNode

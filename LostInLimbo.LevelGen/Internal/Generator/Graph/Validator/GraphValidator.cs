@@ -25,7 +25,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// catch-all (e.g. a disconnected dead-end branch while the exit itself is fine). A
 /// conditioned edge wholly inside an unreachable branch is never a softlock - the player
 /// cannot stand at it - so it falls through to the unreachable-region reasons. Structural
-/// problems (missing nodes, dangling references, duplicate identifiers, nodes over their
+/// problems (empty or duplicate identifiers, missing nodes, dangling references, conditions
+/// pointing at missing or non-Solution POIs, nodes over their
 /// <see cref="LilNode.MaxEdges"/> hard cap, a Goal POI inside a secret node) are reported
 /// before any traversal. Each reason
 /// is reported only for the first failing check.
@@ -45,8 +46,8 @@ internal sealed class GraphValidator(LilGraph? graph)
   private HashSet<Guid> _startNodeIds = [];
   /// <summary>All end nodes.</summary>
   private HashSet<Guid> _exitNodeIds = [];
-  /// <summary>All POIs.</summary>
-  private HashSet<Guid> _poiIds = [];
+  /// <summary>All POI types mapped by POI id.</summary>
+  private Dictionary<Guid, EnPoiType> _poiTypes = [];
   /// <summary>Flooded nodes.</summary>
   private HashSet<Guid> _flooded = [];
 
@@ -91,7 +92,8 @@ internal sealed class GraphValidator(LilGraph? graph)
   }
 
   /// <summary>
-  /// Sets up internal data. Note it can fail here too.
+  /// Sets up internal data: builds the node and POI indexes, rejecting empty or duplicate
+  /// node/POI identifiers, and requires at least one Start and one Exit POI.
   /// </summary>
   /// <returns>Null if success, otherwise failure.</returns>
   private GraphValidationResult? Setup()
@@ -99,6 +101,8 @@ internal sealed class GraphValidator(LilGraph? graph)
     _nodesById = new Dictionary<Guid, LilNode>(_graph!.Nodes.Count);
     foreach (var node in _graph.Nodes)
     {
+      if (node.Id == Guid.Empty) return GraphValidationResult.Fail($"Node {node.Id} has an empty id.");
+
       if (!_nodesById.TryAdd(node.Id, node)) return GraphValidationResult.Fail($"Duplicate node id {node.Id}.");
     }
 
@@ -106,7 +110,9 @@ internal sealed class GraphValidator(LilGraph? graph)
     {
       foreach (var poi in node.Pois)
       {
-        if (!_poiIds.Add(poi.Id)) return GraphValidationResult.Fail($"Duplicate POI id {poi.Id}.");
+        if (poi.Id == Guid.Empty) return GraphValidationResult.Fail($"POI {poi.Id} has an empty id.");
+
+        if (!_poiTypes.TryAdd(poi.Id, poi.Type)) return GraphValidationResult.Fail($"Duplicate POI id {poi.Id}.");
 
         if (poi.Type == EnPoiType.Start) _startNodeIds.Add(node.Id);
         else if (poi.Type == EnPoiType.Exit) _exitNodeIds.Add(node.Id);
@@ -144,13 +150,24 @@ internal sealed class GraphValidator(LilGraph? graph)
   }
 
   /// <summary>
-  /// Check edges.
+  /// Checks edge identity (non-empty, unique) and reference integrity: both endpoints must
+  /// exist and differ, and every condition must carry a non-empty <see cref="LilCondition.RequiresPoi"/>
+  /// that references an existing POI of type <see cref="EnPoiType.Solution"/>.
   /// </summary>
+  /// <remarks>Runs after <see cref="Setup"/>, so every node and POI identifier is known to be
+  /// non-empty and unique.</remarks>
   /// <returns>Null if success, otherwise failure.</returns>
   private GraphValidationResult? CheckEdges()
   {
+    var edgeIds = new HashSet<Guid>();
     foreach (var edge in _graph!.Edges)
     {
+      if (edge.Id == Guid.Empty)
+        return GraphValidationResult.Fail($"Edge {edge.Id} has an empty id.");
+
+      if (!edgeIds.Add(edge.Id))
+        return GraphValidationResult.Fail($"Duplicate edge id {edge.Id}.");
+
       if (!_nodesById!.ContainsKey(edge.From))
         return GraphValidationResult.Fail($"Edge {edge.Id} references missing node {edge.From}.");
 
@@ -162,8 +179,15 @@ internal sealed class GraphValidator(LilGraph? graph)
 
       foreach (var condition in edge.Conditions)
       {
-        if (!_poiIds.Contains(condition.RequiresPoi))
+        if (condition.RequiresPoi == Guid.Empty)
+          return GraphValidationResult.Fail($"Condition on edge {edge.Id} has an empty RequiresPoi.");
+
+        if (!_poiTypes.TryGetValue(condition.RequiresPoi, out var poiType))
           return GraphValidationResult.Fail($"Condition on edge {edge.Id} references missing POI {condition.RequiresPoi}.");
+
+        if (condition.Type == EnConditionType.RequiresSolution && poiType != EnPoiType.Solution)
+          return GraphValidationResult.Fail(
+            $"Condition on edge {edge.Id} references non-Solution POI {condition.RequiresPoi} (type {poiType}).");
       }
     }
     return null;

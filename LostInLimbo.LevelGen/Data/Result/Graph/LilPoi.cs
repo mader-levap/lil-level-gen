@@ -7,8 +7,9 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// </summary>
 /// <remarks>
 /// Immutable once created. A node can contain multiple POIs (see <see cref="LilNode.Pois"/>).
-/// Invariant (documented, not yet enforced): <see cref="Id"/> should not be <see cref="Guid.Empty"/>
-/// and should be unique across the entire graph (not just within a single node), so that
+/// Invariant (enforced by <see cref="LostInLimbo.LevelGen.Api.LevelGraphValidation"/>):
+/// <see cref="Id"/> must not be <see cref="Guid.Empty"/>
+/// and must be unique across the entire graph (not just within a single node), so that
 /// <see cref="LilCondition"/> can reference a specific POI.
 /// </remarks>
 public sealed record LilPoi

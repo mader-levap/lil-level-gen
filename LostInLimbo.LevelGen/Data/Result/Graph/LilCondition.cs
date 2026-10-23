@@ -19,8 +19,10 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// Example: door requiring both red and blue keys produces two <see cref="LilCondition"/>
 /// entries on the same edge, each pointing to the respective key POI.
 /// </para>
-/// Invariants (documented, not yet enforced): for <see cref="EnConditionType.RequiresSolution"/>,
-/// <see cref="RequiresPoi"/> must reference an existing POI whose type is
+/// Invariants (enforced by <see cref="LostInLimbo.LevelGen.Api.LevelGraphValidation"/>):
+/// for <see cref="EnConditionType.RequiresSolution"/>,
+/// <see cref="RequiresPoi"/> must not be <see cref="Guid.Empty"/> and
+/// must reference an existing POI whose type is
 /// <see cref="EnPoiType.Solution"/>.
 /// </remarks>
 public sealed record LilCondition
