@@ -10,8 +10,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <para>
 /// Builds the simple level graph: one or more nodes without obstacles. Start and exit may or
 /// may not be in the same node. Skeleton relationships may not exceed
-/// <see cref="MaxEdgesStar"/> per node; the extra-relationships phase skips any node whose
-/// total degree has already reached <see cref="MaxEdges"/>.
+/// <see cref="MaxExtraDegreeStar"/> per node; the extra-relationships phase skips any node whose
+/// total degree has already reached <see cref="MaxExtraDegree"/>.
 /// </para>
 /// </summary>
 /// <remarks>
@@ -27,22 +27,24 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <list type="bullet">
 /// <item>Create a minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
 /// <item>Add POIs. Start and exit are random and the same node is allowed.</item>
-/// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxEdges"/>.</item>
+/// <item>Extra relationships between random nodes up to connectivity and <see cref="MaxExtraDegree"/>.</item>
 /// <item>Finalization: secret nodes, objective POIs, node relative size and grouping.</item>
 /// </list>
 /// </remarks>
 internal sealed class GraphBuilderSimple : AGraphBuilder
 {
+  /// <summary>Chance that given relationship is chokepoint (only one physical passage allowed for map generation).</summary>
+  private const float ChokepointChance = 0.5f;
+
   /// <summary>Total-degree eligibility threshold for the extra-relationships phase: nodes whose degree has reached this cap are skipped, so extras never push total degree above it (inclusive).</summary>
-  internal const int MaxEdges = 4;
+  internal const int MaxExtraDegree = 4;
   /// <summary>
   /// Maximum number of relationships a node may gain in the skeleton phase (inclusive). A
   /// central node that reaches this cap hands its remaining nodes over to a new central.
   /// </summary>
-  internal const int MaxEdgesStar = 7;
+  internal const int MaxExtraDegreeStar = 7;
   /// <summary>Minimum size where scenarios differ.</summary>
   private const int ScenarioSize = 3;
-
   /// <summary>
   /// Initial relative size of every node; replaced by the <see cref="ProcNodeRelSize"/>
   /// pass once the whole graph (relationships and POIs included) is known.
@@ -61,7 +63,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   /// <summary>
   /// Skeleton scenario for the minimal spanning structure. All three come from the same
   /// algorithm: create a linear prefix of nodes, then attach the rest to a central node,
-  /// handing over to a new central when the current one reaches <see cref="MaxEdgesStar"/>.
+  /// handing over to a new central when the current one reaches <see cref="MaxExtraDegreeStar"/>.
   /// </summary>
   private enum EnSkeletonScenario
   {
@@ -121,7 +123,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
       Graph.Nodes.Add(new LilNode {
         Id = id,
         RelSize = NodeRelSize,
-        MaxEdges = MaxEdgesStar
+        MaxEdges = MaxExtraDegreeStar
       });
     }
 
@@ -131,7 +133,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   /// <summary>
   /// Creates the minimal connected skeleton: a chain over a linear prefix of nodes, with
   /// every remaining node attached to the current central node. When a central node reaches
-  /// <see cref="MaxEdgesStar"/>, a new central takes over so no node exceeds the skeleton
+  /// <see cref="MaxExtraDegreeStar"/>, a new central takes over so no node exceeds the skeleton
   /// cap. Uses exactly <c>size - 1</c> relationships - the minimum for a connected graph.
   /// </summary>
   /// <param name="size">Total number of nodes, from <c>CnfGraph.Size</c>.</param>
@@ -163,7 +165,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
       var central = PickCentral(linearCount);
       for (var i = linearCount; i < size; i++)
       {
-        if (degrees[central] >= MaxEdgesStar) central = PickNextCentral(degrees);
+        if (degrees[central] >= MaxExtraDegreeStar) central = PickNextCentral(degrees);
         AddEdge(central, i, nodeIds, degrees, adjacency);
       }
     }
@@ -197,7 +199,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
 
   /// <summary>
   /// Picks a replacement central node once the previous one reached
-  /// <see cref="MaxEdgesStar"/>. Only already attached nodes (degree at least one) below
+  /// <see cref="MaxExtraDegreeStar"/>. Only already attached nodes (degree at least one) below
   /// the cap are eligible - an unattached node would split the skeleton into components.
   /// </summary>
   /// <remarks>
@@ -209,7 +211,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   /// <param name="degrees">Per-node relationship count.</param>
   /// <returns>Index of the chosen central node.</returns>
   /// <exception cref="InvalidOperationException">
-  /// No eligible node remains; unreachable as long as <see cref="MaxEdgesStar"/> is at least two.
+  /// No eligible node remains; unreachable as long as <see cref="MaxExtraDegreeStar"/> is at least two.
   /// </exception>
   private int PickNextCentral(int[] degrees)
   {
@@ -217,7 +219,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
     var eligible = new List<int>();
     for (var i = 0; i < degrees.Length; i++)
     {
-      if (degrees[i] >= 1 && degrees[i] < MaxEdgesStar) eligible.Add(i);
+      if (degrees[i] >= 1 && degrees[i] < MaxExtraDegreeStar) eligible.Add(i);
     }
 
     if (eligible.Count == 0)
@@ -294,7 +296,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
     foreach (var (from, to) in candidates)
     {
       if (added >= connectivity) break;
-      if (degrees[from] >= MaxEdges || degrees[to] >= MaxEdges) continue;
+      if (degrees[from] >= MaxExtraDegree || degrees[to] >= MaxExtraDegree) continue;
 
       AddEdge(from, to, nodeIds, degrees, adjacency);
       added++;
@@ -322,7 +324,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
       Id = DeriveEdgeId(from, to),
       From = nodeIds[from],
       To = nodeIds[to],
-      Chokepoint = Random.NextBool(0.5f),
+      Chokepoint = Random.NextBool(ChokepointChance),
     });
   }
 

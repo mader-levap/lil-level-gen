@@ -145,7 +145,7 @@ public sealed class LevelGenerationSession
 
   /// <summary>
   /// Resume level generation, applying the given run kind to the next segment.
-  /// Works only if generation is paused (run kind budget exhausted or an explicit
+  /// Works only if generation is <b>paused</b> (run kind budget exhausted or an explicit
   /// <see cref="Pause"/> request stopped the previous run).
   /// </summary>
   /// <param name="enRunKind">The kind of run.</param>

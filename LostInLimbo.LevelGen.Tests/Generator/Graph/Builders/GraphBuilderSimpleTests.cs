@@ -16,10 +16,10 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 public sealed class GraphBuilderSimpleTests
 {
   /// <summary>Mirrors <c>GraphBuilderSimple.MaxEdges</c>: cap of the random-relationships phase.</summary>
-  private const int MaxDegree = GraphBuilderSimple.MaxEdges;
+  private const int MaxDegree = GraphBuilderSimple.MaxExtraDegree;
 
   /// <summary>Mirrors <c>GraphBuilderSimple.MaxEdgesStar</c>: cap of the skeleton phase.</summary>
-  private const int MaxDegreeStar = GraphBuilderSimple.MaxEdgesStar;
+  private const int MaxDegreeStar = GraphBuilderSimple.MaxExtraDegreeStar;
 
   /// <summary>Tests for the skeleton shape: node count, minimality, connectivity, scenarios.</summary>
   public sealed class ShapeTests

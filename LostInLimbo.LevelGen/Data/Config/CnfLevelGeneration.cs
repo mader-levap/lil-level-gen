@@ -60,8 +60,12 @@ public sealed record CnfLevelGeneration
       throw new ArgumentOutOfRangeException(nameof(ConfigVersion), ConfigVersion, "Config version must be at least 1.");
     if (General is null)
       throw new ArgumentException("General config must not be null.", nameof(General));
+    if (Style is null)
+      throw new ArgumentException("Style config must not be null.", nameof(Style));
     if (Graph is null)
       throw new ArgumentException("Graph config must not be null.", nameof(Graph));
+    if (Map is null)
+      throw new ArgumentException("Map config must not be null.", nameof(Map));
 
     General.Validate();
     Style.Validate();
