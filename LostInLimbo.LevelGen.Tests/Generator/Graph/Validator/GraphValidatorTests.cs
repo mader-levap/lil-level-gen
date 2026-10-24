@@ -1805,6 +1805,98 @@ public sealed class GraphValidatorTests
         $"One-way passage {Id(101)} is a point of no return: the far side cannot reach the Exit.",
         result.FailureReason);
     }
+
+    [Fact]
+    public void Validate_TwoMandatoryGoalsBothReachable_Succeeds()
+    {
+      // Arrange: Two mandatory goals on the open path to the exit.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(20, EnPoiType.Goal)),
+          Node(3, Poi(21, EnPoiType.Goal)),
+          Node(4, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 2, to: 3),
+          Edge(102, from: 3, to: 4),
+        ],
+      };
+
+      // Act: Validate the graph with both goals reachable.
+      var result = Validate(graph);
+
+      // Assert: Winning requires every mandatory goal reached; both are.
+      Assert.True(result.Success, result.FailureReason);
+      Assert.Null(result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_TwoMandatoryGoals_OneStrandedBehindOneWay_ReportsFirstGoal()
+    {
+      // Arrange: Two mandatory goals; the one-way into the exit strands goal 20 on the near
+      // side while goal 21 crosses with the exit. The strand scan runs in node-list order,
+      // so goal 20 (node 2) must be named, not goal 21 (node 3).
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(20, EnPoiType.Goal)),
+          Node(3, Poi(21, EnPoiType.Goal)),
+          Node(4, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 2, to: 3),
+          Edge(102, from: 3, to: 4, EnPassageDirection.OneWay),
+        ],
+      };
+
+      // Act: Validate the graph whose first goal is stranded by the one-way.
+      var result = Validate(graph);
+
+      // Assert: Failure names the first goal in node-list order.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"Goal POI {Id(20)} is stranded behind one-way passage {Id(102)}.",
+        result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_TwoMandatoryGoals_OneOnUnreachableIsland_ReportsUnreachable()
+    {
+      // Arrange: One mandatory goal reachable (node 2), the other a disconnected island
+      // (node 3). The island is unreachable either way, so it belongs to the leftover-node
+      // reason, not the strand reason - there are no one-way edges at all.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(20, EnPoiType.Goal)),
+          Node(3, Poi(21, EnPoiType.Goal)),
+          Node(4, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 1, to: 4),
+        ],
+      };
+
+      // Act: Validate the graph with an orphaned mandatory goal.
+      var result = Validate(graph);
+
+      // Assert: Unreachable content keeps the unreachable-node report.
+      Assert.False(result.Success);
+      Assert.Equal("1 node(s) unreachable from start POI.", result.FailureReason);
+    }
   }
 
   /// <summary>
