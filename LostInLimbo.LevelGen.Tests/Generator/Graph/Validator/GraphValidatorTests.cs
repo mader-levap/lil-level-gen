@@ -23,6 +23,24 @@ public sealed class GraphValidatorTests
   public sealed class StructureTests
   {
     [Fact]
+    public void Validate_ValidationDisabled_ReturnsSuccess()
+    {
+      // Arrange: Broken graph (missing start and exit POIs) but validation disabled.
+      var graph = new LilGraph
+      {
+        Nodes = [Node(1)],
+        Edges = [],
+      };
+
+      // Act: Validate with validation disabled.
+      var result = Validate(graph, CnfValidGraphOpt.Default);
+
+      // Assert: Success regardless of broken graph.
+      Assert.True(result.Success);
+      Assert.Null(result.FailureReason);
+    }
+
+    [Fact]
     public void Validate_NullGraph_Fails()
     {
       // Arrange: No graph at all.
@@ -382,7 +400,7 @@ public sealed class GraphValidatorTests
 
       // Assert: Failure reports the unreachable exit. Note this error takes precedence over the orphan node.
       Assert.False(result.Success);
-      Assert.Equal("Exit POI is not reachable from Start.", result.FailureReason);
+      Assert.Equal("Exit POI is not reachable from start POI.", result.FailureReason);
     }
 
     [Fact]
@@ -482,7 +500,7 @@ public sealed class GraphValidatorTests
 
       // Assert: The player cannot walk 2 -> 1, so the exit is unreachable.
       Assert.False(result.Success);
-      Assert.Equal("Exit POI is not reachable from Start.", result.FailureReason);
+      Assert.Equal("Exit POI is not reachable from start POI.", result.FailureReason);
     }
   }
 
@@ -696,7 +714,7 @@ public sealed class GraphValidatorTests
 
       // Assert: The unreachable exit wins over the gate the player never encounters.
       Assert.False(result.Success);
-      Assert.Equal("Exit POI is not reachable from Start.", result.FailureReason);
+      Assert.Equal("Exit POI is not reachable from start POI.", result.FailureReason);
     }
 
     [Fact]
@@ -755,6 +773,29 @@ public sealed class GraphValidatorTests
   /// <summary>Tests the <see cref="LilNode.MaxEdges"/> hard cap: over-cap failures and unlimited negative caps.</summary>
   public sealed class MaxEdgesTests
   {
+    
+    [Fact]
+    public void Validate_NodeMaxEdgesZeroWithEdge_Fails()
+    {
+      // Arrange: Node with MaxEdges 0 but has an edge.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, 0, Poi(10, EnPoiType.Start)),
+          Node(2, 0, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges = [Edge(100, from: 1, to: 2)],
+      };
+
+      // Act: Validate the graph.
+      var result = Validate(graph);
+
+      // Assert: Failure due to over-cap.
+      Assert.False(result.Success);
+      Assert.Equal($"Node {Id(1)} has 1 relationships, over its MaxEdges cap of 0.", result.FailureReason);
+    }
+
     [Fact]
     public void Validate_NodeOverMaxEdgesCap_Fails()
     {
@@ -902,6 +943,197 @@ public sealed class GraphValidatorTests
       Assert.Equal(
         $"Node {Id(1)} has 2 relationships, over its MaxEdges cap of 1.",
         result.FailureReason);
+    }
+  }
+
+  /// <summary>Tests for the goal-in-secret rule and its deliberate exceptions.</summary>
+  public sealed class StartExitPoisTests
+  {
+    [Fact]
+    public void Validate_MultipleStarts_ExitMustBeReachableFromAllStarts_Fails()
+    {
+      // Arrange: Two start nodes; exit only reachable from start 1, not from start 2.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Start)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 3),
+        ],
+      };
+
+      // Act: Validate the graph.
+      var result = Validate(graph);
+
+      // Assert: Exit must be reachable from all starts.
+      Assert.False(result.Success);
+      Assert.Equal("Exit POI is not reachable from at least one start POI.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_MultipleStarts_ExitReachableFromAllStarts_Succeeds()
+    {
+      // Arrange: Two start nodes; exit reachable from both.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Start)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 3),
+          Edge(101, from: 2, to: 3),
+        ],
+      };
+
+      // Act: Validate the graph.
+      var result = Validate(graph);
+
+      // Assert: All starts can reach exit.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_MultipleExits_AllExitsMustBeReachableFromSingleStart_Fails()
+    {
+      // Arrange: One start, two exits; only exit 1 reachable.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3, Poi(13, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+        ],
+      };
+
+      // Act: Validate the graph.
+      var result = Validate(graph);
+
+      // Assert: All exits must be reachable.
+      Assert.False(result.Success);
+      Assert.Equal("At least one exit POI is not reachable from any start POI.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_MultipleExits_AllExitsReachableFromSingleStart_Succeeds()
+    {
+      // Arrange: One start, two exits; both reachable.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3, Poi(13, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 1, to: 3),
+        ],
+      };
+
+      // Act: Validate the graph.
+      var result = Validate(graph);
+
+      // Assert: All exits reachable.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_MultipleStartsAndExits_AllStartsMustReachAtLeastOneExit_AllExitsReachableByAtLeastOneStart_Succeeds()
+    {
+      // Arrange: Two starts, two exits; start1 can reach exit1, start2 can reach exit2.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Start)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+          Node(4, Poi(13, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 3),
+          Edge(101, from: 2, to: 4),
+        ],
+      };
+
+      // Act: Validate the graph.
+      var result = Validate(graph);
+
+      // Assert: All starts reach at least one exit, all exits reachable by at least one start.
+      Assert.True(result.Success, result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_MultipleStartsAndExits_FailsIfSomeStartCannotReachAnyExit()
+    {
+      // Arrange: start2 cannot reach any exit.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Start)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+          Node(4, Poi(13, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 3),
+          Edge(101, from: 1, to: 4),
+        ],
+      };
+
+      // Act: Validate the graph.
+      var result = Validate(graph);
+
+      // Assert: Some start cannot reach any exit.
+      Assert.False(result.Success);
+      Assert.Equal("Exit POI is not reachable from at least one start POI.", result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_MultipleStartsAndExits_FailsIfSomeExitNotReachableByAnyStart()
+    {
+      // Arrange: exit2 not reachable by any start.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(12, EnPoiType.Start)),
+          Node(3, Poi(11, EnPoiType.Exit)),
+          Node(4, Poi(13, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 3),
+          Edge(101, from: 2, to: 3),
+        ],
+      };
+
+      // Act: Validate the graph.
+      var result = Validate(graph);
+
+      // Assert: Some exit not reachable by any start.
+      Assert.False(result.Success);
+      Assert.Equal("At least one exit POI is not reachable from any start POI.", result.FailureReason);
     }
   }
 
@@ -1455,7 +1687,7 @@ public sealed class GraphValidatorTests
 
       // Assert: The guard lets CheckExits report the unreachable exit first.
       Assert.False(result.Success);
-      Assert.Equal("Exit POI is not reachable from Start.", result.FailureReason);
+      Assert.Equal("Exit POI is not reachable from start POI.", result.FailureReason);
     }
 
     [Fact]

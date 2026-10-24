@@ -403,13 +403,33 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
   /// <returns>Null if success, otherwise failure.</returns>
   private LilResult? CheckExits()
   {
-    if (!ContainsAnyExit(_flooded))
-      return LilResult.Fail("Exit POI is not reachable from Start.");
+    // Every exit must be reachable by at least one start.
+    foreach (var exitId in _exitNodeIds)
+    {
+      if (!_flooded.Contains(exitId)) {
+        if (_exitNodeIds.Count == 1) return LilResult.Fail("Exit POI is not reachable from start POI.");
+        return LilResult.Fail("At least one exit POI is not reachable from any start POI.");
+      }
+    }
+
+    // Every start must be able to reach at least one exit. Walk backwards from the
+    // exits along the passages: a node can reach an exit when it can step (forward
+    // along any passage, or backward along a bidirectional one) into a node already
+    // known to reach an exit.
+    var canReachExit = new HashSet<Guid>();
+    FloodBackwardsFromExits(canReachExit);
+    foreach (var startId in _startNodeIds)
+    {
+      if (!canReachExit.Contains(startId)) {
+        if (_startNodeIds.Count == 1) return LilResult.Fail("Exit POI is not reachable from at start POI.");
+        return LilResult.Fail("Exit POI is not reachable from at least one start POI.");
+      }
+    }
 
     var unreachableCount = _graph!.Nodes.Count - _flooded.Count;
     if (unreachableCount > 0)
       return LilResult.Fail($"{unreachableCount} node(s) unreachable from Start.");
-    return null; // Success: Exit POI is reachable from Start POI.
+    return null; // Success: every start reaches an exit and every exit is reachable.
   }
 
   // ///////////////////////////////////////////////////////////////////////////
@@ -598,6 +618,38 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     }
 
     return false;
+  }
+
+  /// <summary>
+  /// Fills <paramref name="reached"/> with every node that can reach at least one exit,
+  /// walking backwards along the passages from the exit nodes. A node can reach an exit
+  /// when it can step forward along any passage, or backward along a bidirectional
+  /// passage, into a node already known to reach an exit. Mirrors the traversal rules of
+  /// the forward flood, so one-way passages only carry reachability in their forward
+  /// sense. Deterministic: edges are scanned in list order.
+  /// </summary>
+  /// <param name="reached">Node ids that can reach an exit.</param>
+  private void FloodBackwardsFromExits(HashSet<Guid> reached)
+  {
+    foreach (var exitId in _exitNodeIds)
+      reached.Add(exitId);
+
+    var changed = true;
+    while (changed)
+    {
+      changed = false;
+      foreach (var edge in _graph!.Edges)
+      {
+        // A passage From -> To lets From reach whatever To reaches.
+        if (reached.Contains(edge.To) && reached.Add(edge.From)) changed = true;
+
+        // A bidirectional passage lets To step back to From.
+        if (edge.Direction == EnPassageDirection.Bidirectional
+            && reached.Contains(edge.From)
+            && reached.Add(edge.To))
+          changed = true;
+      }
+    }
   }
 
   /// <summary>Floods a node (marks it reachable) and collects its POIs; returns false when the node
