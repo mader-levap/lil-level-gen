@@ -132,6 +132,7 @@ Prefer focused tests. Example names:
 
 Other rules:
 - If a bug is known, create a test first, run it to make sure the test catches the bug, then fix the bug.
+- If possible, create a test first for new behavior, run it (should fail), then implement behavior.
 - Comment tests. Use the Arrange/Act/Assert convention, for example `// Assert: Value is correct.`
 - For test files with many tests, group them logically into test suites.
 

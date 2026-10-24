@@ -46,10 +46,13 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// concurrent calls. Safe to call in bulk seed loops.</para>
 /// </remarks>
 /// <param name="graph">Graph to verify.</param>
-internal sealed class GraphValidator(LilGraph? graph)
+/// <param name="options">Validator options; defaults to <see cref="GraphValidatorOpt.Default"/>.</param>
+internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options)
 {
   /// <summary>Graph to verify.</summary>
   private LilGraph? _graph = graph;
+  /// <summary>Validator options; defaults to <see cref="GraphValidatorOpt.Default"/>.</summary>
+  private GraphValidatorOpt _options = options ?? GraphValidatorOpt.Default;
   /// <summary>All nodes mapped by id.</summary>
   private Dictionary<Guid, LilNode>? _nodesById;
   /// <summary>All start nodes.</summary>
@@ -90,8 +93,7 @@ internal sealed class GraphValidator(LilGraph? graph)
     result = CheckExits();
     if (result != null) return result;
 
-    return GraphValidationResult.Succeed();
-
+    return GraphValidationResult.Succeed(); // Success: All checks passed.
   }
 
   /// <summary>
@@ -102,7 +104,7 @@ internal sealed class GraphValidator(LilGraph? graph)
   {
     if (_graph is null) return GraphValidationResult.Fail("Graph is null.");
     if (_graph.Nodes.Count == 0) return GraphValidationResult.Fail("Graph has no nodes.");
-    return null;
+    return null; // Success: Graph exists and has nodes.
   }
 
   /// <summary>
@@ -138,7 +140,7 @@ internal sealed class GraphValidator(LilGraph? graph)
     if (_startNodeIds.Count == 0) return GraphValidationResult.Fail("Graph has no Start POI.");
     if (_exitNodeIds.Count == 0) return GraphValidationResult.Fail("Graph has no Exit POI.");
 
-    return null;
+    return null; // Success: Basic structure of graph is valid.
   }
 
   /// <summary>
@@ -162,7 +164,7 @@ internal sealed class GraphValidator(LilGraph? graph)
       }
     }
 
-    return null;
+    return null; // Success: No secret contain obligatory goal.
   }
 
   /// <summary>
@@ -206,7 +208,7 @@ internal sealed class GraphValidator(LilGraph? graph)
             $"Condition on edge {edge.Id} references non-Solution POI {condition.RequiresPoi} (type {poiType}).");
       }
     }
-    return null;
+    return null; // Success: All edges are valid.
   }
 
   /// <summary>
@@ -236,7 +238,7 @@ internal sealed class GraphValidator(LilGraph? graph)
           $"Node {node.Id} has {degrees[node.Id]} relationships, over its MaxEdges cap of {node.MaxEdges}.");
     }
 
-    return null;
+    return null; // Success: All nodes observe MaxEdges hard cap.
   }
 
   /// <summary>
@@ -282,7 +284,7 @@ internal sealed class GraphValidator(LilGraph? graph)
 
       return GraphValidationResult.Fail($"Conditioned edge {edge.Id} can never be satisfied.");
     }
-    return null;
+    return null; // Success: All nodes are reachable by player.
   }
 
   /// <summary>
@@ -342,6 +344,13 @@ internal sealed class GraphValidator(LilGraph? graph)
       // return could still reach.
       var farSide = new HashSet<Guid>();
       FloodStructural(farSide, edge.To);
+      bool containsAnyExit = ContainsAnyExit(farSide);
+
+      // When one-way dead ends are disallowed, entering a one-way whose far side cannot
+      // reach the Exit is always a softlock - even when the dead end holds no important
+      // POI and the level stays winnable without crossing it.
+      if (!_options.AllowOneWayDeadEnds && !containsAnyExit)
+        return TrappedFailure(edge, farSide, referencedSolutions);
 
       // What stays winnable without ever crossing: condition-aware, with the far side off
       // limits for both standing around and picking anything up.
@@ -355,8 +364,7 @@ internal sealed class GraphValidator(LilGraph? graph)
       // passage's.
       if (!IsShortfallFromFarSide(canWin)) continue;
 
-      if (!ContainsAnyExit(farSide))
-        return TrappedFailure(edge, farSide, referencedSolutions);
+      if (!containsAnyExit) return TrappedFailure(edge, farSide, referencedSolutions);
 
       // The far side holds the exit, so crossing it is forced to finish the level: every
       // mandatory goal the player can currently reach must stay reachable from there.
@@ -375,8 +383,26 @@ internal sealed class GraphValidator(LilGraph? graph)
       }
     }
 
-    return null;
+    return null; // Success: graph is beatable.
   }
+
+  /// <summary>
+  /// Check exits.
+  /// </summary>
+  /// <returns>Null if success, otherwise failure.</returns>
+  private GraphValidationResult? CheckExits()
+  {
+    if (!ContainsAnyExit(_flooded))
+      return GraphValidationResult.Fail("Exit POI is not reachable from Start.");
+
+    var unreachableCount = _graph!.Nodes.Count - _flooded.Count;
+    if (unreachableCount > 0)
+      return GraphValidationResult.Fail($"{unreachableCount} node(s) unreachable from Start.");
+    return null; // Success: Exit POI is reachable from Start POI.
+  }
+
+  // ///////////////////////////////////////////////////////////////////////////
+  // Helper functions.
 
   /// <summary>Floods a node and everything structurally reachable from it: bidirectional
   /// passages both ways, one-way passages forward only, conditions ignored and no POIs
@@ -544,21 +570,6 @@ internal sealed class GraphValidator(LilGraph? graph)
     }
 
     return false;
-  }
-
-  /// <summary>
-  /// Check exits.
-  /// </summary>
-  /// <returns>Null if success, otherwise failure.</returns>
-  private GraphValidationResult? CheckExits()
-  {
-    if (!ContainsAnyExit(_flooded))
-      return GraphValidationResult.Fail("Exit POI is not reachable from Start.");
-
-    var unreachableCount = _graph!.Nodes.Count - _flooded.Count;
-    if (unreachableCount > 0)
-      return GraphValidationResult.Fail($"{unreachableCount} node(s) unreachable from Start.");
-    return null;
   }
 
   /// <summary>Floods a node (marks it reachable) and collects its POIs; returns false when the node

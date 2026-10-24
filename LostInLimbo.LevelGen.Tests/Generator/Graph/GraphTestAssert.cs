@@ -209,7 +209,7 @@ internal static class GraphTestAssert
   /// <param name="graph">Graph to check.</param>
   public static void AssertBeatable(LilGraph graph, string failMsg = "")
   {
-    var result = new GraphValidator(graph).Validate();
+    var result = new GraphValidator(graph, GraphValidatorOpt.Default).Validate();
 
     // Assert: The validation reports success; otherwise its reason explains the failure.
     if (failMsg != "") failMsg += "\n";

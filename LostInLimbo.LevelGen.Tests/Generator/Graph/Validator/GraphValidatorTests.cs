@@ -1481,11 +1481,105 @@ public sealed class GraphValidatorTests
       Assert.False(result.Success);
       Assert.Equal("1 node(s) unreachable from Start.", result.FailureReason);
     }
+
+    [Fact]
+    public void Validate_ExitLessOneWayDeadEnd_Allowed_Succeeds()
+    {
+      // Arrange: Start reaches an exit directly, plus an open one-way into an empty dead end.
+      // With dead ends allowed (default), the voluntary one-way is fine.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 1, to: 3, EnPassageDirection.OneWay),
+        ],
+      };
+
+      // Act: Validate with default options.
+      var result = Validate(graph);
+
+      // Assert: The empty dead end is allowed.
+      Assert.True(result.Success, result.FailureReason);
+      Assert.Null(result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_ExitLessOneWayDeadEnd_Disallowed_Fails()
+    {
+      // Arrange: Same empty dead end, but one-way dead ends are disallowed.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 1, to: 3, EnPassageDirection.OneWay),
+        ],
+      };
+
+      // Act: Validate with dead ends disallowed.
+      var result = Validate(graph, new GraphValidatorOpt { AllowOneWayDeadEnds = false });
+
+      // Assert: The one-way is a point of no return even though the dead end is empty.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"One-way passage {Id(101)} is a point of no return: the far side cannot reach the Exit.",
+        result.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_SolvableGateInsideDisallowedDeadEnd_Fails()
+    {
+      // Arrange: Start holds the key, a one-way leads into an empty dead end containing a
+      // solvable conditioned gate. Even though the gate can be opened, the dead end itself
+      // has no exit, so disallowing dead ends rejects the whole one-way.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start), Poi(12, EnPoiType.Solution)),
+          Node(2, Poi(11, EnPoiType.Exit)),
+          Node(3),
+          Node(4),
+        ],
+        Edges =
+        [
+          Edge(100, from: 1, to: 2),
+          Edge(101, from: 1, to: 3, EnPassageDirection.OneWay),
+          Edge(102, from: 3, to: 4, conditions: [Condition(12)]),
+        ],
+      };
+
+      // Act: Validate with dead ends disallowed.
+      var result = Validate(graph, new GraphValidatorOpt { AllowOneWayDeadEnds = false });
+
+      // Assert: The far side of the one-way holds no exit, so the passage itself is rejected
+      // before the conditioned gate is ever considered.
+      Assert.False(result.Success);
+      Assert.Equal(
+        $"One-way passage {Id(101)} is a point of no return: the far side cannot reach the Exit.",
+        result.FailureReason);
+    }
   }
 
   /// <summary>
   /// Runs one validation on a fresh validator instance. A <see cref="GraphValidator"/> holds
   /// per-call state, so instances must not be reused or shared across threads.
   /// </summary>
-  private static GraphValidationResult Validate(LilGraph? graph) => new GraphValidator(graph).Validate();
+  /// <param name="graph">Graph to validate.</param>
+  /// <param name="options">Validator options; defaults to <see cref="GraphValidatorOpt.Default"/>.</param>
+  private static GraphValidationResult Validate(LilGraph? graph, GraphValidatorOpt? options = null)
+    => new GraphValidator(graph, options).Validate();
 }

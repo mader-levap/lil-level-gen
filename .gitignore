@@ -13,6 +13,9 @@ artifacts/
 *.userosscache
 *.sln.docstates
 
+# AI
+.kilo
+
 # Test results
 [Tt]est[Rr]esults/
 *.trx

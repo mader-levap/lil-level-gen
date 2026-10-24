@@ -31,6 +31,6 @@ public static class LevelGraphValidation
     if (world is null) throw new ArgumentNullException(nameof(world));
 
     // Fresh validator per call: instances hold per-call state and must not be shared.
-    return new GraphValidator(world.Graph).Validate();
+    return new GraphValidator(world.Graph, GraphValidatorOpt.Default).Validate();
   }
 }
