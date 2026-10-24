@@ -42,9 +42,18 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// A conditioned edge wholly inside an unreachable branch is never a softlock - the player
 /// cannot stand at it - so it falls through to the unreachable-region reasons.
 /// </para>
-/// <para>Instances hold per-call state, so create a new instance per validation
+/// <para>
+/// Instances hold per-call state, so create a new instance per validation
 /// (or use <see cref="LevelGraphValidation"/>); one instance must not be shared across
-/// concurrent calls. Safe to call in bulk seed loops.</para>
+/// concurrent calls. Safe to call in bulk seed loops.
+/// </para>
+/// <para>
+/// Optimizations will be done later. Main issues:
+/// </para>
+/// <list type="bullet">
+/// <item><b>CheckTraversals()</b>: O(N·E). Condition-aware fixpoint rescans all edges each iteration; a long chain floods one node/iteration → O(N²) edge scans.</item>
+/// <item><b>CheckGoalBeatability()</b>: O(K·(N·E + N·P)). THE HOTSPOT — per reachable one-way edge: a full structural flood + a full condition-aware excluding flood; chained one-ways → cubic.</item>
+/// </list>
 /// </remarks>
 /// <param name="graph">Graph to verify.</param>
 /// <param name="options">Validator options.</param>
@@ -332,17 +341,15 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     if (!ContainsAnyExit(_flooded)) return null;
 
     // POIs any passage condition points at; only those count as must-collect content.
-    var referencedSolutions = new HashSet<Guid>();
-    foreach (var edge in _graph!.Edges)
-    {
-      foreach (var condition in edge.Conditions)
-        referencedSolutions.Add(condition.RequiresPoi);
-    }
+    // Built lazily on the first reachable one-way edge; graphs without one skip this work.
+    HashSet<Guid>? referencedSolutions = null;
 
-    foreach (var edge in _graph.Edges)
+    foreach (var edge in _graph!.Edges)
     {
       if (edge.Direction != EnPassageDirection.OneWay) continue;
       if (!_flooded.Contains(edge.From)) continue;
+
+      referencedSolutions ??= BuildReferencedSolutions();
 
       // Flood the far side structurally to see what a player crossing the point of no
       // return could still reach.
@@ -354,7 +361,7 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
       // reach the Exit is always a softlock - even when the dead end holds no important
       // POI and the level stays winnable without crossing it.
       if (!_options.AllowOneWayDeadEnds && !containsAnyExit)
-        return TrappedFailure(edge, farSide, referencedSolutions);
+        return TrappedFailure(edge, farSide, referencedSolutions!);
 
       // What stays winnable without ever crossing: condition-aware, with the far side off
       // limits for both standing around and picking anything up.
@@ -368,7 +375,7 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
       // passage's.
       if (!IsShortfallFromFarSide(canWin)) continue;
 
-      if (!containsAnyExit) return TrappedFailure(edge, farSide, referencedSolutions);
+      if (!containsAnyExit) return TrappedFailure(edge, farSide, referencedSolutions!);
 
       // The far side holds the exit, so crossing it is forced to finish the level: every
       // mandatory goal the player can currently reach must stay reachable from there.
@@ -560,6 +567,23 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
 
     return LilResult.Fail(
       $"One-way passage {edge.Id} is a point of no return: the far side cannot reach the Exit.");
+  }
+
+  /// <summary>Builds the set of all POI ids referenced by passage conditions.</summary>
+  /// <returns>
+  /// Ids of every <see cref="LilCondition.RequiresPoi"/> across all edges. Deterministic:
+  /// edges and conditions are scanned in list order; the result is a set used only for
+  /// membership tests, so iteration order never affects output.
+  /// </returns>
+  private HashSet<Guid> BuildReferencedSolutions()
+  {
+    var referencedSolutions = new HashSet<Guid>();
+    foreach (var edge in _graph!.Edges)
+    {
+      foreach (var condition in edge.Conditions)
+        referencedSolutions.Add(condition.RequiresPoi);
+    }
+    return referencedSolutions;
   }
 
   /// <summary>Checks whether any node holding an <see cref="EnPoiType.Exit"/> POI is
