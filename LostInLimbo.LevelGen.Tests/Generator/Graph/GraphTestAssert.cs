@@ -1,3 +1,4 @@
+using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 
@@ -209,7 +210,7 @@ internal static class GraphTestAssert
   /// <param name="graph">Graph to check.</param>
   public static void AssertBeatable(LilGraph graph, string failMsg = "")
   {
-    var result = new GraphValidator(graph, GraphValidatorOpt.Default).Validate();
+    var result = new GraphValidator(graph, CnfValidGraphOpt.DefEnabled).Validate();
 
     // Assert: The validation reports success; otherwise its reason explains the failure.
     if (failMsg != "") failMsg += "\n";

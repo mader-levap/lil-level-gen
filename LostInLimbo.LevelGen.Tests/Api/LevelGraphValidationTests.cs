@@ -1,11 +1,11 @@
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Tests.Generator.Graph;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
-using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestSupport;
 
 namespace LostInLimbo.LevelGen.Tests.Api;
 
@@ -22,7 +22,7 @@ public sealed class LevelGraphValidationTests
     // Arrange: No world at all.
 
     // Act: Try to validate the missing world.
-    var act = () => LevelGraphValidation.Validate(null!);
+    var act = () => LevelGraphValidation.Validate(null!, CnfValidGraphOpt.DefEnabled);
 
     // Assert: The argument is rejected up front.
     var exception = Assert.Throws<ArgumentNullException>(act);
@@ -36,7 +36,7 @@ public sealed class LevelGraphValidationTests
     var world = new LilWorld();
 
     // Act: Validate the not-yet-generated graph.
-    var result = LevelGraphValidation.Validate(world);
+    var result = LevelGraphValidation.Validate(world, CnfValidGraphOpt.DefEnabled);
 
     // Assert: Failure reported through the public result shape.
     Assert.False(result.Success);
@@ -60,7 +60,7 @@ public sealed class LevelGraphValidationTests
     };
 
     // Act: Validate the disconnected graph.
-    var result = LevelGraphValidation.Validate(world);
+    var result = LevelGraphValidation.Validate(world, CnfValidGraphOpt.DefEnabled);
 
     // Assert: The leftover node is reported.
     Assert.False(result.Success);
@@ -76,7 +76,7 @@ public sealed class LevelGraphValidationTests
     var world = new LilWorld { Graph = graph };
 
     // Act: Validate the generated world.
-    var result = LevelGraphValidation.Validate(world);
+    var result = LevelGraphValidation.Validate(world, CnfValidGraphOpt.DefEnabled);
 
     // Assert: The generated graph is beatable.
     Assert.NotEmpty(graph.Nodes);

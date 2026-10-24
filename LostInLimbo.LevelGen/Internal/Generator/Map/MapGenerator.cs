@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Result;
@@ -8,8 +7,10 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Map;
 
 /// <summary>
 /// <para>Placeholder map pass; currently only advances the step counter (does not modify <c>LilMap</c>).</para>
-/// NOTE: right now it is a placeholder.
 /// </summary>
+/// <remarks>
+/// <para>Currently PLACEHOLDER.</para>
+/// </remarks>
 internal sealed class MapGenerator
 {
   /// <summary>Configuration data for level generation.</summary>

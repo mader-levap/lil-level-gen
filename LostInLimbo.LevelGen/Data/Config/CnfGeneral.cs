@@ -16,10 +16,12 @@ public sealed record CnfGeneral
   /// <summary>Default degeneration degree - no degeneration at all.</summary>
   public const float DefaultDegeneration = 0.0f;
 
-  //
+  // Defaults.
 
   /// <summary>Default instance.</summary>
   public static CnfGeneral Default { get; } = new();
+
+  // Fields.
 
   /// <summary>
   /// World seed from which all other seeds are derived deterministically.
@@ -33,7 +35,7 @@ public sealed record CnfGeneral
   /// </summary>
   public float Degeneration { get; init; } = DefaultDegeneration;
 
-  //
+  // Helpers.
 
   /// <summary>
   /// Checks that this config can be used for generation.

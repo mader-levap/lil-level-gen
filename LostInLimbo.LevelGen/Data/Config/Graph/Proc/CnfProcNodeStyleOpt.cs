@@ -1,16 +1,16 @@
 using System;
 
-namespace LostInLimbo.LevelGen.Data.Config.Graph;
+namespace LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 
 /// <summary>
 /// <para>Configuration of the node-grouping processor (<c>ProcNodeStyle</c>).</para>
 /// </summary>
-public sealed record CnfProcNodeStyleOpts
+public sealed record CnfProcNodeStyleOpt
 {
   /// <summary>
   /// Default instance: three groups.
   /// </summary>
-  public static CnfProcNodeStyleOpts Default { get; } = new()
+  public static CnfProcNodeStyleOpt Default { get; } = new()
   {
     GroupCount = 3,
   };
@@ -21,7 +21,7 @@ public sealed record CnfProcNodeStyleOpts
   /// </summary>
   public int GroupCount { get; init; } = 3;
 
-  //
+  // Helpers.
 
   /// <summary>
   /// Checks that this config can be used for generation.

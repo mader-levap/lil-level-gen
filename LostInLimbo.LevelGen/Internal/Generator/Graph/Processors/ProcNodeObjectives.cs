@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Utils;
 
@@ -50,7 +50,7 @@ internal sealed class ProcNodeObjectives
   /// <summary>Graph whose nodes gain objective POIs in place; may be empty.</summary>
   private readonly LilGraph _graph;
   /// <summary>Objective parameters; validated at construction.</summary>
-  private readonly CnfProcNodeObjectivesOpts _options;
+  private readonly CnfProcNodeObjectivesOpt _options;
   /// <summary>Random for sub-seed.</summary>
   private readonly SeededRandom _random;
   /// <summary>Graph sub-seed the identifier derivations are based on.</summary>
@@ -64,8 +64,8 @@ internal sealed class ProcNodeObjectives
   /// <param name="options">Objective parameters; validated before use.</param>
   /// <param name="seedGraph">Graph sub-seed the random stream and identifier derivations are based on.</param>
   /// <exception cref="ArgumentNullException"><paramref name="graph"/> or <paramref name="options"/> is null.</exception>
-  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="CnfProcNodeObjectivesOpts.Validate"/>.</exception>
-  public ProcNodeObjectives(LilGraph graph, CnfProcNodeObjectivesOpts options, long seedGraph)
+  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="CnfProcNodeObjectivesOpt.Validate"/>.</exception>
+  public ProcNodeObjectives(LilGraph graph, CnfProcNodeObjectivesOpt options, long seedGraph)
   {
     if (graph is null) throw new ArgumentNullException(nameof(graph));
     if (options is null) throw new ArgumentNullException(nameof(options));
@@ -79,8 +79,8 @@ internal sealed class ProcNodeObjectives
   }
 
   /// <summary>
-  /// Places up to <see cref="CnfProcNodeObjectivesOpts.GoalAmount"/> mandatory goals on
-  /// non-secret nodes and up to <see cref="CnfProcNodeObjectivesOpts.OptGoalAmount"/> optional
+  /// Places up to <see cref="CnfProcNodeObjectivesOpt.GoalAmount"/> mandatory goals on
+  /// non-secret nodes and up to <see cref="CnfProcNodeObjectivesOpt.OptGoalAmount"/> optional
   /// goals on any node, at most one goal POI per node. Stops early when the eligible nodes
   /// run out; the excess amount is ignored.
   /// </summary>

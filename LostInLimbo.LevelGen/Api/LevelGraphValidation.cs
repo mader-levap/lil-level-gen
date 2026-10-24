@@ -1,4 +1,5 @@
 using System;
+using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 
@@ -13,7 +14,7 @@ namespace LostInLimbo.LevelGen.Api;
 /// <remarks>
 /// Only <see cref="LilWorld.Graph"/> is read; map, stats and phase are ignored. Intended for
 /// tests, editor tooling and bulk verification loops over many seeds. See
-/// <see cref="GraphValidationResult"/> for the result shape.
+/// <see cref="LilResult"/> for the result shape.
 /// </remarks>
 public static class LevelGraphValidation
 {
@@ -21,16 +22,17 @@ public static class LevelGraphValidation
   /// Validates the level graph of the given world.
   /// </summary>
   /// <param name="world">World whose graph is checked.</param>
+  /// <param name="validatorOpt">Validator options.</param>
   /// <returns>
-  /// A result whose <see cref="GraphValidationResult.Success"/> is <see langword="true"/> when
+  /// A result whose <see cref="LilResult.Success"/> is <see langword="true"/> when
   /// the graph is beatable; otherwise a failed result with the reason of the first failed check.
   /// </returns>
   /// <exception cref="ArgumentNullException"><paramref name="world"/> is <see langword="null"/>.</exception>
-  public static GraphValidationResult Validate(LilWorld world)
+  public static LilResult Validate(LilWorld world, CnfValidGraphOpt validatorOpt)
   {
     if (world is null) throw new ArgumentNullException(nameof(world));
 
     // Fresh validator per call: instances hold per-call state and must not be shared.
-    return new GraphValidator(world.Graph, GraphValidatorOpt.Default).Validate();
+    return new GraphValidator(world.Graph, validatorOpt).Validate();
   }
 }

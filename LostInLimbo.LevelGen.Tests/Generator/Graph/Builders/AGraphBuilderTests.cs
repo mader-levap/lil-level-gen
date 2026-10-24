@@ -72,10 +72,11 @@ public sealed class AGraphBuilderTests
     var graph = new LilGraph();
 
     // Act: Run the build with the failure hook enabled.
-    var success = builder.Run(config, new PrepData(), graph);
+    var result = builder.Run(config, new PrepData(), graph);
 
     // Assert: The build reports failure and leaves the target graph untouched.
-    Assert.False(success);
+    Assert.False(result.Success);
+    Assert.Equal("Deliberate failure at the very start.", result.FailureReason);
     Assert.Empty(graph.Nodes);
     Assert.Empty(graph.Edges);
   }

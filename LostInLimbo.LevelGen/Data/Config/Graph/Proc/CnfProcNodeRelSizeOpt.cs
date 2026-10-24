@@ -1,6 +1,6 @@
 using System;
 
-namespace LostInLimbo.LevelGen.Data.Config.Graph;
+namespace LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 
 /// <summary>
 /// <para>
@@ -22,13 +22,13 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 /// off. <see cref="Growth"/> is only relevant when <see cref="Steps"/> is greater than 1.
 /// </para>
 /// </remarks>
-public sealed record CnfProcNodeRelSizeOpts
+public sealed record CnfProcNodeRelSizeOpt
 {
   /// <summary>
   /// Default instance: three geometric steps (1, 2, 4), mild skew and mild bias toward
   /// well-connected POI carriers.
   /// </summary>
-  public static CnfProcNodeRelSizeOpts Default { get; } = new()
+  public static CnfProcNodeRelSizeOpt Default { get; } = new()
   {
     Steps = 3,
     Skew = 0.3f,
@@ -94,7 +94,7 @@ public sealed record CnfProcNodeRelSizeOpts
     return ComputeStepValues();
   }
 
-  //
+  // Helpers.
 
   /// <summary>
   /// Checks that this config can be used for generation.

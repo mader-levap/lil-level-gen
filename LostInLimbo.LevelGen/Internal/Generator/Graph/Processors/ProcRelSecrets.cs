@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Utils;
 
@@ -16,11 +16,11 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Algorithm: for each of the <see cref="CnfProcRelSecretsOpts.Amount"/> secrets a host is
+/// Algorithm: for each of the <see cref="CnfProcRelSecretsOpt.Amount"/> secrets a host is
 /// picked, then a new node (Secret, no POIs) and a new bidirectional chokepoint
 /// relationship (Secret, unconditional) from the host to it are appended. The first secret
 /// always attaches to a random ordinary node. Every later secret attaches to a random
-/// ordinary node too, but with <see cref="CnfProcRelSecretsOpts.ChanceSecretInSecret"/>
+/// ordinary node too, but with <see cref="CnfProcRelSecretsOpt.ChanceSecretInSecret"/>
 /// probability attaches to a random secret created by this pass instead - over many runs
 /// this nests secrets behind secrets (a secret-in-secret tree) rarely. The resulting graph
 /// stays connected: every secret node is reachable from its host over an open passage.
@@ -64,7 +64,7 @@ internal sealed class ProcRelSecrets
   /// <summary>Graph that gains secret nodes and edges in place; may be empty.</summary>
   private readonly LilGraph _graph;
   /// <summary>Secret parameters; validated at construction.</summary>
-  private readonly CnfProcRelSecretsOpts _options;
+  private readonly CnfProcRelSecretsOpt _options;
   /// <summary>Random for sub-seed.</summary>
   private readonly SeededRandom _random;
   /// <summary>Graph sub-seed the identifier derivations are based on.</summary>
@@ -78,8 +78,8 @@ internal sealed class ProcRelSecrets
   /// <param name="options">Secret parameters; validated before use.</param>
   /// <param name="seedGraph">Graph sub-seed the random stream and identifier derivations are based on.</param>
   /// <exception cref="ArgumentNullException"><paramref name="graph"/> or <paramref name="options"/> is null.</exception>
-  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="CnfProcRelSecretsOpts.Validate"/>.</exception>
-  public ProcRelSecrets(LilGraph graph, CnfProcRelSecretsOpts options, long seedGraph)
+  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="CnfProcRelSecretsOpt.Validate"/>.</exception>
+  public ProcRelSecrets(LilGraph graph, CnfProcRelSecretsOpt options, long seedGraph)
   {
     if (graph is null) throw new ArgumentNullException(nameof(graph));
     if (options is null) throw new ArgumentNullException(nameof(options));
@@ -93,7 +93,7 @@ internal sealed class ProcRelSecrets
   }
 
   /// <summary>
-  /// Appends up to <see cref="CnfProcRelSecretsOpts.Amount"/> secret nodes, each reachable
+  /// Appends up to <see cref="CnfProcRelSecretsOpt.Amount"/> secret nodes, each reachable
   /// only over its own secret relationship, to the graph given to the constructor. Stops
   /// early when no node has <see cref="LilNode.MaxEdges"/> capacity left for another
   /// relationship.

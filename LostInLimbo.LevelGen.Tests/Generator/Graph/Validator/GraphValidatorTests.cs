@@ -1,4 +1,5 @@
 using LostInLimbo.LevelGen.Api;
+using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
@@ -1530,7 +1531,7 @@ public sealed class GraphValidatorTests
       };
 
       // Act: Validate with dead ends disallowed.
-      var result = Validate(graph, new GraphValidatorOpt { AllowOneWayDeadEnds = false });
+      var result = Validate(graph, CnfValidGraphOpt.DefEnabled with { AllowOneWayDeadEnds = false });
 
       // Assert: The one-way is a point of no return even though the dead end is empty.
       Assert.False(result.Success);
@@ -1563,7 +1564,7 @@ public sealed class GraphValidatorTests
       };
 
       // Act: Validate with dead ends disallowed.
-      var result = Validate(graph, new GraphValidatorOpt { AllowOneWayDeadEnds = false });
+      var result = Validate(graph, CnfValidGraphOpt.DefEnabled with { AllowOneWayDeadEnds = false });
 
       // Assert: The far side of the one-way holds no exit, so the passage itself is rejected
       // before the conditioned gate is ever considered.
@@ -1575,11 +1576,20 @@ public sealed class GraphValidatorTests
   }
 
   /// <summary>
-  /// Runs one validation on a fresh validator instance. A <see cref="GraphValidator"/> holds
-  /// per-call state, so instances must not be reused or shared across threads.
+  /// Runs one validation on a fresh validator instance using default options with enabled validator.
+  /// A <see cref="GraphValidator"/> holds per-call state, so instances must not be reused or shared across threads.
   /// </summary>
   /// <param name="graph">Graph to validate.</param>
-  /// <param name="options">Validator options; defaults to <see cref="GraphValidatorOpt.Default"/>.</param>
-  private static GraphValidationResult Validate(LilGraph? graph, GraphValidatorOpt? options = null)
+  private static LilResult Validate(LilGraph? graph)
+    => Validate(graph, CnfValidGraphOpt.DefEnabled);
+
+
+  /// <summary>
+  /// Runs one validation on a fresh validator instance using given validator options.
+  /// A <see cref="GraphValidator"/> holds per-call state, so instances must not be reused or shared across threads.
+  /// </summary>
+  /// <param name="graph">Graph to validate.</param>
+  /// <param name="options">Validator options.</param>
+  private static LilResult Validate(LilGraph? graph, CnfValidGraphOpt options)
     => new GraphValidator(graph, options).Validate();
 }

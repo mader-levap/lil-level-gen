@@ -1,6 +1,7 @@
 using System;
+using System.IO.Pipelines;
 using System.Threading;
-
+using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Data.Result.Stats;
@@ -207,7 +208,7 @@ internal sealed class LevelGenerator
 
     // Complete generation means the level is done; otherwise the run stopped early (Step/Area
     // budget exhausted, or an explicit pause request) and can be resumed with remaining steps.
-    return IsGenerationComplete() ? EnGenResult.Finished : EnGenResult.Paused;
+    return IsMapGenerationComplete() ? EnGenResult.Finished : EnGenResult.Paused;
   }
 
   //
@@ -262,11 +263,12 @@ internal sealed class LevelGenerator
     cancellationToken.ThrowIfCancellationRequested();
 
     GraphGenerator graphGenerator = new GraphGenerator(_config, _prepData!, _world);
-    if (!graphGenerator.Execute())
+    LilResult result = graphGenerator.Execute();
+    if (!result.Success)
     {
       // A failed build leaves the graph partially mutated; fail the whole run so the
       // partial world is never published and the build is never re-run on resume.
-      throw new InvalidOperationException("Graph generation failed.");
+      throw new InvalidOperationException("Graph generation failed. Reason: "+result.FailureReason);
     }
     _world.Phase = EnPhase.Map; // move to next phase
     return true;
@@ -299,7 +301,7 @@ internal sealed class LevelGenerator
     var maxStepsThisRun = _enRunKind == EnRunKind.All ? int.MaxValue : 1;
 
     var stepsRun = 0;
-    while (stepsRun < maxStepsThisRun && !IsGenerationComplete())
+    while (stepsRun < maxStepsThisRun && !IsMapGenerationComplete())
     {
       // Pause checkpoint: a request pending before the next step starts ends the run.
       if (_pauseRequested) return;
@@ -317,7 +319,7 @@ internal sealed class LevelGenerator
   /// complex check (layout complete, all areas placed, ...) and will not know the total
   /// number of steps in advance.
   /// </summary>
-  private bool IsGenerationComplete()
+  private bool IsMapGenerationComplete()
   {
     return _world.Stats.Steps >= _totalSteps;
   }

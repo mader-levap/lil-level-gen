@@ -1,7 +1,7 @@
 using System;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 
-namespace LostInLimbo.LevelGen.Data.Config.Graph;
+namespace LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 
 /// <summary>
 /// <para>
@@ -16,12 +16,12 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 /// Both counts are soft: when fewer eligible nodes remain than requested, the excess
 /// is ignored and the processor stops early.
 /// </remarks>
-public sealed record CnfProcNodeObjectivesOpts
+public sealed record CnfProcNodeObjectivesOpt
 {
   /// <summary>
   /// Default instance: one mandatory goal and one optional goal.
   /// </summary>
-  public static CnfProcNodeObjectivesOpts Default { get; } = new()
+  public static CnfProcNodeObjectivesOpt Default { get; } = new()
   {
     GoalAmount = 1,
     OptGoalAmount = 1,
@@ -39,7 +39,7 @@ public sealed record CnfProcNodeObjectivesOpts
   /// </summary>
   public int OptGoalAmount { get; init; } = 1;
 
-  //
+  // Helpers.
 
   /// <summary>
   /// Checks that this config can be used for generation.

@@ -1,5 +1,7 @@
+using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 using LostInLimbo.LevelGen.Internal.Generator.Prepass;
@@ -22,9 +24,9 @@ internal static class GraphTestSupport
   /// Proc options with the secrets processor disabled - for builder tests that assert
   /// plain skeleton shape without compensating for the default secret node.
   /// </summary>
-  public static CnfProcOpts NoSecrets { get; } = CnfProcOpts.Default with
+  public static CnfProcOpt NoSecrets { get; } = CnfProcOpt.Default with
   {
-    RelSecrets = new CnfProcRelSecretsOpts { Amount = 0 },
+    RelSecrets = new CnfProcRelSecretsOpt { Amount = 0 },
   };
 
   //
@@ -42,8 +44,8 @@ internal static class GraphTestSupport
   /// <param name="builder">Which builder the factory should create.</param>
   /// <param name="graphConfig">Graph config to use; defaults to a plain config for <paramref name="builder"/>.</param>
   /// <param name="seedGraph">Graph sub-seed to use.</param>
-  /// <returns>The reported build success and the filled target graph.</returns>
-  public static (bool Success, LilGraph Graph) Build(
+  /// <returns>The reported build result and the filled target graph.</returns>
+  public static (LilResult Result, LilGraph Graph) Build(
     EnGraphBuilder builder,
     CnfGraph? graphConfig = null,
     long seedGraph = DefaultSeedGraph)
@@ -58,10 +60,10 @@ internal static class GraphTestSupport
     var graph = new LilGraph();
 
     // Act: Hand over the inputs, then build.
-    var success = graphBuilder.Run(config, prepData, graph);
+    var result = graphBuilder.Run(config, prepData, graph);
 
     // Assert-adjacent: Outcome and shape assertions live in the tests.
-    return (success, graph);
+    return (result, graph);
   }
 
   //

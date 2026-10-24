@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using LostInLimbo.LevelGen.Internal.Utils;
@@ -85,7 +86,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   private const long SaltSolutionPoi = 0x736F6C7574696F6E; // "solution"
 
   /// <inheritdoc/>
-  protected override bool Build()
+  protected override LilResult Build()
   {
     var size = Config.Graph.Size;
     var connectivity = Config.Graph.Connectivity;
@@ -109,7 +110,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
     new ProcNodeStyle(Graph, procOpts.NodeStyle, PrepData.SeedGraph).Execute();
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
-    return true;
+    return LilResult.Succeed();
   }
 
   //

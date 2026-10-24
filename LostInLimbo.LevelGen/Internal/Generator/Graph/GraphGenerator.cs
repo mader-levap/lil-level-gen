@@ -1,14 +1,18 @@
+using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 using LostInLimbo.LevelGen.Internal.Generator.Prepass;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph;
 
 /// <summary>
 /// <para>Generates an abstract graph representing the level and its features. Modifies <c>LilGraph</c>.</para>
+/// <para>
 /// Dispatches to the <see cref="AGraphBuilder"/> implementation selected by configuration
-/// (see <see cref="GraphBuilderFactory"/>).
+/// (see <see cref="GraphBuilderFactory"/>) and optionally calls graph validator.
+/// </para>
 /// </summary>
 internal sealed class GraphGenerator
 {
@@ -35,12 +39,17 @@ internal sealed class GraphGenerator
   }
 
   /// <summary>
-  /// Creates the whole graph. It is treated as a single step.
+  /// Creates the whole graph and optionally validates it. It is treated as a single step.
   /// </summary>
   /// <returns>True if graph generation was successful, otherwise false.</returns>
-  public bool Execute()
+  public LilResult Execute()
   {
     AGraphBuilder builder = GraphBuilderFactory.Create(_config.Graph.Builder);
-    return builder.Run(_config, _prepData, _world.Graph);
+    LilResult graphGenResult = builder.Run(_config, _prepData, _world.Graph);
+    if (graphGenResult.Success) {
+      LilResult graphValidationResult = new GraphValidator(_world.Graph, _config.Graph.ValidatorOpts).Validate();
+      if (!graphValidationResult.Success) return graphValidationResult; // validation failed
+    }
+    return graphGenResult;
   }
 }

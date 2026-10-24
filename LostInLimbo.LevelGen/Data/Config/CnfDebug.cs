@@ -16,10 +16,12 @@ public sealed record CnfDebug
   /// <summary>Default number of steps the placeholder generation loop executes.</summary>
   public const int DefaultPlaceholderSteps = 10;
 
-  //
+  // Defaults.
 
   /// <summary>Default instance.</summary>
   public static CnfDebug Default { get; } = new();
+
+  // Fields.
 
   /// <summary>
   /// If true, throw an exception already at the start.
@@ -46,7 +48,7 @@ public sealed record CnfDebug
   /// </summary>
   public int PlaceholderSteps { get; init; } = DefaultPlaceholderSteps;
 
-  //
+  // Helpers.
 
   /// <summary>
   /// Checks that this config can be used.

@@ -320,7 +320,7 @@ public sealed class LevelGeneratorTests
       // consumer can never observe the invalid graph and resume cannot re-run the build.
       Assert.Equal(EnGenResult.Error, statusStore.Current.Result);
       var error = Assert.IsType<InvalidOperationException>(statusStore.Current.Error);
-      Assert.Equal("Graph generation failed.", error.Message);
+      Assert.Equal("Graph generation failed. Reason: Deliberate failure at the very start.", error.Message);
       Assert.Null(statusStore.CurrentSnapshot.World);
     }
 

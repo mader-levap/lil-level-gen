@@ -1,6 +1,6 @@
 using System;
 
-namespace LostInLimbo.LevelGen.Data.Config.Graph;
+namespace LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 
 /// <summary>
 /// <para>Options of the graph finalization processors.</para>
@@ -9,22 +9,28 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 /// One section per processor. Sections left out of a config keep their defaults.
 /// Builders that run no processors (for example <c>OneNode</c>) ignore this config entirely.
 /// </remarks>
-public sealed record CnfProcOpts
+public sealed record CnfProcOpt
 {
+  // Defaults.
+
   /// <summary>Default instance.</summary>
-  public static CnfProcOpts Default { get; } = new();
+  public static CnfProcOpt Default { get; } = new();
+
+  // Fields.
 
   /// <summary>Options of the secret-nodes processor.</summary>
-  public CnfProcRelSecretsOpts RelSecrets { get; init; } = CnfProcRelSecretsOpts.Default;
+  public CnfProcRelSecretsOpt RelSecrets { get; init; } = CnfProcRelSecretsOpt.Default;
 
   /// <summary>Options of the objective-POIs processor.</summary>
-  public CnfProcNodeObjectivesOpts NodeObjectives { get; init; } = CnfProcNodeObjectivesOpts.Default;
+  public CnfProcNodeObjectivesOpt NodeObjectives { get; init; } = CnfProcNodeObjectivesOpt.Default;
 
   /// <summary>Options of the relative-size processor.</summary>
-  public CnfProcNodeRelSizeOpts NodeRelSize { get; init; } = CnfProcNodeRelSizeOpts.Default;
+  public CnfProcNodeRelSizeOpt NodeRelSize { get; init; } = CnfProcNodeRelSizeOpt.Default;
 
   /// <summary>Options of the node-grouping processor.</summary>
-  public CnfProcNodeStyleOpts NodeStyle { get; init; } = CnfProcNodeStyleOpts.Default;
+  public CnfProcNodeStyleOpt NodeStyle { get; init; } = CnfProcNodeStyleOpt.Default;
+
+  //  Helpers.
 
   /// <summary>
   /// Checks that this config can be used for generation.

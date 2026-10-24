@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Utils;
 
@@ -15,7 +15,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// <remarks>
 /// <para>
 /// Sizes are sampled from a fixed set of step values (see
-/// <see cref="CnfProcNodeRelSizeOpts.Prepare"/>): the options decide how many
+/// <see cref="CnfProcNodeRelSizeOpt.Prepare"/>): the options decide how many
 /// steps exist, how large they grow, how strongly one step dominates and how hard
 /// relationships and POIs pull nodes upward. Bias only changes likelihood - a large node
 /// without POIs and with a single relationship stays possible, just less likely.
@@ -23,7 +23,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// <para>
 /// Algorithm: roll one dominant step per graph, then visit every node in Id order and
 /// sample its step independently. The base weight mixes a flat share (controlled by
-/// <see cref="CnfProcNodeRelSizeOpts.Skew"/>) with the dominant step; a linear tilt
+/// <see cref="CnfProcNodeRelSizeOpt.Skew"/>) with the dominant step; a linear tilt
 /// proportional to the node's bias score adds weight to higher steps. The bias score sums
 /// the min-max normalized relationship count and POI count of the node - min-max keeps the
 /// bias relative: when all nodes look the same, there is nothing to distinguish and the
@@ -50,11 +50,11 @@ internal sealed class ProcNodeRelSize
   /// <summary>Graph whose nodes are rewritten in place; may be empty.</summary>
   private readonly LilGraph _graph;
   /// <summary>Distribution parameters; validated at construction.</summary>
-  private readonly CnfProcNodeRelSizeOpts _options;
+  private readonly CnfProcNodeRelSizeOpt _options;
   /// <summary>Random for sub-seed.</summary>
   private readonly SeededRandom _random;
 
-  /// <summary>Ascending step values built from <c>options</c>; see <see cref="CnfProcNodeRelSizeOpts.Prepare"/>.</summary>
+  /// <summary>Ascending step values built from <c>options</c>; see <see cref="CnfProcNodeRelSizeOpt.Prepare"/>.</summary>
   private readonly int[] _stepValues;
 
   /// <summary>
@@ -65,9 +65,9 @@ internal sealed class ProcNodeRelSize
   /// <param name="options">Distribution parameters; validated before use.</param>
   /// <param name="seedGraph">Graph sub-seed the distribution stream is derived from.</param>
   /// <exception cref="ArgumentNullException"><paramref name="graph"/> or <paramref name="options"/> is null.</exception>
-  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="CnfProcNodeRelSizeOpts.Validate"/>.</exception>
-  /// <exception cref="ArgumentException">Options contradict each other; see <see cref="CnfProcNodeRelSizeOpts.Validate"/>.</exception>
-  public ProcNodeRelSize(LilGraph graph, CnfProcNodeRelSizeOpts options, long seedGraph)
+  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="CnfProcNodeRelSizeOpt.Validate"/>.</exception>
+  /// <exception cref="ArgumentException">Options contradict each other; see <see cref="CnfProcNodeRelSizeOpt.Validate"/>.</exception>
+  public ProcNodeRelSize(LilGraph graph, CnfProcNodeRelSizeOpt options, long seedGraph)
   {
     if (graph is null) throw new ArgumentNullException(nameof(graph));
     if (options is null) throw new ArgumentNullException(nameof(options));

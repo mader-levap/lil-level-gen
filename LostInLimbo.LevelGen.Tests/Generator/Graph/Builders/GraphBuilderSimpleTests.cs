@@ -1,7 +1,7 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
-using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 
@@ -34,14 +34,14 @@ public sealed class GraphBuilderSimpleTests
     public void Build_WithAnySize_ProducesConfiguredNodeCount(int size)
     {
       // Act: Build a graph of the given size, without the default secret node.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = size,
         ProcOpts = GraphTestSupport.NoSecrets,
       });
 
       // Assert: The node count follows the size setting exactly.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.Equal(size, graph.Nodes.Count);
     }
 
@@ -55,7 +55,7 @@ public sealed class GraphBuilderSimpleTests
     {
       // Act: Build a graph without any extra relationships, without the default secret
       // node.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = size,
         ProcOpts = GraphTestSupport.NoSecrets,
@@ -63,7 +63,7 @@ public sealed class GraphBuilderSimpleTests
 
       // Assert: The skeleton is a tree - size minus one relationships - and the graph
       // stays connected.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.Equal(Math.Max(0, size - 1), graph.Edges.Count);
       GraphTestAssert.AssertBeatable(graph);
     }
@@ -77,7 +77,7 @@ public sealed class GraphBuilderSimpleTests
     {
       // Act: Build a graph whose requested extras fit under the degree cap, without the
       // default secret node.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = size,
         Connectivity = connectivity,
@@ -86,7 +86,7 @@ public sealed class GraphBuilderSimpleTests
 
       // Assert: Every requested extra relationship exists on top of the tree and the
       // graph stays connected.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.Equal(size - 1 + connectivity, graph.Edges.Count);
       GraphTestAssert.AssertBeatable(graph);
     }
@@ -127,7 +127,7 @@ public sealed class GraphBuilderSimpleTests
     {
       // Act: Build with configs ranging from trivial to far beyond capacity, without the
       // default secret node.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = size,
         Connectivity = connectivity,
@@ -135,7 +135,7 @@ public sealed class GraphBuilderSimpleTests
       });
 
       // Assert: The builder never fails - unsatisfiable settings are stretched silently.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.Equal(size, graph.Nodes.Count);
     }
 
@@ -145,7 +145,7 @@ public sealed class GraphBuilderSimpleTests
     public void Build_WithSizeOne_WithAnyConnectivity_ProducesSingleNodeWithBothPois(int connectivity)
     {
       // Act: Build the degenerate one-node graph with and without extra connectivity.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = 1,
         Connectivity = connectivity,
@@ -154,7 +154,7 @@ public sealed class GraphBuilderSimpleTests
       // Assert: No relationships are possible, yet both POIs and the mandatory goal live
       // on the single ordinary node; the finalization pass appends one secret node
       // hanging off it, which hosts the optional goal (allowed in secret nodes).
-      Assert.True(success);
+      Assert.True(result.Success);
       var ordinary = Assert.Single(graph.Nodes.Where(node => !node.Secret));
       var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
       Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Start));
@@ -175,7 +175,7 @@ public sealed class GraphBuilderSimpleTests
     {
       // Act: Ask for far more relationships than a five-node graph can hold, without the
       // default secret node.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = 5,
         Connectivity = 10000,
@@ -185,7 +185,7 @@ public sealed class GraphBuilderSimpleTests
       // Assert: The build succeeds, no node exceeds the plain degree cap on builder
       // passages (at size five even a skeleton central collects at most four nodes) and
       // the complete graph bound is respected.
-      Assert.True(success);
+      Assert.True(result.Success);
       GraphTestAssert.AssertDegreeCap(graph, MaxDegree);
       GraphTestAssert.AssertMaxEdges(graph);
       Assert.All(graph.Nodes, node => Assert.Equal(MaxDegreeStar, node.MaxEdges));
@@ -200,7 +200,7 @@ public sealed class GraphBuilderSimpleTests
     {
       // Act: Ask for far more relationships than a twenty-node graph can hold, without
       // the default secret node.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = 20,
         Connectivity = 10000,
@@ -210,7 +210,7 @@ public sealed class GraphBuilderSimpleTests
       // Assert: The build succeeds, keeps at least the skeleton, stays structurally
       // valid and never exceeds the skeleton degree cap on builder passages - central
       // handover keeps even star-shaped skeletons bounded.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.True(graph.Edges.Count >= 19, "The skeleton alone already holds 19 relationships.");
       Assert.True(graph.Edges.Count <= 190, "Twenty nodes cannot hold more than 190 pair passages.");
       GraphTestAssert.AssertDegreeCap(graph, MaxDegreeStar);
@@ -232,14 +232,14 @@ public sealed class GraphBuilderSimpleTests
       // skeleton degree cap and stay a connected tree.
       for (var seed = 0; seed < 30; seed++)
       {
-        var (success, graph) = GraphTestSupport.Build(
+        var (result, graph) = GraphTestSupport.Build(
           EnGraphBuilder.Simple,
           new CnfGraph { Size = size, ProcOpts = GraphTestSupport.NoSecrets },
           seed);
 
         // Assert: Success, exactly size minus one skeleton relationships, connectivity
         // and the degree cap hold no matter which scenario was rolled.
-        Assert.True(success);
+        Assert.True(result.Success);
         Assert.Equal(size - 1, graph.Edges.Count);
         GraphTestAssert.AssertDegreeCap(graph, MaxDegreeStar);
         GraphTestAssert.AssertBeatable(graph, $"Skeleton graph must be connected (size {size}, seed {seed}).");
@@ -276,7 +276,7 @@ public sealed class GraphBuilderSimpleTests
     public void Build_WithAnyConfig_ProducesValidGraphStructure(int size, int connectivity)
     {
       // Act: Build a graph across sizes and connectivity levels.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
         Size = size,
         Connectivity = connectivity,
@@ -284,10 +284,10 @@ public sealed class GraphBuilderSimpleTests
 
       // Assert: Edges are well-formed, all passages open and every node uses one of the
       // default relative-size steps.
-      Assert.True(success);
+      Assert.True(result.Success);
       GraphTestAssert.AssertValidEdges(graph);
       GraphTestAssert.AssertOpenPassages(graph);
-      var stepValues = CnfProcNodeRelSizeOpts.Default.Prepare();
+      var stepValues = CnfProcNodeRelSizeOpt.Default.Prepare();
       Assert.All(graph.Nodes, node => Assert.Contains(node.RelSize, stepValues));
     }
   }
@@ -303,11 +303,11 @@ public sealed class GraphBuilderSimpleTests
     public void Build_AlwaysAddsExactlyOneSecretHangingOffOrdinaryNode(int size)
     {
       // Act: Build a graph of the given size.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size });
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = size });
 
       // Assert: One secret node exists, reached only over its own secret chokepoint
       // whose source is an ordinary node.
-      Assert.True(success);
+      Assert.True(result.Success);
       var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
       var edge = Assert.Single(graph.Edges.Where(edge => edge.Secret));
       Assert.True(edge.Chokepoint);
@@ -346,7 +346,7 @@ public sealed class GraphBuilderSimpleTests
       var second = GraphTestSupport.Build(EnGraphBuilder.Simple, config);
 
       // Assert: Nodes, edges and POIs match one by one.
-      Assert.Equal(first.Success, second.Success);
+      Assert.Equal(first.Result.Success, second.Result.Success);
       GraphTestAssert.AssertEqualGraphs(first.Graph, second.Graph);
     }
 

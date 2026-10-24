@@ -45,14 +45,14 @@ public sealed class GraphBuilderLinearTests
     public void Build_WithAnySize_ProducesConfiguredNodeCount(int size)
     {
       // Act: Build a graph of the given size, without the default secret node.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
       {
         Size = size,
         ProcOpts = GraphTestSupport.NoSecrets,
       });
 
       // Assert: The node count follows the size setting exactly.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.Equal(size, graph.Nodes.Count);
     }
 
@@ -66,7 +66,7 @@ public sealed class GraphBuilderLinearTests
     {
       // Act: Build a graph without any extra relationships, without the default secret
       // node.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
       {
         Size = size,
         ProcOpts = GraphTestSupport.NoSecrets,
@@ -74,7 +74,7 @@ public sealed class GraphBuilderLinearTests
 
       // Assert: The skeleton is exactly the chain over all nodes - size minus one
       // relationships, each consecutive pair once - and it is connected.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.Equal(Math.Max(0, size - 1), graph.Edges.Count);
       GraphAssertions.AssertExactChain(graph, size);
       GraphTestAssert.AssertBeatable(graph, "Chain graph must be connected.");
@@ -91,7 +91,7 @@ public sealed class GraphBuilderLinearTests
       {
         // Act: Build a graph whose requested extras fit well under the capacity, without
         // the default secret node.
-        var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
         {
           Size = size,
           Connectivity = connectivity,
@@ -100,7 +100,7 @@ public sealed class GraphBuilderLinearTests
 
         // Assert: Every requested extra relationship exists on top of the chain and the
         // graph stays connected.
-        Assert.True(success, $"Build failed for size {size}, seed {seed}.");
+        Assert.True(result.Success, $"Build failed for size {size}, seed {seed}.");
         Assert.Equal(size - 1 + connectivity, graph.Edges.Count);
         GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (size {size}, seed {seed}).");
       }
@@ -156,7 +156,7 @@ public sealed class GraphBuilderLinearTests
     public void Build_WithSizeOne_WithAnyConnectivity_ProducesSingleNodeWithoutEdges(int connectivity)
     {
       // Act: Build the degenerate one-node graph with and without extra connectivity.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
       {
         Size = 1,
         Connectivity = connectivity,
@@ -165,7 +165,7 @@ public sealed class GraphBuilderLinearTests
       // Assert: No relationship is possible, yet both POIs and the mandatory goal live on
       // the single ordinary node; the finalization pass appends one secret node hanging
       // off it, which hosts the optional goal (allowed in secret nodes).
-      Assert.True(success);
+      Assert.True(result.Success);
       var ordinary = Assert.Single(graph.Nodes.Where(node => !node.Secret));
       var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
       Assert.Single(ordinary.Pois.Where(poi => poi.Type == EnPoiType.Start));
@@ -186,7 +186,7 @@ public sealed class GraphBuilderLinearTests
     {
       // Act: Two nodes can only link to each other; one extra relationship is the
       // capacity. Secrets are disabled so only builder passages remain.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
       {
         Size = 2,
         Connectivity = 1,
@@ -195,7 +195,7 @@ public sealed class GraphBuilderLinearTests
 
       // Assert: The skeleton passage and its parallel extra passage both exist, between
       // the same two nodes but with distinct identifiers.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.Equal(2, graph.Edges.Count);
       Assert.Equal(graph.Edges[0].From, graph.Edges[1].From);
       Assert.Equal(graph.Edges[0].To, graph.Edges[1].To);
@@ -213,7 +213,7 @@ public sealed class GraphBuilderLinearTests
       {
         // Act: Ask for far more extra relationships than the graph can hold, without the
         // default secret node.
-        var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
         {
           Size = size,
           Connectivity = connectivity,
@@ -223,7 +223,7 @@ public sealed class GraphBuilderLinearTests
         // Assert: The build succeeds, keeps at least the skeleton and every constraint of
         // the extra-relationships pass holds: chain order, skip window, per-direction
         // degree caps, the one-extra-per-pair rule and the node MaxEdges hard cap.
-        Assert.True(success, $"Build failed for size {size}, seed {seed}.");
+        Assert.True(result.Success, $"Build failed for size {size}, seed {seed}.");
         Assert.True(graph.Edges.Count >= size - 1, $"Skeleton missing (size {size}, seed {seed}).");
         GraphAssertions.AssertForwardAndSkipWindow(graph);
         GraphAssertions.AssertExtraDegreeCaps(graph);
@@ -264,7 +264,7 @@ public sealed class GraphBuilderLinearTests
     {
       // Act: Three nodes offer exactly three extra-relationship slots under all caps.
       // Secrets are disabled so only builder passages remain.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
       {
         Size = 3,
         Connectivity = 10000,
@@ -274,7 +274,7 @@ public sealed class GraphBuilderLinearTests
       // Assert: Every node pair carries its full complement of passages - two for the
       // adjacent pairs (skeleton plus extra), one for the skipping pair - five pair
       // passages in total - and the degree caps still hold.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.Equal(5, graph.Edges.Count);
       GraphAssertions.AssertPairPassageCounts(graph);
       GraphAssertions.AssertExtraDegreeCaps(graph);
@@ -317,7 +317,7 @@ public sealed class GraphBuilderLinearTests
     public void Build_WithZeroComplexity_KeepsPassagesOpen()
     {
       // Act: Build without requesting obstacles.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
       {
         Size = 12,
         Connectivity = 5,
@@ -325,7 +325,7 @@ public sealed class GraphBuilderLinearTests
       });
 
       // Assert: No solution POI exists and every passage stays open.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.Empty(GraphTestSupport.GetPois(graph, EnPoiType.Solution));
       GraphTestAssert.AssertOpenPassages(graph);
     }
@@ -340,7 +340,7 @@ public sealed class GraphBuilderLinearTests
       {
         // Act: Plenty of nodes, so no relationship saturates and every requested
         // obstacle fits.
-        var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
         {
           Size = 20,
           Connectivity = 4,
@@ -349,7 +349,7 @@ public sealed class GraphBuilderLinearTests
 
         // Assert: One solution POI per obstacle, and every condition is a solution
         // requirement pointing at one of those POIs.
-        Assert.True(success, $"Build failed for complexity {complexity}, seed {seed}.");
+        Assert.True(result.Success, $"Build failed for complexity {complexity}, seed {seed}.");
         Assert.Equal(complexity, GraphTestSupport.GetPois(graph, EnPoiType.Solution).Count);
 
         var solutionIds = GraphTestSupport.GetPois(graph, EnPoiType.Solution).Select(poi => poi.Id).ToHashSet();
@@ -372,7 +372,7 @@ public sealed class GraphBuilderLinearTests
     {
       // Act: A single node has no incoming relationship to guard; secrets are disabled
       // so the node is the whole graph.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
       {
         Size = 1,
         Complexity = complexity,
@@ -381,7 +381,7 @@ public sealed class GraphBuilderLinearTests
 
       // Assert: Build succeeds, the node holds both POIs and the mandatory goal, and no
       // solution or condition appears.
-      Assert.True(success);
+      Assert.True(result.Success);
       var node = Assert.Single(graph.Nodes);
       Assert.Single(node.Pois.Where(poi => poi.Type == EnPoiType.Start));
       Assert.Single(node.Pois.Where(poi => poi.Type == EnPoiType.Exit));
@@ -396,7 +396,7 @@ public sealed class GraphBuilderLinearTests
       // Act: Four nodes without extras offer three guardable relationships with room for
       // MaxConditionPerRel conditions each - nine obstacles - yet far more is requested.
       // Secrets are disabled so only builder relationships remain.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
       {
         Size = 4,
         Connectivity = 0,
@@ -406,7 +406,7 @@ public sealed class GraphBuilderLinearTests
 
       // Assert: The pass ends silently once everything is saturated: nine solutions and
       // exactly MaxConditionPerRel conditions on every relationship, never more.
-      Assert.True(success);
+      Assert.True(result.Success);
       Assert.Equal((4 - 1) * MaxConditionPerRel, GraphTestSupport.GetPois(graph, EnPoiType.Solution).Count);
       foreach (var edge in graph.Edges)
       {
@@ -539,7 +539,7 @@ public sealed class GraphBuilderLinearTests
       for (var seed = 0; seed < 5; seed++)
       {
         // Act: Build across sizes, connectivity levels, complexity levels and seeds.
-        var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
         {
           Size = size,
           Connectivity = connectivity,
@@ -548,7 +548,7 @@ public sealed class GraphBuilderLinearTests
 
         // Assert: The build succeeds and the beatability simulation passes with
         // conditions active - solutions are always reachable before they are demanded.
-        Assert.True(success, $"Build failed for size {size}, seed {seed}.");
+        Assert.True(result.Success, $"Build failed for size {size}, seed {seed}.");
         GraphTestAssert.AssertValidEdges(graph, allowDuplicates: true);
         GraphTestAssert.AssertBeatable(graph, $"Conditioned graph must stay beatable (size {size}, seed {seed}).");
       }
@@ -566,11 +566,11 @@ public sealed class GraphBuilderLinearTests
     public void Build_AlwaysAddsExactlyOneSecretHangingOffChainNode(int size)
     {
       // Act: Build a graph of the given size.
-      var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph { Size = size });
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph { Size = size });
 
       // Assert: One secret node exists, reached only over its own secret chokepoint
       // whose source is an ordinary chain node.
-      Assert.True(success);
+      Assert.True(result.Success);
       var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
       var edge = Assert.Single(graph.Edges.Where(edge => edge.Secret));
       Assert.True(edge.Chokepoint);
@@ -609,7 +609,7 @@ public sealed class GraphBuilderLinearTests
       var second = GraphTestSupport.Build(EnGraphBuilder.Linear, config);
 
       // Assert: Nodes, edges (including conditions) and POIs match one by one.
-      Assert.Equal(first.Success, second.Success);
+      Assert.Equal(first.Result.Success, second.Result.Success);
       GraphTestAssert.AssertEqualGraphs(first.Graph, second.Graph);
     }
 
@@ -691,7 +691,7 @@ public sealed class GraphBuilderLinearTests
       for (var seed = 0; seed < 5; seed++)
       {
         // Act: Build a graph across sizes, connectivity levels and seeds.
-        var (success, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
         {
           Size = size,
           Connectivity = connectivity,
@@ -700,7 +700,7 @@ public sealed class GraphBuilderLinearTests
         // Assert: The build succeeds and the beatability simulation passes: structure is
         // valid, every passage is open for now, and start reaches exit with all nodes
         // reachable.
-        Assert.True(success, $"Build failed for size {size}, seed {seed}.");
+        Assert.True(result.Success, $"Build failed for size {size}, seed {seed}.");
         GraphTestAssert.AssertValidEdges(graph, allowDuplicates: true);
         GraphTestAssert.AssertOpenPassages(graph);
         GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (size {size}, seed {seed}).");

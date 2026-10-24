@@ -1,4 +1,4 @@
-using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using static LostInLimbo.LevelGen.Tests.Generator.Graph.GraphTestCreate;
@@ -32,7 +32,7 @@ public sealed class ProcNodeObjectivesTests
     public void Constructor_WithNullGraph_ThrowsArgumentNullException()
     {
       // Act & Assert: A missing graph is rejected.
-      Assert.Throws<ArgumentNullException>(() => new ProcNodeObjectives(null!, CnfProcNodeObjectivesOpts.Default, Seed));
+      Assert.Throws<ArgumentNullException>(() => new ProcNodeObjectives(null!, CnfProcNodeObjectivesOpt.Default, Seed));
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public sealed class ProcNodeObjectivesTests
     {
       // Arrange: Options rejected by validation; the rules themselves are pinned by
       // CnfProcOptsTests.
-      var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = -1 };
+      var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = -1 };
 
       // Act & Assert: Construction alone rejects the options, before Execute can run.
       Assert.Throws<ArgumentOutOfRangeException>(
@@ -63,7 +63,7 @@ public sealed class ProcNodeObjectivesTests
     {
       // Arrange: A chain graph and options that disable the pass.
       var graph = CreateStartExitChainGraph(4);
-      var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 0, OptGoalAmount = 0 };
+      var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 0, OptGoalAmount = 0 };
 
       // Act: Run the pass.
       new ProcNodeObjectives(graph, options, Seed).Execute();
@@ -83,7 +83,7 @@ public sealed class ProcNodeObjectivesTests
       var graph = new LilGraph();
 
       // Act: Run the pass with the default options.
-      new ProcNodeObjectives(graph, CnfProcNodeObjectivesOpts.Default, Seed).Execute();
+      new ProcNodeObjectives(graph, CnfProcNodeObjectivesOpt.Default, Seed).Execute();
 
       // Assert: The graph stays empty instead of failing.
       Assert.Empty(graph.Nodes);
@@ -95,7 +95,7 @@ public sealed class ProcNodeObjectivesTests
     {
       // Arrange: A six-node chain without secrets.
       var graph = CreateStartExitChainGraph(6);
-      var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 3, OptGoalAmount = 0 };
+      var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 3, OptGoalAmount = 0 };
 
       // Act: Place three mandatory goals.
       new ProcNodeObjectives(graph, options, Seed).Execute();
@@ -113,8 +113,8 @@ public sealed class ProcNodeObjectivesTests
       {
         // Arrange: A chain graph with two appended secret nodes.
         var graph = CreateStartExitChainGraph(4);
-        new ProcRelSecrets(graph, CnfProcRelSecretsOpts.Default with { Amount = 2 }, seed).Execute();
-        var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 100, OptGoalAmount = 0 };
+        new ProcRelSecrets(graph, CnfProcRelSecretsOpt.Default with { Amount = 2 }, seed).Execute();
+        var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 100, OptGoalAmount = 0 };
 
         // Act: Demand far more goals than non-secret nodes exist.
         new ProcNodeObjectives(graph, options, seed).Execute();
@@ -137,8 +137,8 @@ public sealed class ProcNodeObjectivesTests
       // Arrange: A chain graph with two appended secret nodes; goals are disabled, so
       // every node is an eligible optional-goal host.
       var graph = CreateStartExitChainGraph(4);
-      new ProcRelSecrets(graph, CnfProcRelSecretsOpts.Default with { Amount = 2 }, Seed).Execute();
-      var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 0, OptGoalAmount = 10 };
+      new ProcRelSecrets(graph, CnfProcRelSecretsOpt.Default with { Amount = 2 }, Seed).Execute();
+      var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 0, OptGoalAmount = 10 };
 
       // Act: Demand more optional goals than nodes exist.
       new ProcNodeObjectives(graph, options, Seed).Execute();
@@ -158,7 +158,7 @@ public sealed class ProcNodeObjectivesTests
       // Arrange: A four-node chain without secrets; the optional amount alone would
       // saturate the graph, so the goal pass must claim its share first.
       var graph = CreateStartExitChainGraph(4);
-      var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 2, OptGoalAmount = 10 };
+      var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 2, OptGoalAmount = 10 };
 
       // Act: Place two mandatory goals, then let optional goals fill the rest.
       new ProcNodeObjectives(graph, options, Seed).Execute();
@@ -179,7 +179,7 @@ public sealed class ProcNodeObjectivesTests
     {
       // Arrange: A four-node chain; node 1 holds the Start POI and must still qualify.
       var graph = CreateStartExitChainGraph(4);
-      var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 4, OptGoalAmount = 0 };
+      var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 4, OptGoalAmount = 0 };
 
       // Act: Demand one goal per node.
       new ProcNodeObjectives(graph, options, Seed).Execute();
@@ -195,8 +195,8 @@ public sealed class ProcNodeObjectivesTests
     {
       // Arrange: A chain graph with secrets, saturated with objectives.
       var graph = CreateStartExitChainGraph(4);
-      new ProcRelSecrets(graph, CnfProcRelSecretsOpts.Default with { Amount = 2 }, Seed).Execute();
-      var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 10, OptGoalAmount = 10 };
+      new ProcRelSecrets(graph, CnfProcRelSecretsOpt.Default with { Amount = 2 }, Seed).Execute();
+      var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 10, OptGoalAmount = 10 };
 
       // Act: Demand more objectives than the graph can hold.
       new ProcNodeObjectives(graph, options, Seed).Execute();
@@ -219,7 +219,7 @@ public sealed class ProcNodeObjectivesTests
       // Arrange: Two identical chain graphs and the same inputs.
       var first = CreateStartExitChainGraph(5);
       var second = CreateStartExitChainGraph(5);
-      var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 2, OptGoalAmount = 2 };
+      var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 2, OptGoalAmount = 2 };
 
       // Act: Run the pass on both graphs.
       new ProcNodeObjectives(first, options, Seed).Execute();
@@ -238,7 +238,7 @@ public sealed class ProcNodeObjectivesTests
       {
         // Arrange: A chain graph with several objectives.
         var graph = CreateStartExitChainGraph(6);
-        var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 3, OptGoalAmount = 2 };
+        var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 3, OptGoalAmount = 2 };
 
         // Act: Place the objectives and read back the hosting node ids in node order.
         new ProcNodeObjectives(graph, options, seed).Execute();
@@ -261,13 +261,13 @@ public sealed class ProcNodeObjectivesTests
     {
       // Arrange: A chain graph; the pass runs second, exactly like in the builders.
       var graph = CreateStartExitChainGraph(5);
-      var options = CnfProcNodeObjectivesOpts.Default with { GoalAmount = 2, OptGoalAmount = 1 };
+      var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 2, OptGoalAmount = 1 };
 
       // Act: Run the finalization passes in builder order.
-      new ProcRelSecrets(graph, CnfProcRelSecretsOpts.Default, Seed).Execute();
+      new ProcRelSecrets(graph, CnfProcRelSecretsOpt.Default, Seed).Execute();
       new ProcNodeObjectives(graph, options, Seed).Execute();
-      new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpts.Default, Seed).Execute();
-      new ProcNodeStyle(graph, CnfProcNodeStyleOpts.Default, Seed).Execute();
+      new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpt.Default, Seed).Execute();
+      new ProcNodeStyle(graph, CnfProcNodeStyleOpt.Default, Seed).Execute();
 
       // Assert: All three objectives survived the later passes.
       Assert.Equal(2, GetPois(graph, EnPoiType.Goal).Count);

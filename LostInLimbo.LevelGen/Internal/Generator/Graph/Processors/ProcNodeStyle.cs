@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Utils;
 
@@ -17,7 +17,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// <para>
 /// Every node ends up in exactly one group. Groups are named <c>g1</c>, <c>g2</c>, ...
 /// zero-padded to the width of the actual group count (e.g. <c>g01</c> for 12 groups).
-/// <see cref="CnfProcNodeStyleOpts.GroupCount"/> is a soft target: a graph with fewer nodes
+/// <see cref="CnfProcNodeStyleOpt.GroupCount"/> is a soft target: a graph with fewer nodes
 /// than requested groups simply drops the excess and uses one group per node.
 /// </para>
 /// <para>
@@ -51,7 +51,7 @@ internal sealed class ProcNodeStyle
   /// <summary>Graph whose nodes are rewritten in place; may be empty.</summary>
   private readonly LilGraph _graph;
   /// <summary>Styling parameters; validated at construction.</summary>
-  private readonly CnfProcNodeStyleOpts _options;
+  private readonly CnfProcNodeStyleOpt _options;
   /// <summary>Random for sub-seed.</summary>
   private readonly SeededRandom _random;
 
@@ -63,8 +63,8 @@ internal sealed class ProcNodeStyle
   /// <param name="options">Node styling parameters; validated before use.</param>
   /// <param name="seedGraph">Graph sub-seed the distribution stream is derived from.</param>
   /// <exception cref="ArgumentNullException"><paramref name="graph"/> or <paramref name="options"/> is null.</exception>
-  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="CnfProcNodeStyleOpts.Validate"/>.</exception>
-  public ProcNodeStyle(LilGraph graph, CnfProcNodeStyleOpts options, long seedGraph)
+  /// <exception cref="ArgumentOutOfRangeException">Options are out of range; see <see cref="CnfProcNodeStyleOpt.Validate"/>.</exception>
+  public ProcNodeStyle(LilGraph graph, CnfProcNodeStyleOpt options, long seedGraph)
   {
     if (graph is null) throw new ArgumentNullException(nameof(graph));
     if (options is null) throw new ArgumentNullException(nameof(options));

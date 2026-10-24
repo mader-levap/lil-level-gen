@@ -1,6 +1,6 @@
 using System;
 
-namespace LostInLimbo.LevelGen.Data.Config.Graph;
+namespace LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 
 /// <summary>
 /// <para>Configuration of the secret-nodes processor (<c>ProcRelSecrets</c>).</para>
@@ -9,7 +9,7 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 /// Zero-valued behavior: <see cref="Amount"/> 0 disables the processor entirely;
 /// <see cref="ChanceSecretInSecret"/> 0 never nests a secret behind another secret.
 /// </remarks>
-public sealed record CnfProcRelSecretsOpts
+public sealed record CnfProcRelSecretsOpt
 {
   /// <summary>Maximum allowed amount - keeps generation cost bounded.</summary>
   public const int MaxAmount = 100;
@@ -20,7 +20,7 @@ public sealed record CnfProcRelSecretsOpts
   /// Default instance: one secret node and a ten percent chance of secret-in-secret
   /// nesting.
   /// </summary>
-  public static CnfProcRelSecretsOpts Default { get; } = new()
+  public static CnfProcRelSecretsOpt Default { get; } = new()
   {
     Amount = 1,
     ChanceSecretInSecret = 0.1f,
@@ -39,7 +39,7 @@ public sealed record CnfProcRelSecretsOpts
   /// </summary>
   public float ChanceSecretInSecret { get; init; } = 0.1f;
 
-  //
+  // Helpers.
 
   /// <summary>
   /// Checks that this config can be used for generation.

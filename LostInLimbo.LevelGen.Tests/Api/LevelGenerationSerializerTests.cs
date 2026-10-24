@@ -3,6 +3,7 @@ using System.Text.Json;
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 
 namespace LostInLimbo.LevelGen.Tests.Api;
 
@@ -114,10 +115,10 @@ public sealed class LevelGenerationSerializerTests
       {
         Graph = new CnfGraph
         {
-          ProcOpts = CnfProcOpts.Default with
+          ProcOpts = CnfProcOpt.Default with
           {
-            RelSecrets = new CnfProcRelSecretsOpts { Amount = 2, ChanceSecretInSecret = 0.25f },
-            NodeStyle = new CnfProcNodeStyleOpts { GroupCount = 4 },
+            RelSecrets = new CnfProcRelSecretsOpt { Amount = 2, ChanceSecretInSecret = 0.25f },
+            NodeStyle = new CnfProcNodeStyleOpt { GroupCount = 4 },
           },
         },
       };
@@ -142,11 +143,11 @@ public sealed class LevelGenerationSerializerTests
         Graph = new CnfGraph
         {
           Builder = EnGraphBuilder.Linear,
-          ProcOpts = new CnfProcOpts
+          ProcOpts = new CnfProcOpt
           {
-            RelSecrets = new CnfProcRelSecretsOpts { Amount = 3, ChanceSecretInSecret = 0.75f },
-            NodeObjectives = new CnfProcNodeObjectivesOpts { GoalAmount = 2, OptGoalAmount = 4 },
-            NodeRelSize = new CnfProcNodeRelSizeOpts
+            RelSecrets = new CnfProcRelSecretsOpt { Amount = 3, ChanceSecretInSecret = 0.75f },
+            NodeObjectives = new CnfProcNodeObjectivesOpt { GoalAmount = 2, OptGoalAmount = 4 },
+            NodeRelSize = new CnfProcNodeRelSizeOpt
             {
               Steps = 5,
               Skew = 0.9f,
@@ -156,7 +157,7 @@ public sealed class LevelGenerationSerializerTests
               BiasRelationships = 0.1f,
               BiasPois = 0.2f,
             },
-            NodeStyle = new CnfProcNodeStyleOpts { GroupCount = 7 },
+            NodeStyle = new CnfProcNodeStyleOpt { GroupCount = 7 },
           },
         },
       };
@@ -413,7 +414,7 @@ public sealed class LevelGenerationSerializerTests
       var config = LevelGenerationSerializer.DeserializeConfig(json);
 
       // Assert: Missing proc options keep the defaults matching the legacy hardcoded ones.
-      Assert.Equal(CnfProcOpts.Default, config.Graph.ProcOpts);
+      Assert.Equal(CnfProcOpt.Default, config.Graph.ProcOpts);
     }
 
     [Fact]
@@ -429,11 +430,11 @@ public sealed class LevelGenerationSerializerTests
       // default.
       Assert.Equal(0, config.Graph.ProcOpts.RelSecrets.Amount);
       Assert.Equal(
-        CnfProcRelSecretsOpts.Default.ChanceSecretInSecret,
+        CnfProcRelSecretsOpt.Default.ChanceSecretInSecret,
         config.Graph.ProcOpts.RelSecrets.ChanceSecretInSecret);
-      Assert.Equal(CnfProcNodeObjectivesOpts.Default, config.Graph.ProcOpts.NodeObjectives);
-      Assert.Equal(CnfProcNodeRelSizeOpts.Default, config.Graph.ProcOpts.NodeRelSize);
-      Assert.Equal(CnfProcNodeStyleOpts.Default, config.Graph.ProcOpts.NodeStyle);
+      Assert.Equal(CnfProcNodeObjectivesOpt.Default, config.Graph.ProcOpts.NodeObjectives);
+      Assert.Equal(CnfProcNodeRelSizeOpt.Default, config.Graph.ProcOpts.NodeRelSize);
+      Assert.Equal(CnfProcNodeStyleOpt.Default, config.Graph.ProcOpts.NodeStyle);
     }
 
     [Fact]

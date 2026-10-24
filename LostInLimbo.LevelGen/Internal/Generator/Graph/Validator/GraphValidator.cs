@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using LostInLimbo.LevelGen.Api;
+using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
@@ -46,13 +47,14 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// concurrent calls. Safe to call in bulk seed loops.</para>
 /// </remarks>
 /// <param name="graph">Graph to verify.</param>
-/// <param name="options">Validator options; defaults to <see cref="GraphValidatorOpt.Default"/>.</param>
-internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options)
+/// <param name="options">Validator options.</param>
+internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
 {
   /// <summary>Graph to verify.</summary>
   private LilGraph? _graph = graph;
-  /// <summary>Validator options; defaults to <see cref="GraphValidatorOpt.Default"/>.</summary>
-  private GraphValidatorOpt _options = options ?? GraphValidatorOpt.Default;
+  /// <summary>Validator options.</summary>
+  private CnfValidGraphOpt _options = options;
+  
   /// <summary>All nodes mapped by id.</summary>
   private Dictionary<Guid, LilNode>? _nodesById;
   /// <summary>All start nodes.</summary>
@@ -70,12 +72,14 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
   /// Validates the given level graph for beatability.
   /// </summary>
   /// <returns>
-  /// A result whose <see cref="GraphValidationResult.Success"/> is <see langword="true"/> when
-  /// the graph is beatable; otherwise a failed result with the reason of the first failed check.
+  /// A result whose <see cref="LilResult.Success"/> is <see langword="true"/> when the graph is valid
+  /// (beatable) or validation is skipped; otherwise a failed result with the reason of the first failed check.
   /// </returns>
-  public GraphValidationResult Validate()
+  public LilResult Validate()
   {
-    GraphValidationResult? result = CheckFundamental();
+    if (!_options.Enabled) return LilResult.Succeed(); // Validation skipped.
+
+    LilResult? result = CheckFundamental();
     if (result != null) return result;
 
     result = Setup();
@@ -93,17 +97,17 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
     result = CheckExits();
     if (result != null) return result;
 
-    return GraphValidationResult.Succeed(); // Success: All checks passed.
+    return LilResult.Succeed(); // Success: All checks passed.
   }
 
   /// <summary>
   /// Checks fundamentals.
   /// </summary>
   /// <returns>Null if success, otherwise failure.</returns>
-  private GraphValidationResult? CheckFundamental()
+  private LilResult? CheckFundamental()
   {
-    if (_graph is null) return GraphValidationResult.Fail("Graph is null.");
-    if (_graph.Nodes.Count == 0) return GraphValidationResult.Fail("Graph has no nodes.");
+    if (_graph is null) return LilResult.Fail("Graph is null.");
+    if (_graph.Nodes.Count == 0) return LilResult.Fail("Graph has no nodes.");
     return null; // Success: Graph exists and has nodes.
   }
 
@@ -113,23 +117,23 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
   /// least one Start and one Exit POI.
   /// </summary>
   /// <returns>Null if success, otherwise failure.</returns>
-  private GraphValidationResult? Setup()
+  private LilResult? Setup()
   {
     _nodesById = new Dictionary<Guid, LilNode>(_graph!.Nodes.Count);
     foreach (var node in _graph.Nodes)
     {
-      if (node.Id == Guid.Empty) return GraphValidationResult.Fail($"Node {node.Id} has an empty id.");
+      if (node.Id == Guid.Empty) return LilResult.Fail($"Node {node.Id} has an empty id.");
 
-      if (!_nodesById.TryAdd(node.Id, node)) return GraphValidationResult.Fail($"Duplicate node id {node.Id}.");
+      if (!_nodesById.TryAdd(node.Id, node)) return LilResult.Fail($"Duplicate node id {node.Id}.");
     }
 
     foreach (var node in _graph.Nodes)
     {
       foreach (var poi in node.Pois)
       {
-        if (poi.Id == Guid.Empty) return GraphValidationResult.Fail($"POI {poi.Id} has an empty id.");
+        if (poi.Id == Guid.Empty) return LilResult.Fail($"POI {poi.Id} has an empty id.");
 
-        if (!_poiTypes.TryAdd(poi.Id, poi.Type)) return GraphValidationResult.Fail($"Duplicate POI id {poi.Id}.");
+        if (!_poiTypes.TryAdd(poi.Id, poi.Type)) return LilResult.Fail($"Duplicate POI id {poi.Id}.");
 
         if (poi.Type == EnPoiType.Start) _startNodeIds.Add(node.Id);
         else if (poi.Type == EnPoiType.Exit) _exitNodeIds.Add(node.Id);
@@ -137,8 +141,8 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
       }
     }
 
-    if (_startNodeIds.Count == 0) return GraphValidationResult.Fail("Graph has no Start POI.");
-    if (_exitNodeIds.Count == 0) return GraphValidationResult.Fail("Graph has no Exit POI.");
+    if (_startNodeIds.Count == 0) return LilResult.Fail("Graph has no Start POI.");
+    if (_exitNodeIds.Count == 0) return LilResult.Fail("Graph has no Exit POI.");
 
     return null; // Success: Basic structure of graph is valid.
   }
@@ -151,7 +155,7 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
   /// </summary>
   /// <remarks>Runs after <see cref="Setup"/>, so all POIs are known to be unique.</remarks>
   /// <returns>Null if success, otherwise failure.</returns>
-  private GraphValidationResult? CheckGoalSecrets()
+  private LilResult? CheckGoalSecrets()
   {
     foreach (var node in _graph!.Nodes)
     {
@@ -160,7 +164,7 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
       foreach (var poi in node.Pois)
       {
         if (poi.Type == EnPoiType.Goal)
-          return GraphValidationResult.Fail($"Goal POI {poi.Id} is in secret node {node.Id}.");
+          return LilResult.Fail($"Goal POI {poi.Id} is in secret node {node.Id}.");
       }
     }
 
@@ -175,36 +179,36 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
   /// <remarks>Runs after <see cref="Setup"/>, so every node and POI identifier is known to be
   /// non-empty and unique.</remarks>
   /// <returns>Null if success, otherwise failure.</returns>
-  private GraphValidationResult? CheckEdges()
+  private LilResult? CheckEdges()
   {
     var edgeIds = new HashSet<Guid>();
     foreach (var edge in _graph!.Edges)
     {
       if (edge.Id == Guid.Empty)
-        return GraphValidationResult.Fail($"Edge {edge.Id} has an empty id.");
+        return LilResult.Fail($"Edge {edge.Id} has an empty id.");
 
       if (!edgeIds.Add(edge.Id))
-        return GraphValidationResult.Fail($"Duplicate edge id {edge.Id}.");
+        return LilResult.Fail($"Duplicate edge id {edge.Id}.");
 
       if (!_nodesById!.ContainsKey(edge.From))
-        return GraphValidationResult.Fail($"Edge {edge.Id} references missing node {edge.From}.");
+        return LilResult.Fail($"Edge {edge.Id} references missing node {edge.From}.");
 
       if (!_nodesById!.ContainsKey(edge.To))
-        return GraphValidationResult.Fail($"Edge {edge.Id} references missing node {edge.To}.");
+        return LilResult.Fail($"Edge {edge.Id} references missing node {edge.To}.");
 
       if (edge.From == edge.To)
-        return GraphValidationResult.Fail($"Edge {edge.Id} connects node to itself.");
+        return LilResult.Fail($"Edge {edge.Id} connects node to itself.");
 
       foreach (var condition in edge.Conditions)
       {
         if (condition.RequiresPoi == Guid.Empty)
-          return GraphValidationResult.Fail($"Condition on edge {edge.Id} has an empty RequiresPoi.");
+          return LilResult.Fail($"Condition on edge {edge.Id} has an empty RequiresPoi.");
 
         if (!_poiTypes.TryGetValue(condition.RequiresPoi, out var poiType))
-          return GraphValidationResult.Fail($"Condition on edge {edge.Id} references missing POI {condition.RequiresPoi}.");
+          return LilResult.Fail($"Condition on edge {edge.Id} references missing POI {condition.RequiresPoi}.");
 
         if (condition.Type == EnConditionType.RequiresSolution && poiType != EnPoiType.Solution)
-          return GraphValidationResult.Fail(
+          return LilResult.Fail(
             $"Condition on edge {edge.Id} references non-Solution POI {condition.RequiresPoi} (type {poiType}).");
       }
     }
@@ -217,7 +221,7 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
   /// </summary>
   /// <remarks>Runs after <see cref="CheckEdges"/>, so every edge endpoint is known to exist.</remarks>
   /// <returns>Null if success, otherwise failure.</returns>
-  private GraphValidationResult? CheckMaxEdges()
+  private LilResult? CheckMaxEdges()
   {
     var degrees = new Dictionary<Guid, int>(_graph!.Nodes.Count);
     foreach (var node in _graph.Nodes)
@@ -234,7 +238,7 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
     foreach (var node in _graph.Nodes)
     {
       if (node.MaxEdges >= 0 && degrees[node.Id] > node.MaxEdges)
-        return GraphValidationResult.Fail(
+        return LilResult.Fail(
           $"Node {node.Id} has {degrees[node.Id]} relationships, over its MaxEdges cap of {node.MaxEdges}.");
     }
 
@@ -246,7 +250,7 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
   /// report the first conditioned passage the player can reach but can never satisfy.
   /// </summary>
   /// <returns>Null if success, otherwise failure.</returns>
-  private GraphValidationResult? CheckTraversals()
+  private LilResult? CheckTraversals()
   {
     var collectedPois = new HashSet<Guid>();
 
@@ -282,7 +286,7 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
       // unreachable-region reasons of CheckExits are the root cause, not the gate.
       if (!IsAtReachableFrontier(edge)) continue;
 
-      return GraphValidationResult.Fail($"Conditioned edge {edge.Id} can never be satisfied.");
+      return LilResult.Fail($"Conditioned edge {edge.Id} can never be satisfied.");
     }
     return null; // Success: All nodes are reachable by player.
   }
@@ -320,7 +324,7 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
   /// reachable one-way passages, so bulk seed loops stay cheap.
   /// </remarks>
   /// <returns>Null if success, otherwise failure.</returns>
-  private GraphValidationResult? CheckGoalBeatability()
+  private LilResult? CheckGoalBeatability()
   {
     // Without a reachable exit every reason below is moot: CheckExits' unreachable-exit
     // report is the root cause and must own it. This also keeps the reasons of this check
@@ -377,7 +381,7 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
         foreach (var poi in node.Pois)
         {
           if (poi.Type == EnPoiType.Goal)
-            return GraphValidationResult.Fail(
+            return LilResult.Fail(
               $"Goal POI {poi.Id} is stranded behind one-way passage {edge.Id}.");
         }
       }
@@ -390,14 +394,14 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
   /// Check exits.
   /// </summary>
   /// <returns>Null if success, otherwise failure.</returns>
-  private GraphValidationResult? CheckExits()
+  private LilResult? CheckExits()
   {
     if (!ContainsAnyExit(_flooded))
-      return GraphValidationResult.Fail("Exit POI is not reachable from Start.");
+      return LilResult.Fail("Exit POI is not reachable from Start.");
 
     var unreachableCount = _graph!.Nodes.Count - _flooded.Count;
     if (unreachableCount > 0)
-      return GraphValidationResult.Fail($"{unreachableCount} node(s) unreachable from Start.");
+      return LilResult.Fail($"{unreachableCount} node(s) unreachable from Start.");
     return null; // Success: Exit POI is reachable from Start POI.
   }
 
@@ -525,7 +529,7 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
   /// <param name="farSide">Node ids structurally reachable beyond the passage.</param>
   /// <param name="referencedSolutions">Ids of all POIs referenced by passage conditions.</param>
   /// <returns>A failed result naming the trapped POI.</returns>
-  private GraphValidationResult TrappedFailure(
+  private LilResult TrappedFailure(
     LilEdge edge,
     HashSet<Guid> farSide,
     HashSet<Guid> referencedSolutions)
@@ -537,7 +541,7 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
       foreach (var poi in node.Pois)
       {
         if (poi.Type == EnPoiType.Goal)
-          return GraphValidationResult.Fail(
+          return LilResult.Fail(
             $"Goal POI {poi.Id} is trapped behind one-way passage {edge.Id} (far side cannot reach the Exit).");
       }
     }
@@ -549,12 +553,12 @@ internal sealed class GraphValidator(LilGraph? graph, GraphValidatorOpt? options
       foreach (var poi in node.Pois)
       {
         if (poi.Type == EnPoiType.Solution && referencedSolutions.Contains(poi.Id))
-          return GraphValidationResult.Fail(
+          return LilResult.Fail(
             $"Solution POI {poi.Id} is trapped behind one-way passage {edge.Id} (far side cannot reach the Exit).");
       }
     }
 
-    return GraphValidationResult.Fail(
+    return LilResult.Fail(
       $"One-way passage {edge.Id} is a point of no return: the far side cannot reach the Exit.");
   }
 

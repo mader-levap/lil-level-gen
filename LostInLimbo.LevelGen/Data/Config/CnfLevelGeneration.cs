@@ -21,10 +21,12 @@ public sealed record CnfLevelGeneration
   /// <summary>Version of the configuration format currently written by the serializer.</summary>
   public const int CurrentConfigVersion = 1;
 
-  //
+  // Defaults.
 
   /// <summary>Default instance.</summary>
   public static CnfLevelGeneration Default { get; } = new();
+
+  // Fields.
 
   /// <summary>
   /// Schema version of this configuration. Increment when the JSON format changes in a way that
@@ -47,7 +49,7 @@ public sealed record CnfLevelGeneration
   /// <summary>Debug configuration. Ignored if null.</summary>
   public CnfDebug? Debug { get; init; } = null;
 
-  //
+  // Helpers.
 
   /// <summary>
   /// Validates the invariants of this configuration and its general, graph and debug sections.

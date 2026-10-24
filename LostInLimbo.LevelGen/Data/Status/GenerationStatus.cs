@@ -14,10 +14,12 @@ namespace LostInLimbo.LevelGen.Data.Status;
 /// </remarks>
 public sealed record GenerationStatus
 {
+  // Defaults.
+
   /// <summary>Default instance: never ran, no error.</summary>
   public static GenerationStatus Default { get; } = new();
 
-  //
+  // Fields.
 
   /// <summary>
   /// Current lifecycle state and result of generation.

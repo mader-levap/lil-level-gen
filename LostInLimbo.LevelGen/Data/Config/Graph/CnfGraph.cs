@@ -1,4 +1,6 @@
 using System;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
+using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 
 namespace LostInLimbo.LevelGen.Data.Config.Graph;
 
@@ -29,10 +31,12 @@ public sealed record CnfGraph
   /// <summary>Maximum allowed size - keeps generation cost bounded.</summary>
   public const int MaxSize = 100;
 
-  //
+  // Defaults.
 
   /// <summary>Default instance.</summary>
   public static CnfGraph Default { get; } = new();
+
+  // Fields.
 
   /// <summary>
   /// Graph builder to use.
@@ -58,12 +62,17 @@ public sealed record CnfGraph
   /// <summary>
   /// Options of the graph finalization processors. Ignored by builders that run no processors.
   /// </summary>
-  public CnfProcOpts ProcOpts { get; init; } = CnfProcOpts.Default;
-
-  //
+  public CnfProcOpt ProcOpts { get; init; } = CnfProcOpt.Default;
 
   /// <summary>
-  /// Checks that this config can be used for generation.
+  /// Validator options.
+  /// </summary>
+  public CnfValidGraphOpt ValidatorOpts { get; init; } = CnfValidGraphOpt.Default;
+
+  // Helpers.
+
+  /// <summary>
+  /// Checks that this graph generation config can be used for graph generation.
   /// </summary>
   /// <exception cref="ArgumentOutOfRangeException">The builder is not a defined enum value, or a value is out of range.</exception>
   /// <exception cref="ArgumentException">ProcOpts is null, or its values are invalid.</exception>
@@ -81,6 +90,8 @@ public sealed record CnfGraph
       throw new ArgumentOutOfRangeException(nameof(Complexity), Complexity, "Complexity must be at least 0.");
     if (ProcOpts is null)
       throw new ArgumentException("ProcOpts config must not be null.", nameof(ProcOpts));
+    if (ValidatorOpts is null)
+      throw new ArgumentException("ValidatorOpts config must not be null.", nameof(ValidatorOpts));
     ProcOpts.Validate();
   }
 }

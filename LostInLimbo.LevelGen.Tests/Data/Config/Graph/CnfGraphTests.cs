@@ -1,4 +1,5 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 
 namespace LostInLimbo.LevelGen.Tests.Data.Config.Graph;
 
@@ -90,9 +91,9 @@ public sealed class CnfGraphTests
     // Arrange: Graph config whose processor options violate their own invariants.
     var graph = new CnfGraph
     {
-      ProcOpts = CnfProcOpts.Default with
+      ProcOpts = CnfProcOpt.Default with
       {
-        NodeStyle = new CnfProcNodeStyleOpts { GroupCount = 0 },
+        NodeStyle = new CnfProcNodeStyleOpt { GroupCount = 0 },
       },
     };
 
@@ -107,10 +108,10 @@ public sealed class CnfGraphTests
     // Arrange: Graph config with valid non-default processor options.
     var graph = new CnfGraph
     {
-      ProcOpts = CnfProcOpts.Default with
+      ProcOpts = CnfProcOpt.Default with
       {
-        RelSecrets = new CnfProcRelSecretsOpts { Amount = 0 },
-        NodeRelSize = new CnfProcNodeRelSizeOpts { Steps = 5, Skew = 1f },
+        RelSecrets = new CnfProcRelSecretsOpt { Amount = 0 },
+        NodeRelSize = new CnfProcNodeRelSizeOpt { Steps = 5, Skew = 1f },
       },
     };
 

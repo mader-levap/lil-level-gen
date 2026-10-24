@@ -1,4 +1,5 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
@@ -23,17 +24,17 @@ public sealed class GraphBuilderProcOptsTests
     var graphConfig = new CnfGraph
     {
       Size = 5,
-      ProcOpts = CnfProcOpts.Default with
+      ProcOpts = CnfProcOpt.Default with
       {
-        RelSecrets = new CnfProcRelSecretsOpts { Amount = 0 },
+        RelSecrets = new CnfProcRelSecretsOpt { Amount = 0 },
       },
     };
 
     // Act: Build through the factory like production dispatch does.
-    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+    var (result, graph) = GraphTestSupport.Build(builder, graphConfig);
 
     // Assert: No secret node exists and no secret edge was appended.
-    Assert.True(success);
+    Assert.True(result.Success);
     Assert.Empty(graph.Nodes.Where(node => node.Secret));
     Assert.Empty(graph.Edges.Where(edge => edge.Secret));
   }
@@ -47,17 +48,17 @@ public sealed class GraphBuilderProcOptsTests
     var graphConfig = new CnfGraph
     {
       Size = 10,
-      ProcOpts = CnfProcOpts.Default with
+      ProcOpts = CnfProcOpt.Default with
       {
-        RelSecrets = new CnfProcRelSecretsOpts { Amount = 3 },
+        RelSecrets = new CnfProcRelSecretsOpt { Amount = 3 },
       },
     };
 
     // Act: Build through the factory like production dispatch does.
-    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+    var (result, graph) = GraphTestSupport.Build(builder, graphConfig);
 
     // Assert: The configured number of secret nodes exists.
-    Assert.True(success);
+    Assert.True(result.Success);
     Assert.Equal(3, graph.Nodes.Count(node => node.Secret));
   }
 
@@ -70,17 +71,17 @@ public sealed class GraphBuilderProcOptsTests
     var graphConfig = new CnfGraph
     {
       Size = 5,
-      ProcOpts = CnfProcOpts.Default with
+      ProcOpts = CnfProcOpt.Default with
       {
-        NodeObjectives = new CnfProcNodeObjectivesOpts { GoalAmount = 0, OptGoalAmount = 0 },
+        NodeObjectives = new CnfProcNodeObjectivesOpt { GoalAmount = 0, OptGoalAmount = 0 },
       },
     };
 
     // Act: Build through the factory like production dispatch does.
-    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+    var (result, graph) = GraphTestSupport.Build(builder, graphConfig);
 
     // Assert: Neither goal nor optional-goal POIs exist; start and exit still do.
-    Assert.True(success);
+    Assert.True(result.Success);
     Assert.Empty(GraphTestSupport.GetPois(graph, EnPoiType.Goal));
     Assert.Empty(GraphTestSupport.GetPois(graph, EnPoiType.OptionalGoal));
     Assert.Single(GraphTestSupport.GetPois(graph, EnPoiType.Start));
@@ -96,18 +97,18 @@ public sealed class GraphBuilderProcOptsTests
     var graphConfig = new CnfGraph
     {
       Size = 10,
-      ProcOpts = CnfProcOpts.Default with
+      ProcOpts = CnfProcOpt.Default with
       {
-        NodeObjectives = new CnfProcNodeObjectivesOpts { GoalAmount = 3, OptGoalAmount = 0 },
+        NodeObjectives = new CnfProcNodeObjectivesOpt { GoalAmount = 3, OptGoalAmount = 0 },
       },
     };
 
     // Act: Build through the factory like production dispatch does.
-    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+    var (result, graph) = GraphTestSupport.Build(builder, graphConfig);
 
     // Assert: The requested mandatory goals exist (node capacity is ample) and no
     // optional goals were placed.
-    Assert.True(success);
+    Assert.True(result.Success);
     Assert.Equal(3, GraphTestSupport.GetPois(graph, EnPoiType.Goal).Count);
     Assert.Empty(GraphTestSupport.GetPois(graph, EnPoiType.OptionalGoal));
   }
@@ -122,9 +123,9 @@ public sealed class GraphBuilderProcOptsTests
     var graphConfig = new CnfGraph
     {
       Size = 5,
-      ProcOpts = CnfProcOpts.Default with
+      ProcOpts = CnfProcOpt.Default with
       {
-        NodeRelSize = new CnfProcNodeRelSizeOpts
+        NodeRelSize = new CnfProcNodeRelSizeOpt
         {
           Steps = 1,
           MinSize = 7,
@@ -135,10 +136,10 @@ public sealed class GraphBuilderProcOptsTests
     };
 
     // Act: Build through the factory like production dispatch does.
-    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+    var (result, graph) = GraphTestSupport.Build(builder, graphConfig);
 
     // Assert: Every node - including the secret one - carries the single step value.
-    Assert.True(success);
+    Assert.True(result.Success);
     Assert.All(graph.Nodes, node => Assert.Equal(7, node.RelSize));
   }
 
@@ -173,17 +174,17 @@ public sealed class GraphBuilderProcOptsTests
     var graphConfig = new CnfGraph
     {
       Size = 5,
-      ProcOpts = CnfProcOpts.Default with
+      ProcOpts = CnfProcOpt.Default with
       {
-        NodeStyle = new CnfProcNodeStyleOpts { GroupCount = 1 },
+        NodeStyle = new CnfProcNodeStyleOpt { GroupCount = 1 },
       },
     };
 
     // Act: Build through the factory like production dispatch does.
-    var (success, graph) = GraphTestSupport.Build(builder, graphConfig);
+    var (result, graph) = GraphTestSupport.Build(builder, graphConfig);
 
     // Assert: Every node was grouped and all groups are identical.
-    Assert.True(success);
+    Assert.True(result.Success);
     Assert.All(graph.Nodes, node => Assert.NotNull(node.Style.Group));
     Assert.Single(graph.Nodes.Select(node => node.Style.Group).Distinct());
   }
@@ -198,12 +199,12 @@ public sealed class GraphBuilderProcOptsTests
     {
       Size = 10,
       Connectivity = 3,
-      ProcOpts = CnfProcOpts.Default with
+      ProcOpts = CnfProcOpt.Default with
       {
-        RelSecrets = new CnfProcRelSecretsOpts { Amount = 2, ChanceSecretInSecret = 0.5f },
-        NodeObjectives = new CnfProcNodeObjectivesOpts { GoalAmount = 2, OptGoalAmount = 1 },
-        NodeRelSize = new CnfProcNodeRelSizeOpts { Steps = 4, Skew = 0.5f },
-        NodeStyle = new CnfProcNodeStyleOpts { GroupCount = 2 },
+        RelSecrets = new CnfProcRelSecretsOpt { Amount = 2, ChanceSecretInSecret = 0.5f },
+        NodeObjectives = new CnfProcNodeObjectivesOpt { GoalAmount = 2, OptGoalAmount = 1 },
+        NodeRelSize = new CnfProcNodeRelSizeOpt { Steps = 4, Skew = 0.5f },
+        NodeStyle = new CnfProcNodeStyleOpt { GroupCount = 2 },
       },
     };
 
