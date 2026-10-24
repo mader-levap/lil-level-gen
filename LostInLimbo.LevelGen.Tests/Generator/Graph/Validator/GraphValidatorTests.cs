@@ -423,7 +423,7 @@ public sealed class GraphValidatorTests
 
       // Assert: Failure reports how many nodes stayed unreachable.
       Assert.False(result.Success);
-      Assert.Equal("1 node(s) unreachable from Start.", result.FailureReason);
+      Assert.Equal("1 node(s) unreachable from start POI.", result.FailureReason);
     }
 
     [Fact]
@@ -477,7 +477,7 @@ public sealed class GraphValidatorTests
 
       // Assert: Exit itself is reachable, so the leftover count is reported.
       Assert.False(result.Success);
-      Assert.Equal("2 node(s) unreachable from Start.", result.FailureReason);
+      Assert.Equal("2 node(s) unreachable from start POI.", result.FailureReason);
     }
 
     [Fact]
@@ -690,7 +690,7 @@ public sealed class GraphValidatorTests
       // Assert: The disconnected branch is the root cause; the gate is not a softlock
       // because the player can never stand at it.
       Assert.False(result.Success);
-      Assert.Equal("2 node(s) unreachable from Start.", result.FailureReason);
+      Assert.Equal("2 node(s) unreachable from start POI.", result.FailureReason);
     }
 
     [Fact]
@@ -766,7 +766,7 @@ public sealed class GraphValidatorTests
 
       // Assert: One-way direction matters: only the unreachable node is reported.
       Assert.False(result.Success);
-      Assert.Equal("1 node(s) unreachable from Start.", result.FailureReason);
+      Assert.Equal("1 node(s) unreachable from start POI.", result.FailureReason);
     }
   }
 
@@ -1662,7 +1662,7 @@ public sealed class GraphValidatorTests
 
       // Assert: The unreachable region keeps the report instead of the innocent passage.
       Assert.False(result.Success);
-      Assert.Equal("1 node(s) unreachable from Start.", result.FailureReason);
+      Assert.Equal("1 node(s) unreachable from start POI.", result.FailureReason);
     }
 
     [Fact]
@@ -1712,7 +1712,7 @@ public sealed class GraphValidatorTests
 
       // Assert: The orphan keeps the unreachable report instead of a false strand claim.
       Assert.False(result.Success);
-      Assert.Equal("1 node(s) unreachable from Start.", result.FailureReason);
+      Assert.Equal("1 node(s) unreachable from start POI.", result.FailureReason);
     }
 
     [Fact]

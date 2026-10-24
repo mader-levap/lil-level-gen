@@ -421,14 +421,13 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     foreach (var startId in _startNodeIds)
     {
       if (!canReachExit.Contains(startId)) {
-        if (_startNodeIds.Count == 1) return LilResult.Fail("Exit POI is not reachable from at start POI.");
+        if (_startNodeIds.Count == 1) return LilResult.Fail("Exit POI is not reachable from start POI.");
         return LilResult.Fail("Exit POI is not reachable from at least one start POI.");
       }
     }
 
     var unreachableCount = _graph!.Nodes.Count - _flooded.Count;
-    if (unreachableCount > 0)
-      return LilResult.Fail($"{unreachableCount} node(s) unreachable from Start.");
+    if (unreachableCount > 0) return LilResult.Fail($"{unreachableCount} node(s) unreachable from start POI.");
     return null; // Success: every start reaches an exit and every exit is reachable.
   }
 

@@ -64,7 +64,7 @@ public sealed class LevelGraphValidationTests
 
     // Assert: The leftover node is reported.
     Assert.False(result.Success);
-    Assert.Equal("1 node(s) unreachable from Start.", result.FailureReason);
+    Assert.Equal("1 node(s) unreachable from start POI.", result.FailureReason);
   }
 
   [Fact]

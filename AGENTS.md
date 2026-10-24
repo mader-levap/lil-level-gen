@@ -187,7 +187,7 @@ It must not depend on player position, camera, engine frame time, or scene state
 
 - All dimensions (X, Y and Z) are used.
 - Important: **Z is up/down** (Blender/UE convention). Consumers that use Y as up/down need to take it into account.
-- Use `Point3` for grid/cell coordinates. Use `System.Numerics.Vector3` for world-space positions or dimensions in meters.
+- Use `LilPoint` for grid/cell coordinates. Use `System.Numerics.Vector3` for world-space positions or dimensions in meters.
 
 ### Randomness and determinism
 
