@@ -343,6 +343,19 @@ public sealed class LevelGenerationSerializerTests
       Assert.Equal("json", exception.ParamName);
       Assert.IsType<JsonException>(exception.InnerException);
     }
+
+    [Fact]
+    public void Deserialize_WithUnknownMember_ThrowsArgumentExceptionWrappingJsonException()
+    {
+      // Arrange: Well-formed JSON carrying a typo'd key that names no config property.
+      var json = "{ \"general\": { \"seed\": 7, \"seedd\": 42 } }";
+
+      // Act/Assert: The unknown member is rejected during parsing instead of silently dropped.
+      var ex = Assert.Throws<ArgumentException>(
+        () => LevelGenerationSerializer.DeserializeConfig(json));
+      Assert.Equal("json", ex.ParamName);
+      Assert.IsType<JsonException>(ex.InnerException);
+    }
   }
 
   /// <summary>Tests <see cref="LevelGenerationSerializer.DeserializeConfig"/> success paths: defaults, case-insensitive keys and enum-name parsing.</summary>

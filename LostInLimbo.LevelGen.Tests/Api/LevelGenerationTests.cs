@@ -172,6 +172,26 @@ public sealed class LevelGenerationTests
     }
 
     [Fact]
+    public void Start_WithInvalidRunKind_ThrowsWithoutClaimingRun()
+    {
+      // Arrange: Idle state and an out-of-range cast of EnRunKind.
+      var invalidKind = (EnRunKind)99;
+
+      // Act/Assert: Start rejects an undefined run kind before claiming the run.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(
+        () => _session.Start(invalidKind, Config()));
+
+      // Assert: The exception names the offending parameter and no claim was taken.
+      Assert.Equal("enRunKind", exception.ParamName);
+      Assert.NotEqual(EnGenResult.Running, _session.Status().Result);
+
+      // Assert: A subsequent valid start still works.
+      Assert.True(_session.Start(EnRunKind.All, Config()));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+    }
+
+    [Fact]
     public void Start_WithFailAtStart_PublishesErrorAndWorldIsNull()
     {
       // Arrange: Debug config that fails immediately.
@@ -317,6 +337,21 @@ public sealed class LevelGenerationTests
       Assert.False(resumed);
       Assert.Equal(EnGenResult.Error, _session.Status().Result);
       Assert.NotNull(_session.Status().Error);
+    }
+
+    [Fact]
+    public void Resume_WithInvalidRunKind_ThrowsWithoutClaimingRun()
+    {
+      // Arrange: Idle state (nothing paused to resume).
+      var invalidKind = (EnRunKind)99;
+
+      // Act/Assert: Resume rejects an undefined run kind before touching any claim.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(
+        () => _session.Resume(invalidKind));
+
+      // Assert: The exception names the offending parameter and no claim was taken.
+      Assert.Equal("enRunKind", exception.ParamName);
+      Assert.Equal(EnGenResult.None, _session.Status().Result);
     }
   }
 

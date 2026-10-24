@@ -13,8 +13,9 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 /// <remarks>
 /// <para>
 /// Unlike the soft constraints of <see cref="CnfGraph"/>, these are hard constraints:
-/// <see cref="Validate"/> throws when the parameters are out of range or contradict each
-/// other (for example a single step together with a bias that demands variation).
+/// <see cref="Validate"/> throws when the parameters are out of range. With a single
+/// step there is no variation, so <see cref="BiasRelationships"/> and <see cref="BiasPois"/>
+/// have no effect and are ignored.
 /// </para>
 /// <para>
 /// Zero-valued behavior: <see cref="Skew"/> 0 makes every step equally probable,
@@ -119,8 +120,6 @@ public sealed record CnfProcNodeRelSizeOpt
       throw new ArgumentOutOfRangeException(nameof(BiasRelationships), BiasRelationships, "BiasRelationships must be a finite value of at least 0.");
     if (!float.IsFinite(BiasPois) || BiasPois < 0f)
       throw new ArgumentOutOfRangeException(nameof(BiasPois), BiasPois, "BiasPois must be a finite value of at least 0.");
-    if (Steps == 1 && (BiasRelationships > 0f || BiasPois > 0f))
-      throw new ArgumentException("A single step leaves no variation for relationship or POI bias; use Steps of at least 2 or set both biases to 0.", nameof(Steps));
 
     // Growth only matters when there is more than one step to derive.
     if (Steps == 1) return;

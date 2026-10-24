@@ -52,7 +52,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// </para>
 /// <list type="bullet">
 /// <item><b>CheckTraversals()</b>: O(N·E). Condition-aware fixpoint rescans all edges each iteration; a long chain floods one node/iteration → O(N²) edge scans.</item>
-/// <item><b>CheckGoalBeatability()</b>: O(K·(N·E + N·P)). THE HOTSPOT — per reachable one-way edge: a full structural flood + a full condition-aware excluding flood; chained one-ways → cubic.</item>
+/// <item><b>CheckGoalBeatability()</b>: O(K·((V+E) + N·E)). Per reachable one-way edge: a now-linear structural flood (adjacency list, see <see cref="FloodStructural"/>) plus a full condition-aware excluding flood that still rescans all edges per iteration; chained one-ways → quadratic in edges.</item>
 /// </list>
 /// </remarks>
 /// <param name="graph">Graph to verify.</param>
@@ -76,6 +76,10 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
   private Dictionary<Guid, EnPoiType> _poiTypes = [];
   /// <summary>Flooded nodes.</summary>
   private HashSet<Guid> _flooded = [];
+
+  /// <summary>Structural neighbors of each node, built once from the edge list so
+  /// <see cref="FloodStructural"/> is O(V+E) instead of O(V·E) per call.</summary>
+  private Dictionary<Guid, List<Guid>>? _adjacency;
 
   /// <summary>
   /// Validates the given level graph for beatability.
@@ -344,6 +348,11 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     // Built lazily on the first reachable one-way edge; graphs without one skip this work.
     HashSet<Guid>? referencedSolutions = null;
 
+    // Build the structural adjacency list once so every FloodStructural call below is
+    // O(V+E) instead of O(V·E). Edge endpoints were validated by CheckEdges, so every
+    // edge references a known node here.
+    _adjacency = BuildStructuralAdjacency();
+
     foreach (var edge in _graph!.Edges)
     {
       if (edge.Direction != EnPassageDirection.OneWay) continue;
@@ -450,13 +459,25 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
       var nodeId = pending.Pop();
       if (!reached.Add(nodeId)) continue;
 
-      foreach (var edge in _graph!.Edges)
-      {
-        if (edge.From == nodeId) pending.Push(edge.To);
-        else if (edge.To == nodeId && edge.Direction == EnPassageDirection.Bidirectional)
-          pending.Push(edge.From);
-      }
+      foreach (var neighbor in _adjacency![nodeId]) pending.Push(neighbor);
     }
+  }
+
+  /// <summary>Builds the structural adjacency list once from the edge list.</summary>
+  /// <returns>Every node mapped to its structural neighbors: forward along every passage,
+  /// and backward along bidirectional ones. Edge endpoints were validated by
+  /// <see cref="CheckEdges"/>, so every edge references a known node.</returns>
+  private Dictionary<Guid, List<Guid>> BuildStructuralAdjacency()
+  {
+    var adjacency = new Dictionary<Guid, List<Guid>>(_graph!.Nodes.Count);
+    foreach (var node in _graph.Nodes) adjacency[node.Id] = [];
+    foreach (var edge in _graph.Edges)
+    {
+      adjacency[edge.From].Add(edge.To);
+      if (edge.Direction == EnPassageDirection.Bidirectional)
+        adjacency[edge.To].Add(edge.From);
+    }
+    return adjacency;
   }
 
   /// <summary>Floods everything a player can reach without ever entering an excluded

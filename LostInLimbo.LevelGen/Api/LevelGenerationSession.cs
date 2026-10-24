@@ -104,12 +104,15 @@ public sealed class LevelGenerationSession
   /// </param>
   /// <returns>True if successfully started generation, otherwise false.</returns>
   /// <exception cref="ArgumentNullException">Config is <see langword="null"/>.</exception>
-  /// <exception cref="ArgumentOutOfRangeException">A numeric config setting is out of range.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">A numeric config setting is out of range,
+  /// or <paramref name="enRunKind"/> is not a defined value of <see cref="EnRunKind"/>.</exception>
   /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
   public bool Start(EnRunKind enRunKind, CnfLevelGeneration config, CancellationToken cancellationToken = default)
   {
     // Validate before claiming so configuration errors cannot leave the status stuck at "running".
     // This is the only validation pass; the generator trusts its caller.
+    if (!Enum.IsDefined(typeof(EnRunKind), enRunKind))
+      throw new ArgumentOutOfRangeException(nameof(enRunKind), enRunKind, "Unknown run kind.");
     ValidateConfig(config);
 
     try
@@ -159,8 +162,14 @@ public sealed class LevelGenerationSession
   /// or a violated internal invariant (see <see cref="EnGenResult.Error"/>) all return false;
   /// use <see cref="Status"/> to tell them apart.
   /// </returns>
+  /// <exception cref="ArgumentOutOfRangeException"><paramref name="enRunKind"/> is not a defined
+  /// value of <see cref="EnRunKind"/>.</exception>
   public bool Resume(EnRunKind enRunKind, CancellationToken cancellationToken = default)
   {
+    // Validate before claiming so an invalid run kind cannot leave the status stuck at "running".
+    if (!Enum.IsDefined(typeof(EnRunKind), enRunKind))
+      throw new ArgumentOutOfRangeException(nameof(enRunKind), enRunKind, "Unknown run kind.");
+
     try
     {
       // Same atomic claim + install as Start (see there): while the gate is held no Cancel,

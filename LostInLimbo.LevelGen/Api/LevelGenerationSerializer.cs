@@ -24,6 +24,9 @@ public static class LevelGenerationSerializer
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     PropertyNameCaseInsensitive = true,
     WriteIndented = true,
+    // Unknown members are rejected so a typo'd key in a hand-edited config is surfaced
+    // instead of silently dropped. (Relevant on deserialization; harmless on write.)
+    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     Converters = { new JsonStringEnumConverter(allowIntegerValues: false) },
   };
 

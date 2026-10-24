@@ -243,13 +243,13 @@ public sealed class ProcNodeRelSizeTests
     public void Distribute_WithSingleStep_AssignsMinSizeToEveryNode()
     {
       // Arrange: One allowed step value - the only configuration without variation, so
-      // both biases must be zeroed to satisfy the single-step contradiction rule.
+      // bias has no effect and every node gets the single step regardless of bias.
       var options = new CnfProcNodeRelSizeOpt
       {
         Steps = 1,
         MinSize = 5,
-        BiasRelationships = 0f,
-        BiasPois = 0f,
+        BiasRelationships = 0.6f,
+        BiasPois = 0.6f,
       };
       var graph = CreateChainGraph(10);
 
