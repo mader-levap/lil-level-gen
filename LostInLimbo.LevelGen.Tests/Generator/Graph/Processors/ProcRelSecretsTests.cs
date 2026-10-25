@@ -279,6 +279,32 @@ public sealed class ProcRelSecretsTests
   public sealed class MaxEdgesTests
   {
     [Fact]
+    public void Execute_WithConfiguredMaxEdges_AssignsCapToCreatedSecrets()
+    {
+      // Arrange: A chain graph whose ordinary nodes stay unlimited; the configured cap
+      // differs from the option default, so only the configured value can satisfy it.
+      var graph = CreateStartExitChainGraph(4);
+      var options = CnfProcRelSecretsOpt.Default with
+      {
+        Amount = 3,
+        ChanceSecretInSecret = 0.5f,
+        MaxEdges = 5,
+      };
+
+      // Act: Add three secrets; the nesting chance may make a secret host a later one,
+      // so the configured cap is consulted for secret hosts as well.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: Every created secret carries the configured cap, while the nodes that
+      // already existed keep their own - the pass only stamps what it appends.
+      var secrets = graph.Nodes.Where(node => node.Secret).ToList();
+      Assert.Equal(3, secrets.Count);
+      Assert.All(secrets, secret => Assert.Equal(5, secret.MaxEdges));
+      Assert.All(graph.Nodes.Where(node => !node.Secret), node => Assert.Equal(DefaultNodeMaxEdges, node.MaxEdges));
+      GraphTestAssert.AssertMaxEdges(graph);
+    }
+
+    [Fact]
     public void Execute_WithHostAtCapacity_SkipsThatHost()
     {
       // Arrange: Chain of two; the first node is capped at its single skeleton

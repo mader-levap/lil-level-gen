@@ -1,4 +1,5 @@
 using System;
+using LostInLimbo.LevelGen.Data.Result.Graph;
 
 namespace LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 
@@ -32,6 +33,14 @@ public sealed record CnfProcRelSecretsOpt
   /// Number of secret nodes to append; 0 disables the processor. Must not be negative. The hard cap is <see cref="MaxAmount"/>.
   /// </summary>
   public int Amount { get; init; } = 1;
+
+  /// <summary>
+  /// Hard cap on the number of passages a secret node created by this processor may
+  /// have - entry passage, exit passage and nested secrets included. Applied to every
+  /// created secret node as <see cref="LilNode.MaxEdges"/>.
+  /// <para>Must be at least 1.</para>
+  /// </summary>
+  public int MaxEdges { get; init; } = 3;
 
   /// <summary>
   /// Per-secret chance that, instead of attaching to a random ordinary node, the new
@@ -88,6 +97,9 @@ public sealed record CnfProcRelSecretsOpt
       throw new ArgumentOutOfRangeException(nameof(Amount), Amount, "Amount must not be negative.");
     if (Amount > MaxAmount)
       throw new ArgumentOutOfRangeException(nameof(Amount), Amount, $"Amount must not exceed {MaxAmount}.");
+    if (MaxEdges < 1)
+      throw new ArgumentOutOfRangeException(nameof(MaxEdges), MaxEdges, "MaxEdges must not be negative or zero.");
+
     if (!float.IsFinite(ChanceSecretInSecret) || ChanceSecretInSecret < 0f || ChanceSecretInSecret > 1f)
       throw new ArgumentOutOfRangeException(nameof(ChanceSecretInSecret), ChanceSecretInSecret, "ChanceSecretInSecret must be a finite value within [0, 1].");
     if (!float.IsFinite(ChanceTwoPassages) || ChanceTwoPassages < 0f || ChanceTwoPassages > 1f)

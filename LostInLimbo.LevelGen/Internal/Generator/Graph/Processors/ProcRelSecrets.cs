@@ -76,12 +76,6 @@ internal sealed class ProcRelSecrets
   /// </summary>
   private const int NodeRelSize = 1;
 
-  /// <summary>
-  /// Hard cap of created secret nodes: at most two passages (entry plus exit) plus at
-  /// most one nested secret hanging off this one.
-  /// </summary>
-  private const int SecretMaxEdges = 3;
-
   /// <summary>Graph that gains secret nodes and edges in place; may be empty.</summary>
   private readonly LilGraph _graph;
   /// <summary>Secret parameters; validated at construction.</summary>
@@ -156,7 +150,7 @@ internal sealed class ProcRelSecrets
       _graph.Nodes.Add(new LilNode {
         Id = nodeId,
         RelSize = NodeRelSize,
-        MaxEdges = SecretMaxEdges,
+        MaxEdges = _options.MaxEdges,
         Secret = true });
       _graph.Edges.Add(new LilEdge
       {

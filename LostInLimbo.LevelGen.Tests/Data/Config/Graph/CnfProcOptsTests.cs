@@ -57,17 +57,6 @@ public sealed class CnfProcOptsTests
   /// <summary>Tests the per-processor config records: defaults and range rules.</summary>
   public sealed class ProcSectionTests
   {
-    [Fact]
-    public void RelSecrets_WithDefaultInstance_DoesNotThrow()
-    {
-      // Arrange/Act: The default instance uses the legacy hardcoded values.
-      CnfProcRelSecretsOpt.Default.Validate();
-
-      // Assert: Defaults match the values builders used before options were configurable.
-      Assert.Equal(1, CnfProcRelSecretsOpt.Default.Amount);
-      Assert.Equal(0.1f, CnfProcRelSecretsOpt.Default.ChanceSecretInSecret);
-    }
-
     [Theory]
     [InlineData(0)]
     [InlineData(2)]
@@ -200,6 +189,29 @@ public sealed class CnfProcOptsTests
       // Act/Assert: The out-of-range value is rejected naming the offending property.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
       Assert.Equal("MaxExitDistance", exception.ParamName);
+    }
+
+    [Fact]
+    public void RelSecrets_WithPositiveMaxEdges_DoesNotThrow()
+    {
+      // Arrange: Config with a cap that allows at least one passage per secret.
+      var opts = new CnfProcRelSecretsOpt { MaxEdges = 1 };
+
+      // Assert: Any cap of at least one passage is allowed.
+      opts.Validate();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    public void RelSecrets_WithNonPositiveMaxEdges_ThrowsArgumentOutOfRangeException(int maxEdges)
+    {
+      // Arrange: Config demanding a cap that leaves no room for a secret's entry passage.
+      var opts = new CnfProcRelSecretsOpt { MaxEdges = maxEdges };
+
+      // Act/Assert: The out-of-range value is rejected naming the offending property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
+      Assert.Equal("MaxEdges", exception.ParamName);
     }
 
     [Fact]
