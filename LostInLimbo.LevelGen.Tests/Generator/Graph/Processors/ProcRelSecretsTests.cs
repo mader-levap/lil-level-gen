@@ -7,13 +7,17 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Processors;
 
 /// <summary>
 /// Tests <see cref="ProcRelSecrets"/>: option validation, secret-node shape, host picking,
-/// secret-in-secret nesting, determinism and the hand-off to the later finalization passes.
+/// secret-in-secret nesting, the two-passage layout, determinism and the hand-off to the
+/// later finalization passes.
 /// </summary>
 /// <remarks>
 /// The pass works on a finished <see cref="LilGraph"/>, so most tests construct graphs
 /// directly instead of going through a builder - that keeps the host pool exactly
 /// controlled per test. Nesting expectations with intermediate chances are statistical:
 /// they average over many seeds, because the exact outcome depends on the random stream.
+/// The two-passage tests force the layout rolls to 0 or 1 wherever the structure alone is
+/// under test, so only the weight-distribution and conditional-chance tests stay
+/// statistical.
 /// </remarks>
 public sealed class ProcRelSecretsTests
 {
@@ -487,9 +491,498 @@ public sealed class ProcRelSecretsTests
     }
   }
 
+  /// <summary>Tests for the rare two-passage layout: return detours, nearby exits, fallback.</summary>
+  public sealed class TwoPassageTests
+  {
+    [Fact]
+    public void Execute_WithChanceZero_NeverCreatesASecondPassage()
+    {
+      // Arrange: A chain graph with the two-passage feature explicitly off.
+      var graph = CreateStartExitChainGraph(5);
+      var options = CnfProcRelSecretsOpt.Default with
+      {
+        Amount = 4,
+        ChanceSecretInSecret = 0f,
+        ChanceTwoPassages = 0f,
+      };
+
+      // Act: Add four secrets.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: Every secret is touched by exactly one secret relationship - no exit
+      // passage ever appears.
+      var secrets = graph.Nodes.Where(node => node.Secret).ToList();
+      Assert.Equal(4, secrets.Count);
+      var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+      Assert.Equal(4, secretEdges.Count);
+      foreach (var secret in secrets)
+      {
+        Assert.Single(secretEdges.Where(edge => edge.From == secret.Id || edge.To == secret.Id));
+      }
+    }
+
+    [Fact]
+    public void Execute_WithChanceOneAndReturnOne_ProducesOneWayReturnPassages()
+    {
+      // Arrange: An uncapped chain; every secret is forced into the A -> S -> A layout.
+      var graph = CreateStartExitChainGraph(6);
+      var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
+      var options = CnfProcRelSecretsOpt.Default with
+      {
+        Amount = 3,
+        ChanceSecretInSecret = 0f,
+        ChanceTwoPassages = 1f,
+        ChanceReturnToHost = 1f,
+      };
+
+      // Act: Add three secrets.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: Two secret passages per secret, all identifiers unique - the entry and
+      // exit edges derive from separate salts.
+      var secrets = graph.Nodes.Where(node => node.Secret).ToList();
+      Assert.Equal(3, secrets.Count);
+      var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+      Assert.Equal(6, secretEdges.Count);
+      Assert.Equal(6, secretEdges.Select(edge => edge.Id).Distinct().Count());
+
+      // Assert: Entry A -> S and exit S -> A, both one way, both open secret chokepoints
+      // hanging off the same ordinary host.
+      foreach (var secret in secrets)
+      {
+        var entry = Assert.Single(secretEdges.Where(edge => edge.To == secret.Id));
+        var exit = Assert.Single(secretEdges.Where(edge => edge.From == secret.Id));
+        Assert.Equal(EnPassageDirection.OneWay, entry.Direction);
+        Assert.Equal(EnPassageDirection.OneWay, exit.Direction);
+        Assert.Equal(entry.From, exit.To);
+        Assert.Contains(entry.From, originalNodeIds);
+        Assert.True(entry.Secret);
+        Assert.True(exit.Secret);
+        Assert.True(entry.Chokepoint);
+        Assert.True(exit.Chokepoint);
+        Assert.Empty(entry.Conditions);
+        Assert.Empty(exit.Conditions);
+      }
+
+      // Assert: Two passages per host stay within every cap and the level stays winnable.
+      GraphTestAssert.AssertMaxEdges(graph);
+      GraphTestAssert.AssertBeatable(graph, "Return-passage graph must stay beatable.");
+    }
+
+    [Fact]
+    public void Execute_WithChanceOneAndReturnZero_ExitsToNearbyOrdinaryNode()
+    {
+      // Arrange: An uncapped chain; every secret must exit to a different nearby node.
+      var graph = CreateStartExitChainGraph(8);
+      var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
+      var options = CnfProcRelSecretsOpt.Default with
+      {
+        Amount = 5,
+        ChanceSecretInSecret = 0f,
+        ChanceTwoPassages = 1f,
+        ChanceReturnToHost = 0f,
+      };
+
+      // Act: Add five secrets.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: Every secret got both passages: an open entry from a host and an open
+      // exit to a different ordinary node within three hops of that host.
+      var secrets = graph.Nodes.Where(node => node.Secret).ToList();
+      Assert.Equal(5, secrets.Count);
+      var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+      Assert.Equal(10, secretEdges.Count);
+      foreach (var secret in secrets)
+      {
+        var entry = Assert.Single(secretEdges.Where(edge => edge.To == secret.Id));
+        var exit = Assert.Single(secretEdges.Where(edge => edge.From == secret.Id));
+        Assert.Equal(EnPassageDirection.Bidirectional, entry.Direction);
+        Assert.Equal(EnPassageDirection.Bidirectional, exit.Direction);
+        Assert.NotEqual(entry.From, exit.To);
+        Assert.Contains(exit.To, originalNodeIds);
+        Assert.InRange(UndirectedDistance(graph, entry.From, exit.To), 1, 3);
+      }
+
+      // Assert: The added passages stay within every cap and the level stays winnable.
+      GraphTestAssert.AssertMaxEdges(graph);
+      GraphTestAssert.AssertBeatable(graph, "Exit-passage graph must stay beatable.");
+    }
+
+    [Fact]
+    public void Execute_WithMaxExitDistanceOne_ExitsOnlyToAdjacentNodes()
+    {
+      // Arrange: The exit bound shrinks to a single hop.
+      var graph = CreateStartExitChainGraph(8);
+      var options = CnfProcRelSecretsOpt.Default with
+      {
+        Amount = 5,
+        ChanceSecretInSecret = 0f,
+        ChanceTwoPassages = 1f,
+        ChanceReturnToHost = 0f,
+        MaxExitDistance = 1,
+      };
+
+      // Act: Add five secrets.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: Every exit lands on a direct neighbor of its host.
+      var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+      Assert.Equal(10, secretEdges.Count);
+      foreach (var secret in graph.Nodes.Where(node => node.Secret))
+      {
+        var entry = Assert.Single(secretEdges.Where(edge => edge.To == secret.Id));
+        var exit = Assert.Single(secretEdges.Where(edge => edge.From == secret.Id));
+        Assert.Equal(1, UndirectedDistance(graph, entry.From, exit.To));
+      }
+
+      // Assert: The tighter bound still respects every cap.
+      GraphTestAssert.AssertMaxEdges(graph);
+    }
+
+    [Fact]
+    public void Execute_WithReturnRollButOnlyOneFreeSlot_FallsBackToSinglePassage()
+    {
+      // Arrange: Only node 1 may host, and it has room for exactly one more relationship
+      // - not enough for the two slots the return layout needs.
+      var graph = CreateCappedChainGraph(
+        [
+          (maxEdges: 2, start: true, exit: false),
+          (maxEdges: 1, start: false, exit: true),
+        ]);
+      var options = CnfProcRelSecretsOpt.Default with
+      {
+        Amount = 1,
+        ChanceSecretInSecret = 0f,
+        ChanceTwoPassages = 1f,
+        ChanceReturnToHost = 1f,
+      };
+
+      // Act: Ask for a two-passage secret anyway.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: The return layout does not fit and no other node has a free slot for an
+      // exit, so the pass falls back to the plain single-passage secret.
+      var secretEdge = Assert.Single(graph.Edges.Where(edge => edge.Secret));
+      Assert.Equal(Id(1), secretEdge.From);
+      Assert.Equal(EnPassageDirection.Bidirectional, secretEdge.Direction);
+      GraphTestAssert.AssertMaxEdges(graph);
+    }
+
+    [Fact]
+    public void Execute_WithReturnRollAndTwoFreeSlots_ProducesReturnPassage()
+    {
+      // Arrange: Only node 1 may host, and it has room for exactly two more
+      // relationships - precisely what the return layout consumes.
+      var graph = CreateCappedChainGraph(
+        [
+          (maxEdges: 3, start: true, exit: false),
+          (maxEdges: 1, start: false, exit: true),
+        ]);
+      var options = CnfProcRelSecretsOpt.Default with
+      {
+        Amount = 1,
+        ChanceSecretInSecret = 0f,
+        ChanceTwoPassages = 1f,
+        ChanceReturnToHost = 1f,
+      };
+
+      // Act: Add the secret.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: Both passages fit exactly into the host's remaining slots - entry out of
+      // node 1 and exit back into node 1, one way each.
+      var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
+      var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+      Assert.Equal(2, secretEdges.Count);
+      var entry = Assert.Single(secretEdges.Where(edge => edge.To == secret.Id));
+      var exit = Assert.Single(secretEdges.Where(edge => edge.From == secret.Id));
+      Assert.Equal(Id(1), entry.From);
+      Assert.Equal(Id(1), exit.To);
+      Assert.Equal(EnPassageDirection.OneWay, entry.Direction);
+      Assert.Equal(EnPassageDirection.OneWay, exit.Direction);
+      GraphTestAssert.AssertMaxEdges(graph);
+    }
+
+    [Fact]
+    public void Execute_WithForcedNestingAndExits_NeverTargetsSecretAsExit()
+    {
+      for (var seed = 0; seed < StatisticalSeedCount; seed++)
+      {
+        // Arrange: A chain where every later secret nests behind the previous one and
+        // every secret must look for an exit among the ordinary nodes.
+        var graph = CreateStartExitChainGraph(6);
+        var options = CnfProcRelSecretsOpt.Default with
+        {
+          Amount = 4,
+          ChanceSecretInSecret = 1f,
+          ChanceTwoPassages = 1f,
+          ChanceReturnToHost = 0f,
+        };
+
+        // Act: Add four nested secrets.
+        new ProcRelSecrets(graph, options, seed).Execute();
+
+        // Assert: Four entries plus four exits - every secret found its exit.
+        var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+        Assert.Equal(8, secretEdges.Count);
+
+        // Assert: Exactly one passage arrives at every secret - its entry. An exit that
+        // targeted a secret would show up as a second incoming passage.
+        foreach (var secret in graph.Nodes.Where(node => node.Secret))
+        {
+          Assert.Equal(1, graph.Edges.Count(edge => edge.To == secret.Id));
+        }
+
+        // Assert: Entry, exit and nesting never push a node over its cap.
+        GraphTestAssert.AssertMaxEdges(graph);
+      }
+    }
+
+    [Fact]
+    public void Execute_WithForcedExit_WeightsNearerNodesHigher()
+    {
+      // Arrange: Many seeds, each with one exit-passage secret on a long chain, so the
+      // observed distance distribution reflects the linear weights.
+      var nearCount = 0;
+      var farCount = 0;
+      const int seedCount = 200;
+      for (var seed = 0; seed < seedCount; seed++)
+      {
+        var graph = CreateStartExitChainGraph(10);
+        var options = CnfProcRelSecretsOpt.Default with
+        {
+          Amount = 1,
+          ChanceSecretInSecret = 0f,
+          ChanceTwoPassages = 1f,
+          ChanceReturnToHost = 0f,
+        };
+
+        // Act: Add one exit-passage secret.
+        new ProcRelSecrets(graph, options, seed).Execute();
+
+        // Measure: Distance between the host and the chosen exit node.
+        var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
+        var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+        var entry = Assert.Single(secretEdges.Where(edge => edge.To == secret.Id));
+        var exit = Assert.Single(secretEdges.Where(edge => edge.From == secret.Id));
+        var distance = UndirectedDistance(graph, entry.From, exit.To);
+        Assert.InRange(distance, 1, 3);
+        if (distance == 1) nearCount++;
+        else if (distance == 3) farCount++;
+      }
+
+      // Assert: The nearest distance carries the highest weight, so over many picks it
+      // must clearly outnumber the farthest one.
+      Assert.True(nearCount > farCount,
+        $"Distance 1 picked {nearCount} times vs distance 3 picked {farCount} times over {seedCount} seeds.");
+    }
+
+    [Fact]
+    public void Execute_WithChanceOneOverManySeeds_KeepsGraphsWithinCapsAndBeatable()
+    {
+      for (var seed = 0; seed < StatisticalSeedCount; seed++)
+      {
+        // Arrange: A tightly capped chain; the layout rolls stay at their defaults, so
+        // each secret independently lands on one of the three layouts.
+        var graph = CreateCappedChainGraph(
+        [
+          (maxEdges: 2, start: true, exit: false),
+          (maxEdges: 3, start: false, exit: false),
+          (maxEdges: 2, start: false, exit: false),
+          (maxEdges: 3, start: false, exit: true),
+        ]);
+        var options = CnfProcRelSecretsOpt.Default with
+        {
+          Amount = 6,
+          ChanceTwoPassages = 1f,
+        };
+
+        // Act: Ask for more secrets than the ends can comfortably host.
+        new ProcRelSecrets(graph, options, seed).Execute();
+
+        // Assert: Every layout observes the caps and keeps the level winnable.
+        GraphTestAssert.AssertMaxEdges(graph);
+        GraphTestAssert.AssertBeatable(graph, $"Two-passage capped graph must stay beatable (seed {seed}).");
+      }
+    }
+
+    [Fact]
+    public void Execute_WithSameSeedAndTwoPassages_ProducesIdenticalGraphs()
+    {
+      // Arrange: Two identical chain graphs and the same two-passage inputs.
+      var first = CreateStartExitChainGraph(6);
+      var second = CreateStartExitChainGraph(6);
+      var options = CnfProcRelSecretsOpt.Default with
+      {
+        Amount = 5,
+        ChanceSecretInSecret = 0.5f,
+        ChanceTwoPassages = 1f,
+      };
+
+      // Act: Run the pass on both graphs.
+      new ProcRelSecrets(first, options, Seed).Execute();
+      new ProcRelSecrets(second, options, Seed).Execute();
+
+      // Assert: Layout rolls, exit search and identifier derivation all stay reproducible.
+      GraphTestAssert.AssertEqualGraphs(first, second);
+    }
+  }
+
+  /// <summary>Tests for the per-secret conditional roll on the exit search.</summary>
+  public sealed class TwoPassageConditionalTests
+  {
+    [Fact]
+    public void Execute_WithConditionalsBlocked_FallsBackToSinglePassage()
+    {
+      // Arrange: Two nodes joined only by a conditional passage, both with one free slot.
+      // When conditional passages are off, the only neighbor is unreachable for the exit
+      // search, so no candidate exists.
+      var graph = CreateConditionalPairGraph();
+      var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
+      var options = CnfProcRelSecretsOpt.Default with
+      {
+        Amount = 1,
+        ChanceSecretInSecret = 0f,
+        ChanceTwoPassages = 1f,
+        ChanceReturnToHost = 0f,
+        ChanceIgnoreConditionals = 0f,
+      };
+
+      // Act: Add one secret.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: The exit search finds nothing without the conditional passage, so the
+      // secret falls back to the single open entry passage.
+      var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
+      var secretEdge = Assert.Single(graph.Edges.Where(edge => edge.Secret));
+      Assert.Equal(secret.Id, secretEdge.To);
+      Assert.Contains(secretEdge.From, originalNodeIds);
+      Assert.Equal(EnPassageDirection.Bidirectional, secretEdge.Direction);
+      GraphTestAssert.AssertMaxEdges(graph);
+      GraphTestAssert.AssertBeatable(graph, "Blocked-conditional graph must stay beatable.");
+    }
+
+    [Fact]
+    public void Execute_WithConditionalsAllowed_CrossesConditionalForExit()
+    {
+      // Arrange: The same pair, but this secret may cross conditional passages.
+      var graph = CreateConditionalPairGraph();
+      var originalNodeIds = graph.Nodes.Select(node => node.Id).ToHashSet();
+      var options = CnfProcRelSecretsOpt.Default with
+      {
+        Amount = 1,
+        ChanceSecretInSecret = 0f,
+        ChanceTwoPassages = 1f,
+        ChanceReturnToHost = 0f,
+        ChanceIgnoreConditionals = 1f,
+      };
+
+      // Act: Add one secret.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: The neighbor behind the conditional passage becomes a valid exit, so the
+      // secret gets both passages: entry from the host, exit to the other node.
+      var secret = Assert.Single(graph.Nodes.Where(node => node.Secret));
+      var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+      Assert.Equal(2, secretEdges.Count);
+      var entry = Assert.Single(secretEdges.Where(edge => edge.To == secret.Id));
+      var exit = Assert.Single(secretEdges.Where(edge => edge.From == secret.Id));
+      Assert.Contains(entry.From, originalNodeIds);
+      Assert.Contains(exit.To, originalNodeIds);
+      Assert.NotEqual(entry.From, exit.To);
+      GraphTestAssert.AssertMaxEdges(graph);
+      GraphTestAssert.AssertBeatable(graph, "Allowed-conditional graph must stay beatable.");
+    }
+
+    [Fact]
+    public void Execute_WithDefaultConditionalChance_ProducesMostlyBlockedExits()
+    {
+      // Arrange: The default ten percent allowance - most secrets must stay blocked.
+      var blockedCount = 0;
+      var allowedCount = 0;
+      const int seedCount = 150;
+      for (var seed = 0; seed < seedCount; seed++)
+      {
+        var graph = CreateConditionalPairGraph();
+        var options = CnfProcRelSecretsOpt.Default with
+        {
+          Amount = 1,
+          ChanceSecretInSecret = 0f,
+          ChanceTwoPassages = 1f,
+          ChanceReturnToHost = 0f,
+        };
+
+        // Act: Add one secret and read back whether the exit search won.
+        new ProcRelSecrets(graph, options, seed).Execute();
+        var secretEdges = graph.Edges.Where(edge => edge.Secret).ToList();
+        if (secretEdges.Count == 1) blockedCount++;
+        else allowedCount++;
+      }
+
+      // Assert: Both rolls happen in practice, but blocking is by far the common case.
+      Assert.True(blockedCount > 0, $"The blocked roll never hit over {seedCount} seeds.");
+      Assert.True(allowedCount > 0, $"The allowed roll never hit over {seedCount} seeds.");
+      Assert.True(blockedCount > allowedCount,
+        $"Blocked {blockedCount} vs allowed {allowedCount} over {seedCount} seeds.");
+    }
+  }
+
   //
   // Graph fixtures
   //
+
+  /// <summary>
+  /// Builds a two-node graph whose only passage is conditional: node 1 holds the Start
+  /// and the referenced Solution POI, node 2 the Exit. Both nodes have exactly one free
+  /// relationship slot.
+  /// </summary>
+  /// <returns>The constructed graph with one conditional edge.</returns>
+  private static LilGraph CreateConditionalPairGraph()
+  {
+    var graph = new LilGraph();
+    graph.Nodes.Add(Node(1, maxEdges: 2, Poi(1001, EnPoiType.Start), Poi(1002, EnPoiType.Solution)));
+    graph.Nodes.Add(Node(2, maxEdges: 2, Poi(2001, EnPoiType.Exit)));
+    graph.Edges.Add(Edge(1, 1, 2, conditions: [Condition(1002)]));
+    return graph;
+  }
+
+  /// <summary>
+  /// Measures the undirected hop distance between two nodes, ignoring passage direction -
+  /// the same view the two-passage exit search uses.
+  /// </summary>
+  /// <param name="graph">Graph to measure in.</param>
+  /// <param name="from">Source node identifier.</param>
+  /// <param name="to">Target node identifier.</param>
+  /// <returns>Number of hops; -1 when the target is unreachable.</returns>
+  private static int UndirectedDistance(LilGraph graph, Guid from, Guid to)
+  {
+    var adjacency = new Dictionary<Guid, List<Guid>>();
+    foreach (var node in graph.Nodes)
+    {
+      adjacency[node.Id] = [];
+    }
+    foreach (var edge in graph.Edges)
+    {
+      adjacency[edge.From].Add(edge.To);
+      adjacency[edge.To].Add(edge.From);
+    }
+
+    var distances = new Dictionary<Guid, int> { [from] = 0 };
+    var queue = new Queue<Guid>();
+    queue.Enqueue(from);
+    while (queue.Count > 0)
+    {
+      var current = queue.Dequeue();
+      foreach (var next in adjacency[current])
+      {
+        if (distances.ContainsKey(next)) continue;
+        distances[next] = distances[current] + 1;
+        queue.Enqueue(next);
+      }
+    }
+
+    return distances.TryGetValue(to, out var distance) ? distance : -1;
+  }
 
   /// <summary>
   /// Builds a chain graph whose nodes carry explicit <see cref="LilNode.MaxEdges"/> caps,

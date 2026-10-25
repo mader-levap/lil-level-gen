@@ -120,6 +120,89 @@ public sealed class CnfProcOptsTests
     }
 
     [Fact]
+    public void RelSecrets_WithTwoPassageDefaults_DoesNotThrow()
+    {
+      // Arrange/Act: A fresh config carries the documented two-passage defaults.
+      var opts = new CnfProcRelSecretsOpt();
+      opts.Validate();
+
+      // Assert: The two-passage feature ships off, with a balanced return roll, a rare
+      // conditional allowance and a three-hop exit bound.
+      Assert.Equal(0f, opts.ChanceTwoPassages);
+      Assert.Equal(0.5f, opts.ChanceReturnToHost);
+      Assert.Equal(0.1f, opts.ChanceIgnoreConditionals);
+      Assert.Equal(3, opts.MaxExitDistance);
+    }
+
+    [Theory]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceTwoPassages))]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceReturnToHost))]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceIgnoreConditionals))]
+    public void RelSecrets_WithTwoPassageChanceWithinUnitInterval_DoesNotThrow(string property)
+    {
+      // Arrange: Config with every two-passage chance at its allowed boundaries.
+      var opts = property switch
+      {
+        nameof(CnfProcRelSecretsOpt.ChanceTwoPassages) => new CnfProcRelSecretsOpt { ChanceTwoPassages = 1f },
+        nameof(CnfProcRelSecretsOpt.ChanceReturnToHost) => new CnfProcRelSecretsOpt { ChanceReturnToHost = 0f },
+        _ => new CnfProcRelSecretsOpt { ChanceIgnoreConditionals = 0.5f },
+      };
+
+      // Assert: Boundary values and the midpoint are all allowed.
+      opts.Validate();
+    }
+
+    [Theory]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceTwoPassages), -0.1f)]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceTwoPassages), 1.1f)]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceTwoPassages), float.NaN)]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceReturnToHost), -0.1f)]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceReturnToHost), 1.1f)]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceReturnToHost), float.PositiveInfinity)]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceIgnoreConditionals), -0.1f)]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceIgnoreConditionals), 1.1f)]
+    [InlineData(nameof(CnfProcRelSecretsOpt.ChanceIgnoreConditionals), float.NegativeInfinity)]
+    public void RelSecrets_WithTwoPassageChanceOutsideUnitInterval_ThrowsArgumentOutOfRangeException(string property, float chance)
+    {
+      // Arrange: Config with one forbidden two-passage chance.
+      var opts = property switch
+      {
+        nameof(CnfProcRelSecretsOpt.ChanceTwoPassages) => new CnfProcRelSecretsOpt { ChanceTwoPassages = chance },
+        nameof(CnfProcRelSecretsOpt.ChanceReturnToHost) => new CnfProcRelSecretsOpt { ChanceReturnToHost = chance },
+        _ => new CnfProcRelSecretsOpt { ChanceIgnoreConditionals = chance },
+      };
+
+      // Act/Assert: The out-of-range value is rejected naming the offending property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
+      Assert.Equal(property, exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(4)]
+    public void RelSecrets_WithPositiveMaxExitDistance_DoesNotThrow(int distance)
+    {
+      // Arrange: Config demanding a reachable exit bound.
+      var opts = new CnfProcRelSecretsOpt { MaxExitDistance = distance };
+
+      // Assert: Any bound of at least one hop is allowed.
+      opts.Validate();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    public void RelSecrets_WithNonPositiveMaxExitDistance_ThrowsArgumentOutOfRangeException(int distance)
+    {
+      // Arrange: Config demanding an impossible exit bound.
+      var opts = new CnfProcRelSecretsOpt { MaxExitDistance = distance };
+
+      // Act/Assert: The out-of-range value is rejected naming the offending property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
+      Assert.Equal("MaxExitDistance", exception.ParamName);
+    }
+
+    [Fact]
     public void NodeObjectives_WithDefaultInstance_DoesNotThrow()
     {
       // Arrange/Act: The default instance uses the legacy hardcoded values.
