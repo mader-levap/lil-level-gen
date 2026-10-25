@@ -14,7 +14,7 @@ public enum EnPhase
   /// <summary>Currently generating the map.
   /// The only phase that increments <see cref="LilStats.Steps"/>.</summary>
   Map,
-  /// <summary>Reserved for a future finalization pass. Currently unused.
+  /// <summary>Currently finalizing generation.
   /// Completes within a single execution, but does not increment <see cref="LilStats.Steps"/>.</summary>
   Finalization,
   /// <summary>Level generation is finished.</summary>

@@ -6,22 +6,22 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Prepass;
 /// <summary>
 /// <para>Creates an instance of <c>PrepData</c> based on the configuration.</para>
 /// </summary>
-internal sealed class PrepassGenerator
+/// <remarks>
+/// <para>
+/// Currently only generates sub-seeds.
+/// </para>
+/// </remarks>
+/// <remarks>
+/// Prepares the prepass generator.
+/// </remarks>
+/// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
+internal sealed class PrepassGenerator(CnfLevelGeneration config)
 {
   /// <summary>Configuration data for level generation.</summary>
-  private readonly CnfLevelGeneration _config;
+  private readonly CnfLevelGeneration _config = config;
 
   /// <summary>Generated preparatory data.</summary>
   private readonly PrepData _prepData = new();
-
-  /// <summary>
-  /// Prepares the prepass generator.
-  /// </summary>
-  /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
-  public PrepassGenerator(CnfLevelGeneration config)
-  {
-    _config = config;
-  }
 
   /// <summary>
   /// Create prepass data.

@@ -1,5 +1,4 @@
 using System;
-using System.IO.Pipelines;
 using System.Threading;
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
@@ -30,9 +29,6 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// </remarks>
 internal sealed class LevelGenerator
 {
-  /// <summary>Map generator. Lazily created as it needs data unavailable in constructor.</summary>
-  private MapGenerator _mapGenerator = null!;
-
   /// <summary>Kind of run. Mutated only between runs via <see cref="SetRunKind"/>.</summary>
   private EnRunKind _enRunKind;
   /// <summary>Configuration data for level generation.</summary>
@@ -191,6 +187,7 @@ internal sealed class LevelGenerator
   /// </param>
   public void Execute(CancellationToken cancellationToken = default)
   {
+    _validationFailureReason = null;
     _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running });
     try
     {
@@ -226,10 +223,6 @@ internal sealed class LevelGenerator
   private EnGenResult RunGeneration(CancellationToken cancellationToken)
   {
     if (_config.Debug?.FailAtStart == true) throw new InvalidOperationException("Deliberate failure at start.");
-
-    // Every run starts with no validation failure of its own; a previous run's failure can
-    // never survive here, because a validation-failed run is terminal and never runs again.
-    _validationFailureReason = null;
 
     MainLoop(cancellationToken);
 
@@ -269,9 +262,8 @@ internal sealed class LevelGenerator
     // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
     cancellationToken.ThrowIfCancellationRequested();
 
-    PrepassGenerator prepassGenerator = new PrepassGenerator(_config);
+    PrepassGenerator prepassGenerator = new(_config);
     _prepData = prepassGenerator.Create();
-    _mapGenerator = new MapGenerator(_config, _prepData, _world);
     _world.Phase = EnPhase.Graph; // move to next phase
     return true;
   }
@@ -305,7 +297,7 @@ internal sealed class LevelGenerator
     // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
     cancellationToken.ThrowIfCancellationRequested();
 
-    GraphGenerator graphGenerator = new GraphGenerator(_config, _prepData!, _world);
+    GraphGenerator graphGenerator = new(_config, GetPrepData(), _world);
     GraphRunResult result = graphGenerator.Execute();
     switch (result.Outcome)
     {
@@ -349,10 +341,11 @@ internal sealed class LevelGenerator
   /// the build is never re-run against the non-empty map on resume.
   /// </exception>
   /// <returns>
-  /// <see langword="true"/> to continue with the next phase; <see langword="false"/> when a
-  /// pause was requested before the step started or when validation failed (the reason is
-  /// kept in <see cref="_validationFailureReason"/>). A failed build throws instead of
-  /// returning <see langword="false"/>.
+  /// <see langword="true"/> to continue with the next phase - also when the world is not in
+  /// the map phase, so the run skips this pass; <see langword="false"/> only when a pause was
+  /// requested before the next step started (the world stays in
+  /// <see cref="EnPhase.Map"/>). A failed build throws instead of returning
+  /// <see langword="false"/>.
   /// </returns>
   private bool RunMap(CancellationToken cancellationToken)
   {
@@ -370,7 +363,8 @@ internal sealed class LevelGenerator
       // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
       cancellationToken.ThrowIfCancellationRequested();
 
-      MapRunResult result = _mapGenerator.ExecuteStep();
+      MapGenerator mapGenerator = new(_config, GetPrepData(), _world);
+      MapRunResult result = mapGenerator.ExecuteStep();
       switch (result.Outcome)
       {
         case EnGenerationOutcome.Success:
@@ -413,6 +407,8 @@ internal sealed class LevelGenerator
     _world.Phase = EnPhase.Completed;
   }
 
+  // Helpers.
+
   /// <summary>
   /// Check if level generation as a whole is completed.
   /// </summary>
@@ -429,5 +425,17 @@ internal sealed class LevelGenerator
   private bool IsMapGenerationComplete()
   {
     return _world.Stats.Steps >= _totalSteps;
+  }
+
+  /// <summary>
+  /// Returns the prepass data required by every phase after prepass.
+  /// </summary>
+  /// <exception cref="InvalidOperationException">
+  /// The world is past the prepass phase but the prepass never ran on this generator.
+  /// </exception>
+  private PrepData GetPrepData()
+  {
+    return _prepData ?? throw new InvalidOperationException(
+      $"Phase {_world.Phase} requires prepass data, but the prepass has not run on this generator.");
   }
 }
