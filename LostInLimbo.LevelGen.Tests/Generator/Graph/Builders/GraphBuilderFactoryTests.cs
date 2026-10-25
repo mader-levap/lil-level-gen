@@ -1,4 +1,5 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
 namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
@@ -15,7 +16,7 @@ public sealed class GraphBuilderFactoryTests
   public void Create_WithDefinedBuilder_ReturnsMatchingBuilder(EnGraphBuilder builder, Type expectedType)
   {
     // Act: Create the implementation for the configured kind.
-    var created = GraphBuilderFactory.Create(builder);
+    var created = GraphBuilderFactory.Create(CnfGraphBuilder.Default with { Builder = builder });
 
     // Assert: The implementation type matches the enum value exactly.
     Assert.Equal(expectedType, created.GetType());
@@ -26,7 +27,9 @@ public sealed class GraphBuilderFactoryTests
   {
     // Act/Assert: A value no member defines is rejected naming the parameter.
     var exception = Assert.Throws<ArgumentOutOfRangeException>(
-      () => GraphBuilderFactory.Create((EnGraphBuilder)99));
-    Assert.Equal("builder", exception.ParamName);
+      () => GraphBuilderFactory.Create(CnfGraphBuilder.Default with { Builder = (EnGraphBuilder)99}));
+
+    // Assert: Threw exception with correct data.
+    Assert.Equal("Builder", exception.ParamName);
   }
 }

@@ -3,6 +3,7 @@ using System.Text.Json;
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 
 namespace LostInLimbo.LevelGen.Tests.Api;
@@ -61,7 +62,7 @@ public sealed class LevelGenerationSerializerTests
       // Arrange: Config selecting the non-default graph builder.
       var config = CnfLevelGeneration.Default with
       {
-        Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear } },
+        Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear, CnfLinear = CnfGraphBuilderLinear.Default } },
       };
 
       // Act: Serialize to canonical JSON.
@@ -84,7 +85,7 @@ public sealed class LevelGenerationSerializerTests
       // Act/Assert: Validation runs before any JSON is produced and names the property.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
         () => LevelGenerationSerializer.SerializeConfig(config));
-      Assert.Equal("GraphBuilder", exception.ParamName);
+      Assert.Equal("Builder", exception.ParamName);
     }
 
     [Fact]
@@ -95,7 +96,7 @@ public sealed class LevelGenerationSerializerTests
       var config = CnfLevelGeneration.Default with
       {
         General = new CnfGeneral { Seed = 1234, Degeneration = 0.5f },
-        Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear }, Complexity = 5 },
+        Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear, CnfLinear = CnfGraphBuilderLinear.Default }, Complexity = 5 },
         Debug = new CnfDebug { PlaceholderSleep = 42 },
       };
 
@@ -142,7 +143,7 @@ public sealed class LevelGenerationSerializerTests
       {
         Graph = new CnfGraph
         {
-          GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear },
+          GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear, CnfLinear = CnfGraphBuilderLinear.Default },
           ProcOpts = new CnfProcOpt
           {
             RelSecrets = new CnfProcRelSecretsOpt { Amount = 3, ChanceSecretInSecret = 0.75f },
@@ -395,33 +396,33 @@ public sealed class LevelGenerationSerializerTests
     public void Deserialize_WithEnumName_ParsesEnum()
     {
       // Arrange: Hand-written JSON naming the graph builder.
-      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"Linear\" } } }";
+      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"Simple\", \"CnfSimple\": { \"ChokepointChance\": 0.5, \"MaxExtraDegree\": 4, \"MaxExtraDegreeStar\": 7 } } } }";
 
       // Act: Deserialize.
       var config = LevelGenerationSerializer.DeserializeConfig(json);
 
       // Assert: The enum member name maps back to its value.
-      Assert.Equal(EnGraphBuilder.Linear, config.Graph.GraphBuilder.Builder);
+      Assert.Equal(EnGraphBuilder.Simple, config.Graph.GraphBuilder.Builder);
     }
 
     [Fact]
     public void Deserialize_WithEnumNameInDifferentCase_ParsesEnum()
     {
       // Arrange: Hand-written JSON using a different case than the enum member name.
-      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"linear\" } } }";
+      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"simple\", \"CnfSimple\": { \"ChokepointChance\": 0.5, \"MaxExtraDegree\": 4, \"MaxExtraDegreeStar\": 7 } } } }";
 
       // Act: Deserialize.
       var config = LevelGenerationSerializer.DeserializeConfig(json);
 
       // Assert: Enum name matching on read forgives casing, like property names do.
-      Assert.Equal(EnGraphBuilder.Linear, config.Graph.GraphBuilder.Builder);
+      Assert.Equal(EnGraphBuilder.Simple, config.Graph.GraphBuilder.Builder);
     }
 
     [Fact]
     public void Deserialize_WithoutProcOpts_KeepsDefaultOptions()
     {
       // Arrange: Hand-written JSON omitting the processor options entirely.
-      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"Linear\" } } }";
+      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"Simple\", \"CnfSimple\": { \"ChokepointChance\": 0.5, \"MaxExtraDegree\": 4, \"MaxExtraDegreeStar\": 7 } } } }";
 
       // Act: Deserialize.
       var config = LevelGenerationSerializer.DeserializeConfig(json);

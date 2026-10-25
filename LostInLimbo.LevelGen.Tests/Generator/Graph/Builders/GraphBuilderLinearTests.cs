@@ -1,4 +1,5 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
@@ -18,19 +19,19 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 public sealed class GraphBuilderLinearTests
 {
   /// <summary>Cap of the extra-relationships phase per direction.</summary>
-  private const int MaxExtraDegree = GraphBuilderLinear.MaxExtraDegree;
+  private static readonly int MaxExtraDegree = CnfGraphBuilderLinear.Default.MaxExtraDegree;
 
   /// <summary>Hard cap of relationships per node, set on every node by the builder.</summary>
-  private const int MaxEdges = GraphBuilderLinear.MaxEdges;
+  private static readonly int MaxEdges = CnfGraphBuilderLinear.Default.MaxEdges;
 
   /// <summary>Nodes an extra relationship may skip.</summary>
-  private const int MaxSkipDistance = GraphBuilderLinear.MaxSkipDistance;
+  private static readonly int MaxSkipDistance = CnfGraphBuilderLinear.Default.MaxSkipDistance;
 
   /// <summary>Conditions one relationship can carry.</summary>
-  private const int MaxConditionPerRel = GraphBuilderLinear.MaxConditionPerRel;
+  private static readonly int MaxConditionPerRel = CnfGraphBuilderLinear.Default.MaxConditionPerRel;
 
   /// <summary>Nodes a solution may sit away from its guarded passage.</summary>
-  private const int MaxConditionDistance = GraphBuilderLinear.MaxConditionDistance;
+  private static readonly int MaxConditionDistance = CnfGraphBuilderLinear.Default.MaxConditionDistance;
 
   /// <summary>Tests for the skeleton shape: node count, minimality and exact chain form.</summary>
   public sealed class ShapeTests
@@ -840,6 +841,82 @@ public sealed class GraphBuilderLinearTests
       }
 
       return counts;
+    }
+  }
+
+  /// <summary>Tests for config validation.</summary>
+  public sealed class ConfigValidationTests
+  {
+    [Fact]
+    public void Validate_Default_DoesNotThrow()
+    {
+      // Arrange: The default instance should be valid.
+      var config = CnfGraphBuilderLinear.Default;
+
+      // Assert: No exception is thrown.
+      config.Validate();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_ZeroOrNegativeMaxEdges_ThrowsArgumentOutOfRange(int maxEdges)
+    {
+      // Arrange: MaxEdges must be at least 1.
+      var config = CnfGraphBuilderLinear.Default with { MaxEdges = maxEdges };
+
+      // Assert: Validation rejects the value.
+      var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+      Assert.Equal(nameof(CnfGraphBuilderLinear.MaxEdges), ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    public void Validate_NegativeMaxExtraDegree_ThrowsArgumentOutOfRange(int maxExtraDegree)
+    {
+      // Arrange: A negative extra-degree cap is invalid.
+      var config = CnfGraphBuilderLinear.Default with { MaxExtraDegree = maxExtraDegree };
+
+      // Assert: Validation rejects the value.
+      var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+      Assert.Equal(nameof(CnfGraphBuilderLinear.MaxExtraDegree), ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_ZeroOrNegativeMaxConditionPerRel_ThrowsArgumentOutOfRange(int maxConditionPerRel)
+    {
+      // Arrange: MaxConditionPerRel must be at least 1.
+      var config = CnfGraphBuilderLinear.Default with { MaxConditionPerRel = maxConditionPerRel };
+
+      // Assert: Validation rejects the value.
+      var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+      Assert.Equal(nameof(CnfGraphBuilderLinear.MaxConditionPerRel), ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    public void Validate_NegativeMaxConditionDistance_ThrowsArgumentOutOfRange(int maxConditionDistance)
+    {
+      // Arrange: A negative condition distance is invalid.
+      var config = CnfGraphBuilderLinear.Default with { MaxConditionDistance = maxConditionDistance };
+
+      // Assert: Validation rejects the value.
+      var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+      Assert.Equal(nameof(CnfGraphBuilderLinear.MaxConditionDistance), ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    public void Validate_NegativeMaxSkipDistance_ThrowsArgumentOutOfRange(int maxSkipDistance)
+    {
+      // Arrange: A negative skip distance is invalid.
+      var config = CnfGraphBuilderLinear.Default with { MaxSkipDistance = maxSkipDistance };
+
+      // Assert: Validation rejects the value.
+      var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+      Assert.Equal(nameof(CnfGraphBuilderLinear.MaxSkipDistance), ex.ParamName);
     }
   }
 }

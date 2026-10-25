@@ -1,4 +1,5 @@
 using System;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 
@@ -36,11 +37,6 @@ public sealed record CnfGraph
   // Fields.
 
   /// <summary>
-  /// Graph builder configuration to use.
-  /// </summary>
-  public CnfGraphBuilder GraphBuilder { get; init; } = CnfGraphBuilder.Default;
-
-  /// <summary>
   /// Size of the graph. Usually just the number of nodes. The hard cap is <see cref="MaxSize"/>.
   /// </summary>
   public int Size { get; init; } = DefaultSize;
@@ -55,6 +51,11 @@ public sealed record CnfGraph
   /// General complexity of the graph. Usually the number of obstacles. Ignored by builders that do not make obstacles.
   /// </summary>
   public int Complexity { get; init; } = DefaultComplexity;
+
+  /// <summary>
+  /// Graph builder configuration to use.
+  /// </summary>
+  public CnfGraphBuilder GraphBuilder { get; init; } = CnfGraphBuilder.Default;
 
   /// <summary>
   /// Options of the graph finalization processors. Ignored by builders that run no processors.
@@ -75,8 +76,6 @@ public sealed record CnfGraph
   /// <exception cref="ArgumentException">ProcOpts is null, or its values are invalid.</exception>
   public void Validate()
   {
-    if (!Enum.IsDefined(typeof(EnGraphBuilder), GraphBuilder.Builder))
-      throw new ArgumentOutOfRangeException(nameof(GraphBuilder), GraphBuilder.Builder, "Unknown graph builder.");
     if (Size < 1)
       throw new ArgumentOutOfRangeException(nameof(Size), Size, "Size must be at least 1.");
     if (Size > MaxSize)
@@ -85,10 +84,15 @@ public sealed record CnfGraph
       throw new ArgumentOutOfRangeException(nameof(Connectivity), Connectivity, "Connectivity must be at least 0.");
     if (Complexity < 0)
       throw new ArgumentOutOfRangeException(nameof(Complexity), Complexity, "Complexity must be at least 0.");
+      
+    if (GraphBuilder is null)
+      throw new ArgumentException("GraphBuilder config must not be null.", nameof(GraphBuilder));
     if (ProcOpts is null)
       throw new ArgumentException("ProcOpts config must not be null.", nameof(ProcOpts));
     if (ValidatorOpts is null)
       throw new ArgumentException("ValidatorOpts config must not be null.", nameof(ValidatorOpts));
+
+    GraphBuilder.Validate();
     ProcOpts.Validate();
   }
 }

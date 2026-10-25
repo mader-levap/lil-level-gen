@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using LostInLimbo.LevelGen.Api;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using LostInLimbo.LevelGen.Internal.Utils;
@@ -34,34 +35,20 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <list type="bullet">
 /// <item>Create a linearly connected skeleton.</item>
 /// <item>Add POIs. Start and exit are at the ends of the linear graph.</item>
-/// <item>Extra relationships between nodes up to connectivity, <see cref="MaxExtraDegree"/>
+/// <item>Extra relationships between nodes up to connectivity, <see cref="CnfGraphBuilderLinear.MaxExtraDegree"/>
 /// and the node <see cref="LilNode.MaxEdges"/> hard cap.</item>
 /// <item>Create obstacles for relationships up to complexity and
-/// <see cref="MaxConditionPerRel"/>: one shared solution condition per chosen node's
+/// <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/>: one shared solution condition per chosen node's
 /// incoming relationships, solution most likely near its guarded passage within
-/// <see cref="MaxConditionDistance"/>.</item>
+/// <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/>.</item>
 /// <item>Finalization: secret nodes, objective POIs, node relative size and grouping.</item>
 /// </list>
 /// </remarks>
-internal sealed class GraphBuilderLinear : AGraphBuilder
+/// <param name="cnfGraphBuilder">Configuration for graph builders.</param>
+internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGraphBuilder
 {
-  /// <summary>
-  /// Maximum number of relationships a node may have, counting skeleton and extra
-  /// relationships together. Assigned to every node as its <see cref="LilNode.MaxEdges"/>
-  /// hard cap and enforced by the extra-relationships pass.
-  /// </summary>
-  internal const int MaxEdges = 5;
-  /// <summary>
-  /// Maximum number of extra relationships a node may gain in the extra-relationships phase (inclusive).
-  /// Important: we count in and out relationships separately.
-  /// </summary>
-  internal const int MaxExtraDegree = 2;
-  /// <summary>Maximum number of conditions that a single relationship can have.</summary>
-  internal const int MaxConditionPerRel = 3;
-  /// <summary>Maximum distance between the solution and the guarded node's chain predecessor (so at most MaxConditionDistance + 1 from the guarded node).</summary>
-  internal const int MaxConditionDistance = 3;
-  /// <summary>Maximum number of nodes that can be skipped by an extra relationship.</summary>
-  internal const int MaxSkipDistance = 2;
+  /// <summary>Builder configuration; defaults to <see cref="CnfGraphBuilderLinear.Default"/>.</summary>
+  private CnfGraphBuilderLinear _config = cnfGraphBuilder.CnfLinear ?? CnfGraphBuilderLinear.Default;
 
   /// <summary>
   /// Initial relative size of every node; replaced by the <see cref="ProcNodeRelSize"/>
@@ -135,7 +122,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
       Graph.Nodes.Add(new LilNode { 
         Id = id,
         RelSize = NodeRelSize,
-        MaxEdges = MaxEdges,
+        MaxEdges = _config.MaxEdges,
       });
     }
 
@@ -184,19 +171,19 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
 
   /// <summary>
   /// Adds extra relationships on top of the skeleton until connectivity is spent or no
-  /// eligible node pair remains under the constraints of <see cref="MaxExtraDegree"/>,
-  /// <see cref="MaxSkipDistance"/> and the <see cref="MaxEdges"/> hard cap.
+  /// eligible node pair remains under the constraints of <see cref="CnfGraphBuilderLinear.MaxExtraDegree"/>,
+  /// <see cref="CnfGraphBuilderLinear.MaxSkipDistance"/> and the <see cref="LilNode.MaxEdges"/> hard cap.
   /// </summary>
   /// <remarks>
   /// <para>One relationship is added per iteration:</para>
   /// <list type="number">
   /// <item>The source (node A) is picked uniformly among all nodes that are not the last node,
-  /// still have out-capacity under <see cref="MaxExtraDegree"/>, still have total capacity
-  /// under <see cref="MaxEdges"/> and can actually place a relationship forward - so a source
+  /// still have out-capacity under <see cref="CnfGraphBuilderLinear.MaxExtraDegree"/>, still have total capacity
+  /// under <see cref="LilNode.MaxEdges"/> and can actually place a relationship forward - so a source
   /// without any eligible target never blocks the pass.</item>
-  /// <item>The target (node B) is picked among nodes after A within <see cref="MaxSkipDistance"/>
-  /// skipped nodes, with in-capacity under <see cref="MaxExtraDegree"/>, total capacity under
-  /// <see cref="MaxEdges"/> and no extra relationship yet on the (A, B) pair. Targets are
+  /// <item>The target (node B) is picked among nodes after A within <see cref="CnfGraphBuilderLinear.MaxSkipDistance"/>
+  /// skipped nodes, with in-capacity under <see cref="CnfGraphBuilderLinear.MaxExtraDegree"/>, total capacity under
+  /// <see cref="LilNode.MaxEdges"/> and no extra relationship yet on the (A, B) pair. Targets are
   /// weighted linearly by remaining skips (adjacent most likely, see <see cref="PickTarget"/>).</item>
   /// </list>
   /// <para>When no eligible source (and therefore no eligible pair) remains, the pass ends
@@ -228,8 +215,8 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
       var sources = new List<int>();
       for (var from = 0; from < size - 1; from++)
       {
-        if (extraOutDegrees[from] >= MaxExtraDegree) continue;
-        if (degrees[from] >= MaxEdges) continue;
+        if (extraOutDegrees[from] >= _config.MaxExtraDegree) continue;
+        if (degrees[from] >= _config.MaxEdges) continue;
         if (HasEligibleTarget(from, degrees, extraInDegrees, extraPairs, size)) sources.Add(from);
       }
 
@@ -259,12 +246,12 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// <returns>True when at least one target within the skip window is eligible.</returns>
   private bool HasEligibleTarget(int from, int[] degrees, int[] extraInDegrees, bool[,] extraPairs, int size)
   {
-    var lastTarget = Math.Min(from + MaxSkipDistance + 1, size - 1);
+    var lastTarget = Math.Min(from + _config.MaxSkipDistance + 1, size - 1);
     for (var to = from + 1; to <= lastTarget; to++)
     {
       if (extraPairs[from, to]) continue;
-      if (extraInDegrees[to] >= MaxExtraDegree) continue;
-      if (degrees[to] >= MaxEdges) continue;
+      if (extraInDegrees[to] >= _config.MaxExtraDegree) continue;
+      if (degrees[to] >= _config.MaxEdges) continue;
       return true;
     }
 
@@ -273,8 +260,8 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
 
   /// <summary>
   /// Picks a target for the given source among its eligible targets, weighted linearly by
-  /// remaining skips: the adjacent node counts <see cref="MaxSkipDistance"/> + 1, one node
-  /// skipped counts <see cref="MaxSkipDistance"/>, and so on down to 1 for the farthest skip.
+  /// remaining skips: the adjacent node counts <see cref="CnfGraphBuilderLinear.MaxSkipDistance"/> + 1, one node
+  /// skipped counts <see cref="CnfGraphBuilderLinear.MaxSkipDistance"/>, and so on down to 1 for the farthest skip.
   /// So the adjacent node is the most likely pick and likelihood falls with distance.
   /// </summary>
   /// <remarks>Deterministic for the same generator state; candidates are enumerated in
@@ -289,14 +276,14 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// <see cref="HasEligibleTarget"/> agreed that one exists.</exception>
   private int PickTarget(int from, int[] degrees, int[] extraInDegrees, bool[,] extraPairs, int size)
   {
-    var lastTarget = Math.Min(from + MaxSkipDistance + 1, size - 1);
+    var lastTarget = Math.Min(from + _config.MaxSkipDistance + 1, size - 1);
     var totalWeight = 0;
     for (var to = from + 1; to <= lastTarget; to++)
     {
       if (extraPairs[from, to]) continue;
-      if (extraInDegrees[to] >= MaxExtraDegree) continue;
-      if (degrees[to] >= MaxEdges) continue;
-      totalWeight += MaxSkipDistance + 1 - (to - from - 1);
+      if (extraInDegrees[to] >= _config.MaxExtraDegree) continue;
+      if (degrees[to] >= _config.MaxEdges) continue;
+      totalWeight += _config.MaxSkipDistance + 1 - (to - from - 1);
     }
 
     if (totalWeight == 0)
@@ -307,9 +294,9 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
     for (var to = from + 1; to <= lastTarget; to++)
     {
       if (extraPairs[from, to]) continue;
-      if (extraInDegrees[to] >= MaxExtraDegree) continue;
-      if (degrees[to] >= MaxEdges) continue;
-      roll -= MaxSkipDistance + 1 - (to - from - 1);
+      if (extraInDegrees[to] >= _config.MaxExtraDegree) continue;
+      if (degrees[to] >= _config.MaxEdges) continue;
+      roll -= _config.MaxSkipDistance + 1 - (to - from - 1);
       if (roll < 0) return to;
     }
 
@@ -375,12 +362,12 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// <see cref="FindObstacleTargets"/>), one target is picked uniformly.</item>
   /// <item>A new solution POI is created and placed by <see cref="PickSolutionNode"/>, so it
   /// is most likely right before the guarded passage and falls off with distance up to
-  /// <see cref="MaxConditionDistance"/>.</item>
+  /// <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/>.</item>
   /// <item>Every relationship going into the target node gains the same new condition
   /// (<see cref="EnConditionType.RequiresSolution"/> pointing at that POI).</item>
   /// </list>
   /// <para>Conditions only ever enter a node's relationships all at once, so all of them
-  /// stay identical and saturate together at <see cref="MaxConditionPerRel"/>. Once no
+  /// stay identical and saturate together at <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/>. Once no
   /// target with capacity remains, excess complexity is discarded silently - complexity is a
   /// soft constraint, just like connectivity. Guaranteed solvable: a solution always lands
   /// at or before the chain predecessor of its guarded node, so the chain reaches it before
@@ -424,7 +411,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
 
   /// <summary>
   /// Collects all nodes but the first whose relationships all still have room for one more
-  /// condition under <see cref="MaxConditionPerRel"/>.
+  /// condition under <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/>.
   /// </summary>
   /// <remarks>Because <see cref="AddObstacles"/> always conditions a node's relationships
   /// together, they saturate together - a node either has full capacity on all of them or on
@@ -441,7 +428,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
       foreach (var edge in Graph.Edges)
       {
         if (edge.To != nodeIds[target]) continue;
-        if (edge.Conditions.Count >= MaxConditionPerRel)
+        if (edge.Conditions.Count >= _config.MaxConditionPerRel)
         {
           eligible = false;
           break;
@@ -457,7 +444,7 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   /// <summary>
   /// Picks the node holding the solution for a passage guarded at the given source node,
   /// weighted linearly by distance: the source node itself counts
-  /// <see cref="MaxConditionDistance"/> + 1, each node further back one less, so the node
+  /// <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/> + 1, each node further back one less, so the node
   /// facing the guarded passage is the most likely and likelihood falls with distance.
   /// </summary>
   /// <remarks>Deterministic for the same generator state; candidates are enumerated backwards
@@ -468,14 +455,14 @@ internal sealed class GraphBuilderLinear : AGraphBuilder
   private int PickSolutionNode(int nearestSource)
   {
     var totalWeight = 0;
-    for (var distance = 0; nearestSource - distance >= 0 && distance <= MaxConditionDistance; distance++)
-      totalWeight += MaxConditionDistance + 1 - distance;
+    for (var distance = 0; nearestSource - distance >= 0 && distance <= _config.MaxConditionDistance; distance++)
+      totalWeight += _config.MaxConditionDistance + 1 - distance;
 
     // Roll once on the cumulative weights and walk the candidates to the picked one.
     var roll = Random.NextInt(totalWeight);
-    for (var distance = 0; nearestSource - distance >= 0 && distance <= MaxConditionDistance; distance++)
+    for (var distance = 0; nearestSource - distance >= 0 && distance <= _config.MaxConditionDistance; distance++)
     {
-      roll -= MaxConditionDistance + 1 - distance;
+      roll -= _config.MaxConditionDistance + 1 - distance;
       if (roll < 0) return nearestSource - distance;
     }
 

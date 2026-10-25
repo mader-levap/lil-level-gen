@@ -1,5 +1,7 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
+using LostInLimbo.LevelGen.Tests.Generator.Graph;
 
 namespace LostInLimbo.LevelGen.Tests.Data.Config.Graph;
 
@@ -15,7 +17,7 @@ public sealed class CnfGraphTests
   public void Validate_WithDefinedBuilder_DoesNotThrow(EnGraphBuilder builder)
   {
     // Arrange: Graph config using a builder the enum defines.
-    var graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = builder } };
+    var graph = new CnfGraph { GraphBuilder = GraphTestSupport.CreateDefBuilder(builder) };
 
     // Assert: Validation completes normally for every defined member.
     graph.Validate();
@@ -29,7 +31,7 @@ public sealed class CnfGraphTests
 
     // Act/Assert: The unknown builder is rejected naming the offending property.
     var exception = Assert.Throws<ArgumentOutOfRangeException>(() => graph.Validate());
-    Assert.Equal("GraphBuilder", exception.ParamName);
+    Assert.Equal("Builder", exception.ParamName);
   }
 
   [Fact]

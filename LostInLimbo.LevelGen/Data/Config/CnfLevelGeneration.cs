@@ -68,6 +68,7 @@ public sealed record CnfLevelGeneration
       throw new ArgumentException("Graph config must not be null.", nameof(Graph));
     if (Map is null)
       throw new ArgumentException("Map config must not be null.", nameof(Map));
+    // Debug can be null.
 
     General.Validate();
     Style.Validate();

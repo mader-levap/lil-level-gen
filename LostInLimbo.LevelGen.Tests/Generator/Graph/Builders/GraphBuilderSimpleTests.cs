@@ -1,4 +1,5 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
@@ -15,11 +16,11 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Builders;
 /// </remarks>
 public sealed class GraphBuilderSimpleTests
 {
-  /// <summary>Mirrors <c>GraphBuilderSimple.MaxEdges</c>: cap of the random-relationships phase.</summary>
-  private const int MaxDegree = GraphBuilderSimple.MaxExtraDegree;
+  /// <summary>Mirrors <c>CnfGraphBuilderSimple.Default.MaxExtraDegree</c>: cap of the random-relationships phase.</summary>
+  private static readonly int MaxDegree = CnfGraphBuilderSimple.Default.MaxExtraDegree;
 
-  /// <summary>Mirrors <c>GraphBuilderSimple.MaxEdgesStar</c>: cap of the skeleton phase.</summary>
-  private const int MaxDegreeStar = GraphBuilderSimple.MaxExtraDegreeStar;
+  /// <summary>Mirrors <c>CnfGraphBuilderSimple.Default.MaxExtraDegreeStar</c>: cap of the skeleton phase.</summary>
+  private static readonly int MaxDegreeStar = CnfGraphBuilderSimple.Default.MaxExtraDegreeStar;
 
   /// <summary>Tests for the skeleton shape: node count, minimality, connectivity, scenarios.</summary>
   public sealed class ShapeTests
@@ -448,6 +449,58 @@ public sealed class GraphBuilderSimpleTests
       // Assert: Both placements are observable - same node allowed, not enforced.
       Assert.Contains(true, outcomes);
       Assert.Contains(false, outcomes);
+    }
+  }
+
+  /// <summary>Tests for config validation.</summary>
+  public sealed class ConfigValidationTests
+  {
+    [Fact]
+    public void Validate_Default_DoesNotThrow()
+    {
+      // Arrange: The default instance should be valid.
+      var config = CnfGraphBuilderSimple.Default;
+
+      // Assert: No exception is thrown.
+      config.Validate();
+    }
+
+    [Theory]
+    [InlineData(-0.1f)]
+    [InlineData(1.1f)]
+    public void Validate_InvalidChokepointChance_ThrowsArgumentOutOfRange(float chance)
+    {
+      // Arrange: A chokepoint chance outside [0, 1] is invalid.
+      var config = CnfGraphBuilderSimple.Default with { ChokepointChance = chance };
+
+      // Assert: Validation rejects the value.
+      var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+      Assert.Equal(nameof(CnfGraphBuilderSimple.ChokepointChance), ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    public void Validate_NegativeMaxExtraDegree_ThrowsArgumentOutOfRange(int maxExtraDegree)
+    {
+      // Arrange: A negative extra-degree cap is invalid.
+      var config = CnfGraphBuilderSimple.Default with { MaxExtraDegree = maxExtraDegree };
+
+      // Assert: Validation rejects the value.
+      var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+      Assert.Equal(nameof(CnfGraphBuilderSimple.MaxExtraDegree), ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_ZeroOrNegativeMaxExtraDegreeStar_ThrowsArgumentOutOfRange(int maxExtraDegreeStar)
+    {
+      // Arrange: The skeleton cap must be at least 1.
+      var config = CnfGraphBuilderSimple.Default with { MaxExtraDegreeStar = maxExtraDegreeStar };
+
+      // Assert: Validation rejects the value.
+      var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+      Assert.Equal(nameof(CnfGraphBuilderSimple.MaxExtraDegreeStar), ex.ParamName);
     }
   }
 }

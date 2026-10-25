@@ -1,6 +1,7 @@
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
@@ -51,10 +52,11 @@ internal static class GraphTestSupport
     long seedGraph = DefaultSeedGraph)
   {
     // Arrange: Fresh builder from the factory, config and an empty target graph.
-    var graphBuilder = GraphBuilderFactory.Create(builder);
+    CnfGraphBuilder defBuilder = CreateDefBuilder(builder);
+    var graphBuilder = GraphBuilderFactory.Create(defBuilder);
     var config = CnfLevelGeneration.Default with
     {
-      Graph = (graphConfig ?? new CnfGraph()) with { GraphBuilder = CnfGraphBuilder.Default with { Builder = builder } },
+      Graph = (graphConfig ?? new CnfGraph()) with { GraphBuilder = defBuilder },
     };
     var prepData = new PrepData { SeedGraph = seedGraph };
     var graph = new LilGraph();
@@ -64,6 +66,21 @@ internal static class GraphTestSupport
 
     // Assert-adjacent: Outcome and shape assertions live in the tests.
     return (result, graph);
+  }
+
+  /// <summary>
+  /// Create default graph builder configuration for given enum.
+  /// </summary>
+  /// <param name="builder">Builder to use.</param>
+  /// <returns></returns>
+  public static CnfGraphBuilder CreateDefBuilder(EnGraphBuilder builder)
+  {
+    return builder switch {
+      EnGraphBuilder.OneNode => CnfGraphBuilder.Default with { Builder = builder },
+      EnGraphBuilder.Simple => CnfGraphBuilder.Default with { Builder = builder, CnfSimple = CnfGraphBuilderSimple.Default },
+      EnGraphBuilder.Linear => CnfGraphBuilder.Default with { Builder = builder, CnfLinear = CnfGraphBuilderLinear.Default },
+      _ => throw new ArgumentOutOfRangeException(nameof(builder), builder, "Unknown graph builder."),
+    };
   }
 
   //

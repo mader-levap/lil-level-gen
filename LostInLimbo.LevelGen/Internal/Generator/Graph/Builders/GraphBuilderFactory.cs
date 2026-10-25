@@ -1,5 +1,6 @@
 using System;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
@@ -17,17 +18,17 @@ internal static class GraphBuilderFactory
   /// Creates the builder implementation matching the configured value. The caller must
   /// invoke <see cref="AGraphBuilder.Setup"/> before <see cref="AGraphBuilder.Build"/>.
   /// </summary>
-  /// <param name="builder">Configured graph builder kind.</param>
+  /// <param name="cnfGraphBuilder">Configuration for builders.</param>
   /// <returns>Fresh builder instance.</returns>
   /// <exception cref="ArgumentOutOfRangeException">The value names no known builder.</exception>
-  public static AGraphBuilder Create(EnGraphBuilder builder)
+  public static AGraphBuilder Create(CnfGraphBuilder cnfGraphBuilder)
   {
-    return builder switch
+    return cnfGraphBuilder.Builder switch
     {
       EnGraphBuilder.OneNode => new GraphBuilderOneNode(),
-      EnGraphBuilder.Simple => new GraphBuilderSimple(),
-      EnGraphBuilder.Linear => new GraphBuilderLinear(),
-      _ => throw new ArgumentOutOfRangeException(nameof(builder), builder, "Unknown graph builder."),
+      EnGraphBuilder.Simple => new GraphBuilderSimple(cnfGraphBuilder),
+      EnGraphBuilder.Linear => new GraphBuilderLinear(cnfGraphBuilder),
+      _ => throw new ArgumentOutOfRangeException(nameof(cnfGraphBuilder.Builder), cnfGraphBuilder.Builder, "Unknown graph builder."),
     };
   }
 }

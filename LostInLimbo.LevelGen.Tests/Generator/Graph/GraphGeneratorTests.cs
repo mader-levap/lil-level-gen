@@ -1,5 +1,6 @@
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Data.Result.Graph;
@@ -19,7 +20,7 @@ public sealed class GraphGeneratorTests
     // Arrange: Generator for the Linear builder with a small configured graph.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear }, Size = 4, Connectivity = 2 },
+      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear, CnfLinear = CnfGraphBuilderLinear.Default }, Size = 4, Connectivity = 2 },
     };
     var prepass = new PrepData { SeedGraph = 42 };
     var world = new LilWorld();
@@ -45,7 +46,7 @@ public sealed class GraphGeneratorTests
     // Arrange: Generator for the Simple builder with a small configured graph.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Simple }, Size = 5, Connectivity = 3 },
+      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Simple, CnfSimple = CnfGraphBuilderSimple.Default }, Size = 5, Connectivity = 3 },
     };
     var prepass = new PrepData { SeedGraph = 42 };
     var world = new LilWorld();
@@ -181,7 +182,7 @@ public sealed class GraphGeneratorTests
     // Arrange: Linear builder with complexity, so the graph gains guarded passages.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear }, Size = 5, Connectivity = 1, Complexity = 3 },
+      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear, CnfLinear = CnfGraphBuilderLinear.Default }, Size = 5, Connectivity = 1, Complexity = 3 },
     };
     var prepass = new PrepData { SeedGraph = 42 };
     var world = new LilWorld();
