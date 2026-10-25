@@ -1,5 +1,6 @@
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph;
@@ -30,7 +31,8 @@ public sealed class GraphGeneratorTests
     // Assert: The graph holds the configured number of nodes plus the one secret node of
     // the finalization pass, the chain skeleton on top of which every requested extra
     // relationship was placed plus the secret relationship, and start/exit POIs.
-    Assert.True(result.Success);
+    Assert.Equal(EnGenerationOutcome.Success, result.Outcome);
+    Assert.Null(result.FailureReason);
     Assert.Equal(4 + 1, world.Graph.Nodes.Count);
     Assert.Equal(3 + 2 + 1, world.Graph.Edges.Count);
     Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Start));
@@ -54,7 +56,8 @@ public sealed class GraphGeneratorTests
 
     // Assert: The graph holds the configured number of nodes plus the one secret node of
     // the finalization pass, a start and an exit POI.
-    Assert.True(result.Success);
+    Assert.Equal(EnGenerationOutcome.Success, result.Outcome);
+    Assert.Null(result.FailureReason);
     Assert.Equal(5 + 1, world.Graph.Nodes.Count);
     Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Start));
     Assert.Contains(world.Graph.Nodes, node => node.Pois.Any(poi => poi.Type == EnPoiType.Exit));
@@ -76,11 +79,75 @@ public sealed class GraphGeneratorTests
     var result = generator.Execute();
 
     // Assert: The graph holds one node with start and exit POI and no edges.
-    Assert.True(result.Success);
+    Assert.Equal(EnGenerationOutcome.Success, result.Outcome);
+    Assert.Null(result.FailureReason);
     var node = Assert.Single(world.Graph.Nodes);
     Assert.Equal(2, node.Pois.Count);
     Assert.Contains(node.Pois, poi => poi.Type == EnPoiType.Start);
     Assert.Contains(node.Pois, poi => poi.Type == EnPoiType.Exit);
     Assert.Empty(world.Graph.Edges);
+  }
+
+  [Fact]
+  public void Execute_WithFailGraphBuildDebug_ReturnsBuildFailedWithReason()
+  {
+    // Arrange: Generator whose debug hook fails the build before anything is written.
+    var config = CnfLevelGeneration.Default with
+    {
+      Debug = new CnfDebug { FailGraphBuild = true },
+    };
+    var prepass = new PrepData { SeedGraph = 42 };
+    var world = new LilWorld();
+    var generator = new GraphGenerator(config, prepass, world);
+
+    // Act: Run graph generation.
+    var result = generator.Execute();
+
+    // Assert: The build failure is reported as such, carrying the builder's reason, so the
+    // caller can tell it apart from a validation failure.
+    Assert.Equal(EnGenerationOutcome.BuildFailed, result.Outcome);
+    Assert.Equal("Deliberate failure at the very start.", result.FailureReason);
+  }
+
+  [Fact]
+  public void Execute_WithFailGraphValidationDebug_ReturnsValidationFailedWithReason()
+  {
+    // Arrange: Generator whose debug hook fails validation after a successful build.
+    var config = CnfLevelGeneration.Default with
+    {
+      Graph = new CnfGraph { Builder = EnGraphBuilder.OneNode },
+      Debug = new CnfDebug { FailGraphValidation = true },
+    };
+    var prepass = new PrepData();
+    var world = new LilWorld();
+    var generator = new GraphGenerator(config, prepass, world);
+
+    // Act: Run graph generation.
+    var result = generator.Execute();
+
+    // Assert: The build succeeded and the deliberate validation failure is reported as such.
+    Assert.Equal(EnGenerationOutcome.ValidationFailed, result.Outcome);
+    Assert.Equal("Deliberate validation failure.", result.FailureReason);
+    Assert.Single(world.Graph.Nodes);
+  }
+
+  [Fact]
+  public void Execute_WithValidationEnabled_ReturnsSuccessForValidGraph()
+  {
+    // Arrange: Generator running the real validator over a graph the builder produces.
+    var config = CnfLevelGeneration.Default with
+    {
+      Graph = new CnfGraph { Builder = EnGraphBuilder.OneNode, ValidatorOpts = CnfValidGraphOpt.DefEnabled },
+    };
+    var prepass = new PrepData();
+    var world = new LilWorld();
+    var generator = new GraphGenerator(config, prepass, world);
+
+    // Act: Run graph generation.
+    var result = generator.Execute();
+
+    // Assert: The built graph passes validation, so the run succeeds without a reason.
+    Assert.Equal(EnGenerationOutcome.Success, result.Outcome);
+    Assert.Null(result.FailureReason);
   }
 }

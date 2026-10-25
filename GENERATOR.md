@@ -86,6 +86,8 @@ All builders share the `AGraphBuilder` abstract base class, which stores the set
 
 Graph build can fail (a false return or an exception), though builders should make it as unlikely as possible. A failed build fails the whole run: the world is discarded and never published, and the run cannot be resumed, so a partially mutated graph is never re-run - builders need no rollback.
 
+Validation failure is special: when the built graph is rejected by the validator (when `CnfValidGraphOpt.Enabled`, or via the `CnfDebug.FailGraphValidation` debug hook), the run ends with `EnGenResult.ValidationError` instead of `EnGenResult.Error`. The reason is reported in `GenerationStatus.FailureReason` (no exception), and - unlike an error - the fully built world is published alongside the status, so the editor can show the rejected graph and debug the failing check. The result is terminal: only a fresh `Start` can run again.
+
 `Simple` and `Linear` finish with the same four finalization processors in the fixed order - secrets, objectives, relative size, grouping - each parameterized by its section of `CnfGraph.ProcOpts`.
 
 ### Map

@@ -1,5 +1,6 @@
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
+using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
@@ -41,15 +42,30 @@ internal sealed class GraphGenerator
   /// <summary>
   /// Creates the whole graph and optionally validates it. It is treated as a single step.
   /// </summary>
-  /// <returns>True if graph generation was successful, otherwise false.</returns>
-  public LilResult Execute()
+  /// <remarks>
+  /// The deliberate debug failure of <see cref="CnfDebug.FailGraphValidation"/> is reported
+  /// instead of running the real validator, and independently of whether validation is enabled
+  /// (see <see cref="CnfValidGraphOpt.Enabled"/>).
+  /// </remarks>
+  /// <returns>
+  /// The outcome of the run: <see cref="EnGenerationOutcome.Success"/>,
+  /// <see cref="EnGenerationOutcome.BuildFailed"/> (graph may be partially mutated) or
+  /// <see cref="EnGenerationOutcome.ValidationFailed"/> (built graph is intact), each failed outcome
+  /// carrying its reason.
+  /// </returns>
+  public GraphRunResult Execute()
   {
     AGraphBuilder builder = GraphBuilderFactory.Create(_config.Graph.Builder);
     LilResult graphGenResult = builder.Run(_config, _prepData, _world.Graph);
-    if (graphGenResult.Success) {
-      LilResult graphValidationResult = new GraphValidator(_world.Graph, _config.Graph.ValidatorOpts).Validate();
-      if (!graphValidationResult.Success) return graphValidationResult; // validation failed
-    }
-    return graphGenResult;
+    if (!graphGenResult.Success)
+      return GraphRunResult.FailBuild(graphGenResult.FailureReason!);
+
+    if (_config.Debug?.FailGraphValidation == true)
+      return GraphRunResult.FailValidation("Deliberate validation failure.");
+
+    LilResult graphValidationResult = new GraphValidator(_world.Graph, _config.Graph.ValidatorOpts).Validate();
+    return graphValidationResult.Success
+      ? GraphRunResult.Succeed()
+      : GraphRunResult.FailValidation(graphValidationResult.FailureReason!);
   }
 }

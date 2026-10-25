@@ -48,4 +48,16 @@ public sealed class CnfDebugTests
     // Assert: No invariant is violated, so validation completes normally.
     debug.Validate();
   }
+
+  [Fact]
+  public void Defaults_WithFreshInstance_HaveFailureHooksDisabled()
+  {
+    // Arrange/Act: A freshly constructed debug config.
+    var debug = new CnfDebug();
+
+    // Assert: Neither deliberate failure hook is active unless a test turns it on.
+    Assert.False(debug.FailAtStart);
+    Assert.False(debug.FailGraphBuild);
+    Assert.False(debug.FailGraphValidation);
+  }
 }

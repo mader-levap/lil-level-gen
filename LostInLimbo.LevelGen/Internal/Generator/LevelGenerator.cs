@@ -8,6 +8,7 @@ using LostInLimbo.LevelGen.Data.Result.Stats;
 using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Internal.Generator.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Map;
+using LostInLimbo.LevelGen.Internal.Generator.Map.Validator;
 using LostInLimbo.LevelGen.Internal.Generator.Prepass;
 using LostInLimbo.LevelGen.Internal.Status;
 
@@ -22,9 +23,10 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// map phase is still a placeholder that advances a fixed number of steps, each imitating
 /// work by sleeping (see <see cref="MainLoop"/>).
 /// Mutates its world in place on the worker thread; the live instance never leaves the worker:
-/// terminal publishes pair a frozen deep copy of it with a <see cref="EnGenResult.Paused"/> or
-/// <see cref="EnGenResult.Finished"/> status in the store, and every other outcome pairs with
-/// no world at all (see <see cref="PublishTerminal"/>).
+/// terminal publishes pair a frozen deep copy of it with a <see cref="EnGenResult.Paused"/>,
+/// <see cref="EnGenResult.Finished"/> or <see cref="EnGenResult.ValidationError"/> status in
+/// the store (the validation copy exposes the rejected graph for debugging), and every other
+/// outcome pairs with no world at all (see <see cref="PublishTerminal"/>).
 /// </remarks>
 internal sealed class LevelGenerator
 {
@@ -57,6 +59,12 @@ internal sealed class LevelGenerator
   /// gate at step boundaries, so it is volatile.
   /// </summary>
   private volatile bool _pauseRequested;
+
+  /// <summary>
+  /// Reason of the validation failure. Non-null value will stop current run.
+  /// Cleared at the start of every run; <see langword="null"/> while no validation failure has occurred.
+  /// </summary>
+  private string? _validationFailureReason;
 
   /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
   private int _totalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
@@ -127,25 +135,31 @@ internal sealed class LevelGenerator
   /// Must be called while holding <see cref="_pauseGate"/> semantics (this method takes it):
   /// the pause flag is rewritten and cleared together with the publish, so a request accepted
   /// by <see cref="TryRequestPause"/> always belongs to the run that publishes next, and no
-  /// stale pause leaks into a later run. Paused and finished results carry a frozen deep copy
-  /// of this generator's world into the store (see <see cref="LilWorldCopy"/>), so the live
-  /// instance is never handed out and <c>World</c> reads status and world as one unit; every
-  /// other result hides the world by pairing with <see langword="null"/>.
+  /// stale pause leaks into a later run. Paused, finished and validation-failed results carry
+  /// a frozen deep copy of this generator's world into the store (see <see cref="LilWorldCopy"/>),
+  /// so the live instance is never handed out and <c>World</c> reads status and world as one
+  /// unit; every other result hides the world by pairing with <see langword="null"/>.
   /// </remarks>
   /// <param name="result">Terminal result to publish.</param>
   /// <param name="error">Exception to attach when publishing <see cref="EnGenResult.Error"/>.</param>
-  private void PublishTerminal(EnGenResult result, Exception? error = null)
+  /// <param name="failureReason">
+  /// Validation failure reason to attach when publishing <see cref="EnGenResult.ValidationError"/>;
+  /// <see langword="null"/> otherwise.
+  /// </param>
+  private void PublishTerminal(EnGenResult result, Exception? error = null, string? failureReason = null)
   {
     lock (_pauseGate)
     {
-      // Pause has precedence over cancellation only; Finished and Error always stand.
+      // Pause has precedence over cancellation only; Finished, ValidationError and Error
+      // always stand: a validation failure reports its graph, not a pause, and a failure or
+      // completion has no work to pause.
       if (_pauseRequested && result == EnGenResult.Cancelled) result = EnGenResult.Paused;
 
       _pauseRequested = false;
-      var world = result is EnGenResult.Paused or EnGenResult.Finished
+      var world = result is EnGenResult.Paused or EnGenResult.Finished or EnGenResult.ValidationError
         ? LilWorldCopy.Copy(_world)
         : null;
-      _statusStore.Publish(new GenerationStatus { Result = result, Error = error }, world);
+      _statusStore.Publish(new GenerationStatus { Result = result, Error = error, FailureReason = failureReason }, world);
     }
   }
 
@@ -157,6 +171,12 @@ internal sealed class LevelGenerator
   /// where an unhandled exception would terminate the host process. Instead the failure is
   /// reported through the status store as <see cref="EnGenResult.Error"/> with the exception
   /// captured in <see cref="GenerationStatus.Error"/>.
+  /// <para>
+  /// A failed graph validation is not an exception: it ends the run as
+  /// <see cref="EnGenResult.ValidationError"/> with the reason in
+  /// <see cref="GenerationStatus.FailureReason"/> and the built graph published alongside it,
+  /// so a consumer can inspect the rejected graph (see <see cref="RunGraph"/>).
+  /// </para>
   /// <para>
   /// Cancellation is not a failure: when <paramref name="cancellationToken"/> is cancelled, the run
   /// stops at its next checkpoint and reports <see cref="EnGenResult.Cancelled"/> with a
@@ -178,7 +198,7 @@ internal sealed class LevelGenerator
       cancellationToken.ThrowIfCancellationRequested();
 
       EnGenResult genResult = RunGeneration(cancellationToken);
-      PublishTerminal(genResult); // Finished or Paused here.
+      PublishTerminal(genResult, failureReason: _validationFailureReason); // Finished, Paused or ValidationError here.
     }
     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
     {
@@ -199,16 +219,27 @@ internal sealed class LevelGenerator
   /// <see cref="CnfDebug.PlaceholderSteps"/>.
   /// </summary>
   /// <param name="cancellationToken">Token checked at every step boundary.</param>
-  /// <returns>Generation result. Finished when all steps are done, otherwise Paused.</returns>
+  /// <returns>
+  /// Generation result: Finished when all steps are done, Paused when the run stopped early,
+  /// or ValidationError when graph validation failed.
+  /// </returns>
   private EnGenResult RunGeneration(CancellationToken cancellationToken)
   {
     if (_config.Debug?.FailAtStart == true) throw new InvalidOperationException("Deliberate failure at start.");
 
+    // Every run starts with no validation failure of its own; a previous run's failure can
+    // never survive here, because a validation-failed run is terminal and never runs again.
+    _validationFailureReason = null;
+
     MainLoop(cancellationToken);
+
+    // A validation failure ends the run with its dedicated result even when a pause request
+    // or an exhausted step budget would otherwise stop the run at this boundary.
+    if (_validationFailureReason is not null) return EnGenResult.ValidationError;
 
     // Complete generation means the level is done; otherwise the run stopped early (Step/Area
     // budget exhausted, or an explicit pause request) and can be resumed with remaining steps.
-    return IsMapGenerationComplete() ? EnGenResult.Finished : EnGenResult.Paused;
+    return IsGenerationComplete() ? EnGenResult.Finished : EnGenResult.Paused;
   }
 
   //
@@ -221,7 +252,8 @@ internal sealed class LevelGenerator
   {
     if (!RunPrepass(cancellationToken)) return;
     if (!RunGraph(cancellationToken)) return;
-    RunMap(cancellationToken);
+    if (!RunMap(cancellationToken)) return;
+    RunFinalization(cancellationToken);
   }
 
   /// <summary>
@@ -247,12 +279,23 @@ internal sealed class LevelGenerator
   /// <summary>
   /// <para>Execute the graph generator. This is considered a single step.</para>
   /// </summary>
+  /// <remarks>
+  /// A validation failure does not throw: the graph is fully built at that point, so the step
+  /// records the reason (see <see cref="_validationFailureReason"/>) and stops the run instead,
+  /// letting <see cref="RunGeneration"/> report <see cref="EnGenResult.ValidationError"/> with
+  /// the intact world for debugging.
+  /// </remarks>
   /// <exception cref="InvalidOperationException">
   /// The graph build reported failure. The world's graph may be partially mutated at that
   /// point, so the run fails instead of pausing: the partial world is never published and
   /// the build is never re-run against the non-empty graph on resume.
   /// </exception>
-  /// <returns>True. A failed build throws instead of returning false.</returns>
+  /// <returns>
+  /// <see langword="true"/> to continue with the next phase; <see langword="false"/> when a
+  /// pause was requested before the step started or when validation failed (the reason is
+  /// kept in <see cref="_validationFailureReason"/>). A failed build throws instead of
+  /// returning <see langword="false"/>.
+  /// </returns>
   private bool RunGraph(CancellationToken cancellationToken)
   {
     // Are we in the correct phase?
@@ -263,12 +306,22 @@ internal sealed class LevelGenerator
     cancellationToken.ThrowIfCancellationRequested();
 
     GraphGenerator graphGenerator = new GraphGenerator(_config, _prepData!, _world);
-    LilResult result = graphGenerator.Execute();
-    if (!result.Success)
+    GraphRunResult result = graphGenerator.Execute();
+    switch (result.Outcome)
     {
-      // A failed build leaves the graph partially mutated; fail the whole run so the
-      // partial world is never published and the build is never re-run on resume.
-      throw new InvalidOperationException("Graph generation failed. Reason: "+result.FailureReason);
+      case EnGenerationOutcome.Success:
+        break;
+      case EnGenerationOutcome.BuildFailed:
+        // A failed build leaves the graph partially mutated; fail the whole run so the
+        // partial world is never published and the build is never re-run on resume.
+        throw new InvalidOperationException("Graph generation failed. Reason: " + result.FailureReason);
+      case EnGenerationOutcome.ValidationFailed:
+        // The graph is fully built; keep the reason so the run can report a validation
+        // failure with the intact world instead of a plain error without one.
+        _validationFailureReason = result.FailureReason;
+        return false; // Still on Graph phase.
+      default:
+        throw new InvalidOperationException("Unknown graph outcome: " + result.Outcome + ".");
     }
     _world.Phase = EnPhase.Map; // move to next phase
     return true;
@@ -276,26 +329,35 @@ internal sealed class LevelGenerator
 
   /// <summary>
   /// <para>Execute the map generator. This can and will take many steps.</para>
+  /// </summary>
+  /// <remarks>
+  /// <para>Currently PLACEHOLDER.</para>
   /// <para>
   /// Loops while generation is not complete yet (see <see cref="IsGenerationComplete"/>) and the
   /// run kind still allows more work: <c>EnRunKind.All</c> runs until generation completes, <c>Area</c>
   /// and <c>Step</c> run at most one step per execution.
   /// </para>
   /// <para>
-  /// Each step first checks for a pause request (the only pause checkpoint, see
+  /// Each loop first checks for a pause request (the only pause checkpoint, see
   /// <see cref="TryRequestPause"/>), then the token (the only cancellation checkpoint), and
-  /// then sleeps for <c>PlaceholderSleep / PlaceholderSteps</c> milliseconds as an imitation of
-  /// the work done in a single step. The sleep itself is a plain, uninterruptible
-  /// <see cref="Thread.Sleep(int)"/>; both pause and cancellation are therefore observed only
-  /// after the current step completes. Completed steps are counted in
-  /// <see cref="LilStats.Steps"/> of <see cref="_world"/>, which survives
-  /// pausing and resuming because the API keeps this generator instance alive.
+  /// then calls map generator for execution of single step.
   /// </para>
-  /// </summary>
-  private void RunMap(CancellationToken cancellationToken)
+  /// </remarks>
+  /// <exception cref="InvalidOperationException">
+  /// The map build reported failure. The world's map may be partially mutated at that
+  /// point, so the run fails instead of pausing: the partial world is never published and
+  /// the build is never re-run against the non-empty map on resume.
+  /// </exception>
+  /// <returns>
+  /// <see langword="true"/> to continue with the next phase; <see langword="false"/> when a
+  /// pause was requested before the step started or when validation failed (the reason is
+  /// kept in <see cref="_validationFailureReason"/>). A failed build throws instead of
+  /// returning <see langword="false"/>.
+  /// </returns>
+  private bool RunMap(CancellationToken cancellationToken)
   {
     // Are we in the correct phase?
-    if (_world.Phase != EnPhase.Map) return;
+    if (_world.Phase != EnPhase.Map) return true;
 
     // Maximum number of steps this execution may add; real passes will budget work differently.
     var maxStepsThisRun = _enRunKind == EnRunKind.All ? int.MaxValue : 1;
@@ -304,18 +366,63 @@ internal sealed class LevelGenerator
     while (stepsRun < maxStepsThisRun && !IsMapGenerationComplete())
     {
       // Pause checkpoint: a request pending before the next step starts ends the run.
-      if (_pauseRequested) return;
+      if (_pauseRequested) return false;
       // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
       cancellationToken.ThrowIfCancellationRequested();
 
-      _mapGenerator.ExecuteStep();
+      MapRunResult result = _mapGenerator.ExecuteStep();
+      switch (result.Outcome)
+      {
+        case EnGenerationOutcome.Success:
+          break;
+        case EnGenerationOutcome.BuildFailed:
+          // A failed build leaves the map partially mutated; fail the whole run so the
+          // partial world is never published and the build is never re-run on resume.
+          throw new InvalidOperationException("Map generation failed. Reason: " + result.FailureReason);
+        default:
+          // Note: EnGenerationOutcome.ValidationFailed is not done here. Map validation is called
+          // separately after entire map is finished.
+          throw new InvalidOperationException("Unknown or invalid map outcome: " + result.Outcome + ".");
+      }
 
       stepsRun++;
     }
+
+    if (IsMapGenerationComplete()) _world.Phase = EnPhase.Finalization;
+    return true;
   }
 
   /// <summary>
-  /// Placeholder for the real completion criterion. The real generator will use a more
+  /// <para>Finalize generation. This is considered a single step.</para>
+  /// </summary>
+  private void RunFinalization(CancellationToken cancellationToken)
+  {
+    // Are we in the correct phase?
+    if (_world.Phase != EnPhase.Finalization) return;
+    // Pause checkpoint: a request pending before the next step starts ends the run.
+    if (_pauseRequested) return;
+    // Cancellation checkpoint: a token cancelled before the next step starts ends the run.
+    cancellationToken.ThrowIfCancellationRequested();
+
+    LilResult mapValidationResult = new MapValidator(_world.Map, _config.Map.ValidatorOpts).Validate();
+    if (!mapValidationResult.Success) {
+      _validationFailureReason = mapValidationResult.FailureReason;
+      return; // Still on Finalization phase.
+    }
+
+    _world.Phase = EnPhase.Completed;
+  }
+
+  /// <summary>
+  /// Check if level generation as a whole is completed.
+  /// </summary>
+  private bool IsGenerationComplete()
+  {
+    return _world.Phase == EnPhase.Completed;
+  }
+
+  /// <summary>
+  /// Placeholder for the real map completion criterion. The real map generator will use a more
   /// complex check (layout complete, all areas placed, ...) and will not know the total
   /// number of steps in advance.
   /// </summary>

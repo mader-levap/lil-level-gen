@@ -40,16 +40,29 @@ internal sealed class MapGenerator
   /// <summary>
   /// Executes one step of map generation.
   /// </summary>
-  /// <returns>True if the step was successful, otherwise false.</returns>
-  public bool ExecuteStep()
+  /// <remarks>
+  /// <para>Currently PLACEHOLDER.</para>
+  /// <para>
+  /// Each step sleeps for <c>PlaceholderSleep / PlaceholderSteps</c> milliseconds as an
+  /// imitation of the work done in a single step. The sleep itself is a plain, uninterruptible
+  /// <see cref="Thread.Sleep(int)"/>.
+  /// Completed steps are counted in <see cref="LilStats.Steps"/> of <see cref="_world"/>,
+  /// which survives pausing and resuming because the API keeps this generator instance alive.
+  /// </para>
+  /// </remarks>
+  /// <returns>
+  /// The outcome of the run: <see cref="EnGenerationOutcome.Success"/> or
+  /// <see cref="EnGenerationOutcome.BuildFailed"/> (map may be partially mutated).
+  /// </returns>
+  public MapRunResult ExecuteStep()
   {
     var sleepMilliseconds = _config.Debug?.PlaceholderSleep ?? CnfDebug.DefaultPlaceholderSleep;
     var stepSleepMilliseconds = sleepMilliseconds / _totalSteps;
 
-    // Imitation of the work of a single step; deliberately not token-aware.
+    // Imitation of the work of a single step; deliberately not token-aware, this is handled by LevelGenerator.
     Thread.Sleep(stepSleepMilliseconds);
 
     _world.Stats.Steps++;
-    return true;  
+    return MapRunResult.Succeed();  
   }
 }

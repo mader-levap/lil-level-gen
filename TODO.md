@@ -1,6 +1,6 @@
 Current tasks:
-- Review code
-- Review tests, with and without coverage
+- Additional graph metadata
+- Secrets should rarely generate two one way passages, one from node to secret note, other from secret node to selected other node
 
 Later:
 - Rework config data more.

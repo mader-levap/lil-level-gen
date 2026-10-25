@@ -34,6 +34,14 @@ public sealed record CnfDebug
   public bool FailGraphBuild { get; init; } = false;
 
   /// <summary>
+  /// If true, graph validation reports failure after a successful build, which ends the run
+  /// with <see cref="Data.Status.EnGenResult.ValidationError"/> and exposes the built graph.
+  /// Independent of <see cref="Graph.Validator.CnfValidGraphOpt.Enabled"/>: the deliberate
+  /// failure is reported even when validation is disabled.
+  /// </summary>
+  public bool FailGraphValidation { get; init; } = false;
+
+  /// <summary>
   /// How long the placeholder generation pretends to work, in milliseconds.
   /// 0 means it returns immediately. Debug only; real passes will not sleep.
   /// The value is split evenly across <see cref="PlaceholderSteps"/> steps, so the

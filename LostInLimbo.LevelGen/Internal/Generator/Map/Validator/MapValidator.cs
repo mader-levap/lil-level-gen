@@ -12,7 +12,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Map.Validator;
 /// </remarks>
 /// <param name="map">Map to verify.</param>
 /// <param name="options">Validator options.</param>
-internal sealed class GraphValidator(LilMap? map, CnfValidMapOpt options)
+internal sealed class MapValidator(LilMap? map, CnfValidMapOpt options)
 {
   /// <summary>Map to verify.</summary>
   private LilMap? _map = map;

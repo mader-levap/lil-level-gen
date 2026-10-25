@@ -399,13 +399,16 @@ public sealed class LevelGenerationSession
   /// </summary>
   /// <remarks>
   /// The method returns a world only for stable states:
-  /// <see cref="EnGenResult.Paused"/> (partial results of an Area or Step run) and
-  /// <see cref="EnGenResult.Finished"/> (complete world). It returns <see langword="null"/>
-  /// while running, after <see cref="EnGenResult.Error"/> (partial world must not be used),
-  /// after <see cref="EnGenResult.Cancelled"/> (cancelled runs discard their partial world),
-  /// and before the first run. Status and world are sampled as one pair, so a returned world
-  /// always belongs to the status this call observed (and that snapshot's publish guarantees
-  /// the final data is visible to the caller), never to a run that claimed in the meantime.
+  /// <see cref="EnGenResult.Paused"/> (partial results of an Area or Step run),
+  /// <see cref="EnGenResult.Finished"/> (complete world) and
+  /// <see cref="EnGenResult.ValidationError"/> (the rejected graph, so a consumer can debug
+  /// the failing check reported in <see cref="GenerationStatus.FailureReason"/>).
+  /// It returns <see langword="null"/> while running, after <see cref="EnGenResult.Error"/>
+  /// (partial world must not be used), after <see cref="EnGenResult.Cancelled"/> (cancelled
+  /// runs discard their partial world), and before the first run. Status and world are sampled
+  /// as one pair, so a returned world always belongs to the status this call observed (and
+  /// that snapshot's publish guarantees the final data is visible to the caller), never to
+  /// a run that claimed in the meantime.
   /// <para>
   /// Each call returns a fresh deep copy (see <see cref="LilWorldCopy"/>) owned by the caller:
   /// the generator's own data can never be reached through it. Mutating the returned world is
@@ -426,7 +429,7 @@ public sealed class LevelGenerationSession
     var snapshot = _statusStore.CurrentSnapshot;
     WorldSampleTestHook?.Invoke();
     var result = snapshot.Status.Result;
-    return result == EnGenResult.Paused || result == EnGenResult.Finished
+    return result is EnGenResult.Paused or EnGenResult.Finished or EnGenResult.ValidationError
       ? LilWorldCopy.Copy(snapshot.World)
       : null;
   }

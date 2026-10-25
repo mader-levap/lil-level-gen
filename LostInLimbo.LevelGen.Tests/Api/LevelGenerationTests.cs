@@ -29,7 +29,8 @@ public sealed class LevelGenerationTests
   /// <param name="failAtStart">If true, the generator fails at start.</param>
   /// <param name="steps">How many placeholder steps the generation is split into.</param>
   /// <param name="failGraphBuild">If true, the graph build reports failure.</param>
-  private static CnfLevelGeneration Config(int sleep = 1000, bool failAtStart = false, int steps = CnfDebug.DefaultPlaceholderSteps, bool failGraphBuild = false)
+  /// <param name="failGraphValidation">If true, graph validation reports failure after a successful build.</param>
+  private static CnfLevelGeneration Config(int sleep = 1000, bool failAtStart = false, int steps = CnfDebug.DefaultPlaceholderSteps, bool failGraphBuild = false, bool failGraphValidation = false)
   {
     return CnfLevelGeneration.Default with
     {
@@ -39,6 +40,7 @@ public sealed class LevelGenerationTests
         PlaceholderSteps = steps,
         FailAtStart = failAtStart,
         FailGraphBuild = failGraphBuild,
+        FailGraphValidation = failGraphValidation,
       },
     };
   }
@@ -224,6 +226,49 @@ public sealed class LevelGenerationTests
     }
 
     [Fact]
+    public void Start_WithValidationFailure_PublishesValidationErrorAndWorldVisible()
+    {
+      // Arrange: Debug config whose graph builds but fails validation.
+      var config = Config(failGraphValidation: true);
+
+      // Act: Start the run and wait for the validation failure.
+      Assert.True(_session.Start(EnRunKind.All, config));
+      WaitForTerminal(_session);
+
+      // Assert: Unlike a plain error, the validation failure is reported distinctly, carries
+      // its reason instead of an exception, and exposes the built graph for debugging.
+      Assert.Equal(EnGenResult.ValidationError, _session.Status().Result);
+      Assert.Null(_session.Status().Error);
+      Assert.Equal("Deliberate validation failure.", _session.Status().FailureReason);
+      var world = _session.World();
+      Assert.NotNull(world);
+      Assert.Equal(EnPhase.Graph, world.Phase);
+      Assert.NotEmpty(world.Graph.Nodes);
+    }
+
+    [Fact]
+    public void Start_AfterValidationErrorRun_Succeeds()
+    {
+      // Arrange: A validation-failed run; ValidationError is terminal but a fresh Start may
+      // claim a new run.
+      Assert.True(_session.Start(EnRunKind.All, Config(failGraphValidation: true)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.ValidationError, _session.Status().Result);
+
+      // Act: Starting a fresh run after the validation failure.
+      var started = _session.Start(EnRunKind.All, Config(sleep: 0));
+
+      // Assert: The fresh run completes normally and replaces the failed run's state,
+      // including the stale failure reason.
+      Assert.True(started);
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.Null(_session.Status().Error);
+      Assert.Null(_session.Status().FailureReason);
+      Assert.NotNull(_session.World());
+    }
+
+    [Fact]
     public void Start_AfterErrorRun_Succeeds()
     {
       // Arrange: A failed run; Error is terminal but a fresh Start may claim a new run.
@@ -337,6 +382,26 @@ public sealed class LevelGenerationTests
       Assert.False(resumed);
       Assert.Equal(EnGenResult.Error, _session.Status().Result);
       Assert.NotNull(_session.Status().Error);
+    }
+
+    [Fact]
+    public void Resume_AfterValidationErrorRun_ReturnsFalse()
+    {
+      // Arrange: A validation-failed run; only a paused run can be resumed, so the
+      // validation state stays terminal and keeps its world for inspection.
+      Assert.True(_session.Start(EnRunKind.All, Config(failGraphValidation: true)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.ValidationError, _session.Status().Result);
+
+      // Act: Attempting to resume the validation-failed run.
+      var resumed = _session.Resume(EnRunKind.All);
+
+      // Assert: Resuming is refused, the validation state is untouched, and the graph
+      // built by the failed run is still visible for debugging.
+      Assert.False(resumed);
+      Assert.Equal(EnGenResult.ValidationError, _session.Status().Result);
+      Assert.Equal("Deliberate validation failure.", _session.Status().FailureReason);
+      Assert.NotNull(_session.World());
     }
 
     [Fact]
@@ -680,6 +745,24 @@ public sealed class LevelGenerationTests
     }
 
     [Fact]
+    public void Clear_AfterValidationErrorRun_ClearsState()
+    {
+      // Arrange: A validation-failed run; terminal but not yet cleared.
+      Assert.True(_session.Start(EnRunKind.All, Config(failGraphValidation: true)));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.ValidationError, _session.Status().Result);
+
+      // Act: Clear the terminal-but-dirty state.
+      var cleared = _session.Clear();
+
+      // Assert: Back to pristine, with no lingering failure reason or world.
+      Assert.True(cleared);
+      Assert.Equal(EnGenResult.None, _session.Status().Result);
+      Assert.Null(_session.Status().FailureReason);
+      Assert.Null(_session.World());
+    }
+
+    [Fact]
     public void Start_AfterClear_Succeeds()
     {
       // Arrange: A paused run with a partial world, then cleared.
@@ -759,7 +842,7 @@ public sealed class LevelGenerationTests
       // Assert: The next call still reports the consistent generated world.
       var next = _session.World();
       Assert.NotNull(next);
-      Assert.Equal(EnPhase.Map, next!.Phase);
+      Assert.Equal(EnPhase.Completed, next!.Phase);
       Assert.Equal(10L, next.Stats.Steps);
       Assert.NotEmpty(next.Graph.Nodes);
       Assert.Contains(next.Graph.Nodes, node => node.Pois.Count > 0);
@@ -792,7 +875,7 @@ public sealed class LevelGenerationTests
       Assert.NotNull(finalWorld);
       Assert.Equal(10L, finalWorld!.Stats.Steps);
       Assert.NotEmpty(finalWorld.Graph.Nodes);
-      Assert.Equal(EnPhase.Map, finalWorld.Phase);
+      Assert.Equal(EnPhase.Completed, finalWorld.Phase);
     }
   }
 

@@ -79,7 +79,10 @@ public sealed class LevelGeneratorTests
       Assert.True(statusStore.TryBeginRun());
       var generator = new LevelGenerator(EnRunKind.Step, FastConfig(), statusStore);
       generator.Execute();
+
+      // Assert: State is correct.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Map, PublishedWorld(statusStore).Phase);
       LilWorld worldBefore = PublishedWorld(statusStore);
       Assert.Equal(1L, worldBefore.Stats.Steps);
 
@@ -92,9 +95,10 @@ public sealed class LevelGeneratorTests
       // with the full step budget in its own copy, while the earlier copy still shows the
       // partial state it was published with (proof it was detached from the live world).
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
       LilWorld worldAfter = PublishedWorld(statusStore);
       Assert.NotSame(worldBefore, worldAfter);
-      Assert.Equal((long)CnfDebug.DefaultPlaceholderSteps, worldAfter.Stats.Steps);
+      Assert.Equal(CnfDebug.DefaultPlaceholderSteps, worldAfter.Stats.Steps);
       Assert.Equal(1L, worldBefore.Stats.Steps);
     }
 
@@ -111,6 +115,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: Whole-level run finishes successfully.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
       Assert.Null(statusStore.Current.Error);
     }
 
@@ -128,6 +133,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: The updated run kind is honored.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
       Assert.Null(statusStore.Current.Error);
     }
 
@@ -145,6 +151,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: The updated run kind is honored.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Map, PublishedWorld(statusStore).Phase);
       Assert.Null(statusStore.Current.Error);
     }
 
@@ -162,6 +169,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: Status reports paused and no error.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Map, PublishedWorld(statusStore).Phase);
       Assert.Null(statusStore.Current.Error);
     }
 
@@ -178,6 +186,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: Exactly one step was made and the run pauses with the rest still pending.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Map, PublishedWorld(statusStore).Phase);
       Assert.Equal(1L, PublishedWorld(statusStore).Stats.Steps);
     }
 
@@ -194,6 +203,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: Exactly one step was made and the run pauses with the rest still pending.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Map, PublishedWorld(statusStore).Phase);
       Assert.Equal(1L, PublishedWorld(statusStore).Stats.Steps);
     }
 
@@ -210,6 +220,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: Every step was made and the run finished.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
       Assert.Equal(3L, PublishedWorld(statusStore).Stats.Steps);
     }
 
@@ -231,12 +242,13 @@ public sealed class LevelGeneratorTests
 
       // Assert: Three steps total, so the third execution finished the level.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
       Assert.Equal(3, executions);
       Assert.Equal(3L, PublishedWorld(statusStore).Stats.Steps);
     }
 
     [Fact]
-    public void Execute_WithAllRunKind_AdvancesPhaseFromGraphToMap()
+    public void Execute_WithAllRunKind_AdvancesPhaseFromPrepassToCompleted()
     {
       // Arrange: Claimed full run over a fresh world, which starts in the prepass phase.
       var statusStore = new GenerationStatusStore();
@@ -248,7 +260,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: The successful graph pass moved the world into the map phase.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
-      Assert.Equal(EnPhase.Map, PublishedWorld(statusStore).Phase);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
     }
 
     [Fact]
@@ -259,6 +271,8 @@ public sealed class LevelGeneratorTests
       Assert.True(statusStore.TryBeginRun());
       var generator = new LevelGenerator(EnRunKind.Step, FastConfig(placeholderSteps: 3), statusStore);
       generator.Execute();
+
+      // Assert: State is correct.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
       LilWorld partialWorld = PublishedWorld(statusStore);
       Assert.Equal(1L, partialWorld.Stats.Steps);
@@ -269,10 +283,10 @@ public sealed class LevelGeneratorTests
       generator.SetRunKind(EnRunKind.All);
       generator.Execute();
 
-      // Assert: The resumed run stays in the map phase; the graph pass ran only once.
+      // Assert: The resumed run completes map and level generation; the graph pass ran only once.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
       LilWorld finishedWorld = PublishedWorld(statusStore);
-      Assert.Equal(EnPhase.Map, finishedWorld.Phase);
+      Assert.Equal(EnPhase.Completed, finishedWorld.Phase);
       Assert.Equal(3L, finishedWorld.Stats.Steps);
     }
   }
@@ -297,6 +311,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: Status reports an error carrying the deliberate failure, and is not stuck running.
       Assert.Equal(EnGenResult.Error, statusStore.Current.Result);
+      Assert.Null(statusStore.CurrentSnapshot.World);
       var error = Assert.IsType<InvalidOperationException>(statusStore.Current.Error);
       Assert.Equal("Deliberate failure at start.", error.Message);
     }
@@ -322,6 +337,34 @@ public sealed class LevelGeneratorTests
       var error = Assert.IsType<InvalidOperationException>(statusStore.Current.Error);
       Assert.Equal("Graph generation failed. Reason: Deliberate failure at the very start.", error.Message);
       Assert.Null(statusStore.CurrentSnapshot.World);
+    }
+
+    [Fact]
+    public void Execute_WithValidationFailure_PublishesValidationErrorWithWorld()
+    {
+      // Arrange: Generator whose graph builds fine but fails validation via the debug hook.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var config = CnfLevelGeneration.Default with
+      {
+        Debug = new CnfDebug { FailGraphValidation = true, PlaceholderSleep = 0 },
+      };
+      var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
+
+      // Act: Run generation. The validation failure must not become a plain error.
+      generator.Execute();
+
+      // Assert: The run reports the dedicated validation result, not an exception, and keeps
+      // the reason so the consumer can show why validation failed.
+      Assert.Equal(EnGenResult.ValidationError, statusStore.Current.Result);
+      Assert.Null(statusStore.Current.Error);
+      Assert.Equal("Deliberate validation failure.", statusStore.Current.FailureReason);
+
+      // Assert: The fully built graph is published for debugging, still in the graph phase
+      // (the map phase was never entered).
+      LilWorld world = PublishedWorld(statusStore);
+      Assert.Equal(EnPhase.Graph, world.Phase);
+      Assert.NotEmpty(world.Graph.Nodes);
     }
 
     [Fact]
@@ -414,6 +457,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: A token nobody cancels has no effect on the outcome.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
       Assert.Null(statusStore.Current.Error);
     }
   }
@@ -438,24 +482,9 @@ public sealed class LevelGeneratorTests
       Assert.True(accepted);
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
       Assert.Null(statusStore.Current.Error);
-      Assert.Equal(0L, PublishedWorld(statusStore).Stats.Steps);
-    }
-
-    [Fact]
-    public void TryRequestPause_BeforeExecute_KeepsPhaseAtPrepass()
-    {
-      // Arrange: A claimed run asked to pause before it touches any generation pass.
-      var statusStore = new GenerationStatusStore();
-      Assert.True(statusStore.TryBeginRun());
-      var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
-
-      // Act: Request the pause, then run the claimed execution.
-      Assert.True(generator.TryRequestPause());
-      generator.Execute();
-
-      // Assert: The graph pass never ran, so the world stays in its initial phase.
-      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
-      Assert.Equal(EnPhase.Prepass, PublishedWorld(statusStore).Phase);
+      var partialWorld = PublishedWorld(statusStore);
+      Assert.Equal(EnPhase.Prepass, partialWorld.Phase);
+      Assert.Equal(0L, partialWorld.Stats.Steps);
     }
 
     [Fact]
@@ -491,12 +520,13 @@ public sealed class LevelGeneratorTests
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
       Assert.Null(statusStore.Current.Error);
       var partialWorld = PublishedWorld(statusStore);
+      Assert.Equal(EnPhase.Map, partialWorld.Phase);
       Assert.True(partialWorld.Stats.Steps > 0 && partialWorld.Stats.Steps < 10,
         $"Expected a partial step count, got {partialWorld.Stats.Steps}.");
     }
 
     [Fact]
-    public void TryRequestPause_OnFinalStep_PublishesFinished()
+    public void TryRequestPause_OnFinalStep_PublishesPausedOnFinalization()
     {
       // Arrange: A single-step run taking 400 ms; pausing while that step sleeps means the
       // step completes before the pause can be observed, so completion wins over the pause.
@@ -519,9 +549,11 @@ public sealed class LevelGeneratorTests
       // Assert: The request was accepted, but the in-flight step completed the level anyway.
       Assert.True(accepted);
       Assert.True(joined, "Generator did not finish within 5 s.");
-      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
       Assert.Null(statusStore.Current.Error);
-      Assert.Equal(1L, PublishedWorld(statusStore).Stats.Steps);
+      var partialWorld = PublishedWorld(statusStore);
+      Assert.Equal(EnPhase.Finalization, partialWorld.Phase);
+      Assert.Equal(1L, partialWorld.Stats.Steps);
     }
 
     [Fact]
@@ -541,7 +573,9 @@ public sealed class LevelGeneratorTests
       // Assert: Pause has precedence over cancellation, so the run pauses instead of cancelling.
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
       Assert.Null(statusStore.Current.Error);
-      Assert.Equal(0L, PublishedWorld(statusStore).Stats.Steps);
+      var partialWorld = PublishedWorld(statusStore);
+      Assert.Equal(EnPhase.Prepass, partialWorld.Phase);
+      Assert.Equal(0L, partialWorld.Stats.Steps);
     }
 
     [Fact]
@@ -552,7 +586,10 @@ public sealed class LevelGeneratorTests
       Assert.True(statusStore.TryBeginRun());
       var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
       generator.Execute();
+
+      // Assert: Current state is correct.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
 
       // Act: Attempting to pause the finished run.
       var accepted = generator.TryRequestPause();
@@ -560,6 +597,7 @@ public sealed class LevelGeneratorTests
       // Assert: There is nothing left to pause, and the terminal state is not disturbed.
       Assert.False(accepted);
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
     }
 
     [Fact]
@@ -572,6 +610,8 @@ public sealed class LevelGeneratorTests
       using var cancellationTokenSource = new CancellationTokenSource();
       cancellationTokenSource.Cancel();
       generator.Execute(cancellationTokenSource.Token);
+
+      // Assert: State is correct.
       Assert.Equal(EnGenResult.Cancelled, statusStore.Current.Result);
 
       // Act: Attempting to pause the cancelled run.
@@ -592,6 +632,7 @@ public sealed class LevelGeneratorTests
       Assert.True(generator.TryRequestPause());
       generator.Execute();
       Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Prepass, PublishedWorld(statusStore).Phase);
       Assert.Equal(0L, PublishedWorld(statusStore).Stats.Steps);
 
       // Act: Claim and execute the next run the way Resume does.
@@ -600,6 +641,7 @@ public sealed class LevelGeneratorTests
 
       // Assert: The consumed pause request does not leak into the next run, which finishes.
       Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
       Assert.Equal(3L, PublishedWorld(statusStore).Stats.Steps);
     }
   }
