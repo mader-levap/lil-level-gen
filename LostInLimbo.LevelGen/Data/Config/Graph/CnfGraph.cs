@@ -16,9 +16,6 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph;
 /// </remarks>
 public sealed record CnfGraph
 {
-  /// <summary>Default builder - simplest possible.</summary>
-  public const EnGraphBuilder DefaultBuilder = EnGraphBuilder.OneNode;
-
   /// <summary>Default size - smallest possible.</summary>
   public const int DefaultSize = 1;
 
@@ -39,9 +36,9 @@ public sealed record CnfGraph
   // Fields.
 
   /// <summary>
-  /// Graph builder to use.
+  /// Graph builder configuration to use.
   /// </summary>
-  public EnGraphBuilder Builder { get; init; } = DefaultBuilder;
+  public CnfGraphBuilder GraphBuilder { get; init; } = CnfGraphBuilder.Default;
 
   /// <summary>
   /// Size of the graph. Usually just the number of nodes. The hard cap is <see cref="MaxSize"/>.
@@ -78,8 +75,8 @@ public sealed record CnfGraph
   /// <exception cref="ArgumentException">ProcOpts is null, or its values are invalid.</exception>
   public void Validate()
   {
-    if (!Enum.IsDefined(typeof(EnGraphBuilder), Builder))
-      throw new ArgumentOutOfRangeException(nameof(Builder), Builder, "Unknown graph builder.");
+    if (!Enum.IsDefined(typeof(EnGraphBuilder), GraphBuilder.Builder))
+      throw new ArgumentOutOfRangeException(nameof(GraphBuilder), GraphBuilder.Builder, "Unknown graph builder.");
     if (Size < 1)
       throw new ArgumentOutOfRangeException(nameof(Size), Size, "Size must be at least 1.");
     if (Size > MaxSize)

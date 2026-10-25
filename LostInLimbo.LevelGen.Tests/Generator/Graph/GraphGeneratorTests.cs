@@ -19,7 +19,7 @@ public sealed class GraphGeneratorTests
     // Arrange: Generator for the Linear builder with a small configured graph.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { Builder = EnGraphBuilder.Linear, Size = 4, Connectivity = 2 },
+      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear }, Size = 4, Connectivity = 2 },
     };
     var prepass = new PrepData { SeedGraph = 42 };
     var world = new LilWorld();
@@ -45,7 +45,7 @@ public sealed class GraphGeneratorTests
     // Arrange: Generator for the Simple builder with a small configured graph.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { Builder = EnGraphBuilder.Simple, Size = 5, Connectivity = 3 },
+      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Simple }, Size = 5, Connectivity = 3 },
     };
     var prepass = new PrepData { SeedGraph = 42 };
     var world = new LilWorld();
@@ -69,7 +69,7 @@ public sealed class GraphGeneratorTests
     // Arrange: Generator for the OneNode builder over a fresh world.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { Builder = EnGraphBuilder.OneNode },
+      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.OneNode } },
     };
     var prepass = new PrepData();
     var world = new LilWorld();
@@ -115,7 +115,7 @@ public sealed class GraphGeneratorTests
     // Arrange: Generator whose debug hook fails validation after a successful build.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { Builder = EnGraphBuilder.OneNode },
+      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.OneNode } },
       Debug = new CnfDebug { FailGraphValidation = true },
     };
     var prepass = new PrepData();
@@ -137,7 +137,7 @@ public sealed class GraphGeneratorTests
     // Arrange: Generator running the real validator over a graph the builder produces.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { Builder = EnGraphBuilder.OneNode, ValidatorOpts = CnfValidGraphOpt.DefEnabled },
+      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.OneNode }, ValidatorOpts = CnfValidGraphOpt.DefEnabled },
     };
     var prepass = new PrepData();
     var world = new LilWorld();
@@ -157,7 +157,7 @@ public sealed class GraphGeneratorTests
     // Arrange: Generator for the OneNode builder over a fresh world.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { Builder = EnGraphBuilder.OneNode },
+      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.OneNode } },
     };
     var prepass = new PrepData();
     var world = new LilWorld();
@@ -181,7 +181,7 @@ public sealed class GraphGeneratorTests
     // Arrange: Linear builder with complexity, so the graph gains guarded passages.
     var config = CnfLevelGeneration.Default with
     {
-      Graph = new CnfGraph { Builder = EnGraphBuilder.Linear, Size = 5, Connectivity = 1, Complexity = 3 },
+      Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear }, Size = 5, Connectivity = 1, Complexity = 3 },
     };
     var prepass = new PrepData { SeedGraph = 42 };
     var world = new LilWorld();

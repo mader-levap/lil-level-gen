@@ -71,7 +71,7 @@ public sealed class LevelGraphValidationTests
   public void Validate_WorldWithGeneratedOneNodeGraph_Succeeds()
   {
     // Arrange: Graph produced by the real OneNode builder through production dispatch.
-    var graphConfig = CnfLevelGeneration.Default.Graph with { Builder = EnGraphBuilder.OneNode };
+    var graphConfig = CnfLevelGeneration.Default.Graph with { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.OneNode } };
     var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.OneNode, graphConfig);
     var world = new LilWorld { Graph = graph };
 

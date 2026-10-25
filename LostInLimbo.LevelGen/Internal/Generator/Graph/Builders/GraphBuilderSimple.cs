@@ -44,6 +44,7 @@ internal sealed class GraphBuilderSimple : AGraphBuilder
   /// central node that reaches this cap hands its remaining nodes over to a new central.
   /// </summary>
   internal const int MaxExtraDegreeStar = 7;
+  
   /// <summary>Minimum size where scenarios differ.</summary>
   private const int ScenarioSize = 3;
   /// <summary>

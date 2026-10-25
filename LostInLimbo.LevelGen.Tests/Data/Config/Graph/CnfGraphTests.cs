@@ -15,7 +15,7 @@ public sealed class CnfGraphTests
   public void Validate_WithDefinedBuilder_DoesNotThrow(EnGraphBuilder builder)
   {
     // Arrange: Graph config using a builder the enum defines.
-    var graph = new CnfGraph { Builder = builder };
+    var graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = builder } };
 
     // Assert: Validation completes normally for every defined member.
     graph.Validate();
@@ -25,11 +25,11 @@ public sealed class CnfGraphTests
   public void Validate_WithUndefinedBuilder_ThrowsArgumentOutOfRangeException()
   {
     // Arrange: Graph config carrying an enum value no member defines.
-    var graph = new CnfGraph { Builder = (EnGraphBuilder)99 };
+    var graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = (EnGraphBuilder)99 } };
 
     // Act/Assert: The unknown builder is rejected naming the offending property.
     var exception = Assert.Throws<ArgumentOutOfRangeException>(() => graph.Validate());
-    Assert.Equal("Builder", exception.ParamName);
+    Assert.Equal("GraphBuilder", exception.ParamName);
   }
 
   [Fact]

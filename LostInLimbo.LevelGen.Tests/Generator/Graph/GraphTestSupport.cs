@@ -38,7 +38,7 @@ internal static class GraphTestSupport
   /// reports the outcome.
   /// </summary>
   /// <remarks>
-  /// The config's <see cref="CnfGraph.Builder"/> is forced to match <paramref name="builder"/>,
+  /// The config's <see cref="CnfGraph.GraphBuilder"/> is forced to match <paramref name="builder"/>,
   /// so a test can never accidentally pair one builder with another builder's config section.
   /// </remarks>
   /// <param name="builder">Which builder the factory should create.</param>
@@ -54,7 +54,7 @@ internal static class GraphTestSupport
     var graphBuilder = GraphBuilderFactory.Create(builder);
     var config = CnfLevelGeneration.Default with
     {
-      Graph = (graphConfig ?? new CnfGraph()) with { Builder = builder },
+      Graph = (graphConfig ?? new CnfGraph()) with { GraphBuilder = CnfGraphBuilder.Default with { Builder = builder } },
     };
     var prepData = new PrepData { SeedGraph = seedGraph };
     var graph = new LilGraph();

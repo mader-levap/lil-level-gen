@@ -52,7 +52,7 @@ internal sealed class GraphGenerator(CnfLevelGeneration config, PrepData prepDat
   /// </returns>
   public GraphRunResult Execute()
   {
-    AGraphBuilder builder = GraphBuilderFactory.Create(_config.Graph.Builder);
+    AGraphBuilder builder = GraphBuilderFactory.Create(_config.Graph.GraphBuilder.Builder);
     LilResult graphGenResult = builder.Run(_config, _prepData, _world.Graph);
     if (!graphGenResult.Success)
       return GraphRunResult.FailBuild(graphGenResult.FailureReason!);

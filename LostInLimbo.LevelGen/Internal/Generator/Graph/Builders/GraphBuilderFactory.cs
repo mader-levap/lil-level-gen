@@ -9,7 +9,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <remarks>
 /// Kept as a separate, pure factory so the dispatch rule is directly unit-testable.
 /// Unknown values are rejected here as defense in depth; the config layer already
-/// validates <see cref="CnfGraph.Builder"/> before a run is claimed.
+/// validates <see cref="CnfGraph.GraphBuilder"/> before a run is claimed.
 /// </remarks>
 internal static class GraphBuilderFactory
 {

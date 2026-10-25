@@ -61,7 +61,7 @@ public sealed class LevelGenerationSerializerTests
       // Arrange: Config selecting the non-default graph builder.
       var config = CnfLevelGeneration.Default with
       {
-        Graph = new CnfGraph { Builder = EnGraphBuilder.Linear },
+        Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear } },
       };
 
       // Act: Serialize to canonical JSON.
@@ -78,13 +78,13 @@ public sealed class LevelGenerationSerializerTests
       // Arrange: Programmatic config carrying an enum value no member defines.
       var config = CnfLevelGeneration.Default with
       {
-        Graph = new CnfGraph { Builder = (EnGraphBuilder)99 },
+        Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = (EnGraphBuilder)99 } },
       };
 
       // Act/Assert: Validation runs before any JSON is produced and names the property.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
         () => LevelGenerationSerializer.SerializeConfig(config));
-      Assert.Equal("Builder", exception.ParamName);
+      Assert.Equal("GraphBuilder", exception.ParamName);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class LevelGenerationSerializerTests
       var config = CnfLevelGeneration.Default with
       {
         General = new CnfGeneral { Seed = 1234, Degeneration = 0.5f },
-        Graph = new CnfGraph { Builder = EnGraphBuilder.Linear, Complexity = 5 },
+        Graph = new CnfGraph { GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear }, Complexity = 5 },
         Debug = new CnfDebug { PlaceholderSleep = 42 },
       };
 
@@ -142,7 +142,7 @@ public sealed class LevelGenerationSerializerTests
       {
         Graph = new CnfGraph
         {
-          Builder = EnGraphBuilder.Linear,
+          GraphBuilder = CnfGraphBuilder.Default with { Builder = EnGraphBuilder.Linear },
           ProcOpts = new CnfProcOpt
           {
             RelSecrets = new CnfProcRelSecretsOpt { Amount = 3, ChanceSecretInSecret = 0.75f },
@@ -320,7 +320,7 @@ public sealed class LevelGenerationSerializerTests
     public void Deserialize_WithUnknownEnumName_ThrowsArgumentExceptionWrappingJsonException()
     {
       // Arrange: Well-formed JSON naming a builder that does not exist.
-      var json = "{ \"graph\": { \"builder\": \"Bogus\" } }";
+      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"Bogus\" } } }";
 
       // Act/Assert: The parse fails and surfaces as ArgumentException naming the parameter,
       // keeping the original JsonException as the inner exception.
@@ -335,7 +335,7 @@ public sealed class LevelGenerationSerializerTests
     {
       // Arrange: Well-formed JSON carrying a numeric builder - even one that names a
       // defined member - because numeric values depend on enum member ordering.
-      var json = "{ \"graph\": { \"builder\": 1 } }";
+      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": 1 } } }";
 
       // Act/Assert: Numbers are rejected during parsing, before validation ever runs.
       var exception = Assert.Throws<ArgumentException>(
@@ -395,33 +395,33 @@ public sealed class LevelGenerationSerializerTests
     public void Deserialize_WithEnumName_ParsesEnum()
     {
       // Arrange: Hand-written JSON naming the graph builder.
-      var json = "{ \"graph\": { \"builder\": \"Linear\" } }";
+      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"Linear\" } } }";
 
       // Act: Deserialize.
       var config = LevelGenerationSerializer.DeserializeConfig(json);
 
       // Assert: The enum member name maps back to its value.
-      Assert.Equal(EnGraphBuilder.Linear, config.Graph.Builder);
+      Assert.Equal(EnGraphBuilder.Linear, config.Graph.GraphBuilder.Builder);
     }
 
     [Fact]
     public void Deserialize_WithEnumNameInDifferentCase_ParsesEnum()
     {
       // Arrange: Hand-written JSON using a different case than the enum member name.
-      var json = "{ \"graph\": { \"builder\": \"linear\" } }";
+      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"linear\" } } }";
 
       // Act: Deserialize.
       var config = LevelGenerationSerializer.DeserializeConfig(json);
 
       // Assert: Enum name matching on read forgives casing, like property names do.
-      Assert.Equal(EnGraphBuilder.Linear, config.Graph.Builder);
+      Assert.Equal(EnGraphBuilder.Linear, config.Graph.GraphBuilder.Builder);
     }
 
     [Fact]
     public void Deserialize_WithoutProcOpts_KeepsDefaultOptions()
     {
       // Arrange: Hand-written JSON omitting the processor options entirely.
-      var json = "{ \"graph\": { \"builder\": \"Linear\" } }";
+      var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"Linear\" } } }";
 
       // Act: Deserialize.
       var config = LevelGenerationSerializer.DeserializeConfig(json);
