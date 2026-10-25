@@ -114,6 +114,18 @@ public sealed class LilGraphDataTests
     }
 
     [Fact]
+    public void LilNode_WithRequiredMembersOnly_HasEmptyReach()
+    {
+      // Arrange/Act: Create node with only the required members set.
+      var node = new LilNode { Id = Guid.NewGuid(), RelSize = NodeRelSize, MaxEdges = NodeMaxEdges };
+
+      // Assert: Reach dictionary is present and empty, never null; the metadata pass fills
+      // it later (and it is mutable in place, like Pois).
+      Assert.NotNull(node.Reach);
+      Assert.Empty(node.Reach);
+    }
+
+    [Fact]
     public void LilNode_WithMultiplePois_ContainsAllPois()
     {
       // Arrange: Node with red and blue key in the same room.

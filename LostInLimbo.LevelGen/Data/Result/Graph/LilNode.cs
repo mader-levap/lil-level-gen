@@ -17,6 +17,11 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// <see cref="LostInLimbo.LevelGen.Api.LevelGraphValidation"/>): <see cref="Id"/> must not be
 /// <see cref="Guid.Empty"/>; it is assigned by the generator.
 /// </para>
+/// <para>
+/// <see cref="Pois"/> and <see cref="Reach"/> are mutable collections filled in place by
+/// generator passes after the node is created: POIs by the graph builders and processors,
+/// reachability metadata by the metadata pass.
+/// </para>
 /// </remarks>
 public sealed record LilNode
 {
@@ -42,4 +47,22 @@ public sealed record LilNode
   /// A node can contain multiple POIs, e.g. two keys in the same room.
   /// </summary>
   public List<LilPoi> Pois { get; init; } = new();
+
+  /// <summary>
+  /// <para>
+  /// Reachability metadata of this node, filled by the metadata pass
+  /// (see <c>LostInLimbo.LevelGen.Internal.Generator.Graph.Meta.GraphMetadata</c>).
+  /// Key is the identifier of a start POI, value is the list of solution POI identifiers
+  /// that must be collected before this node can be reached from that start - the smallest
+  /// such list over all passages from that start. An empty list means the node is reachable
+  /// from that start without meeting any condition; a start POI with no entry at all means
+  /// this node cannot be reached from that start (and a node unreachable from every start
+  /// keeps an empty dictionary).
+  /// </para>
+  /// <para>
+  /// The value list is sorted ascending by POI identifier, so the same graph always produces
+  /// the same data; the order carries no other meaning. Never <see langword="null"/>.
+  /// </para>
+  /// </summary>
+  public Dictionary<Guid, List<Guid>> Reach { get; init; } = new();
 }

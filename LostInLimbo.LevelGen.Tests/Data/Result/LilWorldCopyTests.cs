@@ -18,11 +18,12 @@ public sealed class LilWorldCopyTests
 
   /// <summary>
   /// Builds a populated world covering every mutable surface: map phase, non-zero stats,
-  /// nodes with POIs and style, and an edge with a condition.
+  /// nodes with POIs, style and reach metadata, and an edge with a condition.
   /// </summary>
   /// <returns>World with data on all copy-relevant members.</returns>
   private static LilWorld PopulatedWorld()
   {
+    var startPoiId = Guid.NewGuid();
     var keyPoiId = Guid.NewGuid();
     return new LilWorld
     {
@@ -37,7 +38,8 @@ public sealed class LilWorldCopyTests
             RelSize = NodeRelSize,
             MaxEdges = NodeMaxEdges,
             Style = new LilStyle { Group = "Lobby" },
-            Pois = [new LilPoi { Id = Guid.NewGuid(), Type = EnPoiType.Start }],
+            Pois = [new LilPoi { Id = startPoiId, Type = EnPoiType.Start }],
+            Reach = new Dictionary<Guid, List<Guid>> { [startPoiId] = [keyPoiId] },
           },
           new LilNode
           {
@@ -135,6 +137,14 @@ public sealed class LilWorldCopyTests
       Assert.Equal(expected.Pois[0].Id, actual.Pois[0].Id);
       Assert.Equal(expected.Pois[0].Type, actual.Pois[0].Type);
       Assert.Equal(expected.Pois[0].Name, actual.Pois[0].Name);
+
+      // Assert: Reach entries are preserved entry-wise (keys and required lists).
+      Assert.Equal(expected.Reach.Count, actual.Reach.Count);
+      foreach (var (startPoiId, required) in expected.Reach)
+      {
+        Assert.True(actual.Reach.ContainsKey(startPoiId));
+        Assert.Equal(required, actual.Reach[startPoiId]);
+      }
     }
 
     // Assert: Edge contents are preserved element-wise.
@@ -167,7 +177,14 @@ public sealed class LilWorldCopyTests
     {
       Assert.NotSame(source.Graph.Nodes[i], copy.Graph.Nodes[i]);
       Assert.NotSame(source.Graph.Nodes[i].Pois, copy.Graph.Nodes[i].Pois);
+      Assert.NotSame(source.Graph.Nodes[i].Reach, copy.Graph.Nodes[i].Reach);
     }
+
+    // Assert: Even the inner reach lists are fresh instances.
+    var sourceRequired = Assert.Single(source.Graph.Nodes[0].Reach.Values);
+    var actualRequired = Assert.Single(copy.Graph.Nodes[0].Reach.Values);
+    Assert.NotSame(sourceRequired, actualRequired);
+
     Assert.NotSame(source.Graph.Edges[0], copy.Graph.Edges[0]);
     Assert.NotSame(source.Graph.Edges[0].Conditions, copy.Graph.Edges[0].Conditions);
   }
@@ -183,7 +200,11 @@ public sealed class LilWorldCopyTests
     Assert.NotNull(copy);
     
     foreach (var node in copy.Graph.Nodes)
+    {
       node.Pois.Clear();
+      node.Reach.Clear();
+    }
+
     copy.Graph.Edges[0].Conditions.Clear();
     copy.Graph.Nodes.Clear();
     copy.Graph.Edges.Clear();
@@ -199,5 +220,32 @@ public sealed class LilWorldCopyTests
     Assert.All(source.Graph.Nodes, node => Assert.Single(node.Pois));
     var sourceEdge = Assert.Single(source.Graph.Edges);
     Assert.Single(sourceEdge.Conditions);
+    var sourceReach = Assert.Single(source.Graph.Nodes[0].Reach);
+    Assert.Single(sourceReach.Value);
+  }
+
+  [Fact]
+  public void Copy_OfWorldWithReach_DetachesReach()
+  {
+    // Arrange: A world whose first node carries one reach entry with one required POI.
+    var source = PopulatedWorld();
+
+    // Act: Copy, then replace the copy's reach list and add an extra entry.
+    var copy = LilWorldCopy.Copy(source);
+    Assert.NotNull(copy);
+    var copyNode = copy.Graph.Nodes[0];
+    var startPoiId = Assert.Single(copyNode.Reach.Keys);
+    copyNode.Reach[startPoiId] = [Guid.NewGuid()];
+    copyNode.Reach[Guid.NewGuid()] = [];
+
+    // Assert: The source kept its original dictionary and required list; the copy's changes
+    // are visible only on the copy's side.
+    var sourceNode = source.Graph.Nodes[0];
+    Assert.NotSame(sourceNode.Reach, copyNode.Reach);
+    var sourceRequired = Assert.Single(sourceNode.Reach.Values);
+    Assert.NotSame(sourceRequired, copyNode.Reach[startPoiId]);
+    Assert.Equal(startPoiId, Assert.Single(sourceNode.Reach.Keys));
+    Assert.Single(sourceRequired);
+    Assert.Equal(2, copyNode.Reach.Count);
   }
 }

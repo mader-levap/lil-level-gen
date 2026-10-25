@@ -150,4 +150,57 @@ public sealed class GraphGeneratorTests
     Assert.Equal(EnGenerationOutcome.Success, result.Outcome);
     Assert.Null(result.FailureReason);
   }
+
+  [Fact]
+  public void Execute_WithOneNodeBuilder_PopulatesReachWithEmptyRequirement()
+  {
+    // Arrange: Generator for the OneNode builder over a fresh world.
+    var config = CnfLevelGeneration.Default with
+    {
+      Graph = new CnfGraph { Builder = EnGraphBuilder.OneNode },
+    };
+    var prepass = new PrepData();
+    var world = new LilWorld();
+    var generator = new GraphGenerator(config, prepass, world);
+
+    // Act: Run graph generation.
+    var result = generator.Execute();
+
+    // Assert: The single node reaches itself from its start without meeting any condition,
+    // so the metadata pass ran before validation with an empty requirement list.
+    Assert.Equal(EnGenerationOutcome.Success, result.Outcome);
+    var node = Assert.Single(world.Graph.Nodes);
+    var startPoi = Assert.Single(node.Pois.Where(poi => poi.Type == EnPoiType.Start));
+    Assert.True(node.Reach.ContainsKey(startPoi.Id));
+    Assert.Empty(node.Reach[startPoi.Id]);
+  }
+
+  [Fact]
+  public void Execute_WithLinearBuilderAndComplexity_PopulatesReachOnEveryNode()
+  {
+    // Arrange: Linear builder with complexity, so the graph gains guarded passages.
+    var config = CnfLevelGeneration.Default with
+    {
+      Graph = new CnfGraph { Builder = EnGraphBuilder.Linear, Size = 5, Connectivity = 1, Complexity = 3 },
+    };
+    var prepass = new PrepData { SeedGraph = 42 };
+    var world = new LilWorld();
+    var generator = new GraphGenerator(config, prepass, world);
+
+    // Act: Run graph generation.
+    var result = generator.Execute();
+
+    // Assert: The run succeeded and every node carries reach metadata keyed by the start
+    // POI - all Linear nodes are reachable from the start, secrets included.
+    Assert.Equal(EnGenerationOutcome.Success, result.Outcome);
+    var startPoi = Assert.Single(
+      world.Graph.Nodes.SelectMany(node => node.Pois).Where(poi => poi.Type == EnPoiType.Start));
+    Assert.All(
+      world.Graph.Nodes,
+      node => Assert.True(node.Reach.ContainsKey(startPoi.Id), $"Node {node.Id} has no reach entry."));
+
+    // Assert: The complexity obstacles guard at least one node behind a condition, so at
+    // least one required list is non-empty.
+    Assert.Contains(world.Graph.Nodes, node => node.Reach[startPoi.Id].Count > 0);
+  }
 }

@@ -15,11 +15,13 @@ namespace LostInLimbo.LevelGen.Data.Result;
 /// copy can be handed to consumers (e.g. <see cref="Api.LevelGenerationSession.World"/>) or
 /// stored without either side being able to affect the other through shared state.
 /// <para>
-/// Maintenance rule: when mutable state is added to <see cref="LilWorld"/>, <see cref="LilGraph"/>,
-/// <see cref="LilNode"/>, <see cref="LilEdge"/> or <see cref="LilStats"/>, extend
-/// <see cref="Copy"/> accordingly so the detachment guarantee holds. Leaf records
-/// (<see cref="LilPoi"/>, <see cref="LilCondition"/>, <see cref="LilStyle"/>) are immutable
-/// (init-only) and are shared as list elements; they need no copying.
+  /// Maintenance rule: when mutable state is added to <see cref="LilWorld"/>, <see cref="LilGraph"/>,
+  /// <see cref="LilNode"/>, <see cref="LilEdge"/> or <see cref="LilStats"/>, extend
+  /// <see cref="Copy"/> accordingly so the detachment guarantee holds. Leaf records
+  /// (<see cref="LilPoi"/>, <see cref="LilCondition"/>, <see cref="LilStyle"/>) are immutable
+  /// (init-only) and are shared as list elements; they need no copying.
+  /// Note that <see cref="LilNode.Reach"/> counts as mutable state even though its leaves are
+  /// <see cref="Guid"/> values: the dictionary and its lists must be detached too.
 /// </para>
 /// Deterministic: the copy preserves all values, identifiers and iteration order of the source.
 /// </remarks>
@@ -52,8 +54,8 @@ public static class LilWorldCopy
   /// <summary>
   /// Copies a graph with fresh node and edge lists. Nodes and edges are recreated via
   /// <c>with</c> so their mutable nested lists (<see cref="LilNode.Pois"/>,
-  /// <see cref="LilEdge.Conditions"/>) are detached as well; immutable leaf records inside
-  /// them stay shared.
+  /// <see cref="LilEdge.Conditions"/>) and dictionaries (<see cref="LilNode.Reach"/>) are
+  /// detached as well; immutable leaf records inside them stay shared.
   /// </summary>
   /// <param name="source">Graph to copy. Must not be <see langword="null"/>.</param>
   /// <returns>A new <see cref="LilGraph"/> instance with fresh containers.</returns>
@@ -61,12 +63,27 @@ public static class LilWorldCopy
   {
     var nodes = new List<LilNode>(source.Nodes.Count);
     foreach (var node in source.Nodes)
-      nodes.Add(node with { Pois = new List<LilPoi>(node.Pois) });
+      nodes.Add(node with { Pois = [.. node.Pois], Reach = CopyReach(node.Reach) });
 
     var edges = new List<LilEdge>(source.Edges.Count);
     foreach (var edge in source.Edges)
-      edges.Add(edge with { Conditions = new List<LilCondition>(edge.Conditions) });
+      edges.Add(edge with { Conditions = [.. edge.Conditions] });
 
     return new LilGraph { Nodes = nodes, Edges = edges };
+  }
+
+  /// <summary>
+  /// Copies a reach dictionary with fresh inner lists, so neither the dictionary nor any
+  /// required list is shared between source and copy.
+  /// </summary>
+  /// <param name="source">Reach dictionary to copy. Must not be <see langword="null"/>.</param>
+  /// <returns>A new dictionary containing new lists with the same values.</returns>
+  private static Dictionary<Guid, List<Guid>> CopyReach(Dictionary<Guid, List<Guid>> source)
+  {
+    var copy = new Dictionary<Guid, List<Guid>>(source.Count);
+    foreach (var (startPoiId, required) in source)
+      copy[startPoiId] = [.. required];
+
+    return copy;
   }
 }

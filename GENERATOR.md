@@ -61,6 +61,7 @@ Configuration must be (de)serializable to/from JSON.
   - Has `RelSize`. If node A has value 1 and node B 2, the latter node is *roughly* twice as big, volume-wise. It is a soft requirement.
     For example, if node A is processed by MapGenerator into two 2x2x1 rooms, node B should have around 16 cells, give or take. It does not matter if node B represents one big 4x4x1 room or seven 1x2x1 small rooms or even 1x1x17 chimney (though you would need some serious degeneration rate to get such a deranged result). The volume of taken space matters.
   - Has `MaxEdges`: hard cap on relationships touching the node (both directions, parallel passages count individually). Negative means no limit.
+  - Has `Reach`: per-start reachability metadata, filled by the metadata pass after the build. Maps the `Id` of every `Start` POI in the graph to the smallest list of solution `Id`s required to reach this node from that start - empty list means reachable without meeting any condition, a missing key means unreachable from that start, never null. Lists are sorted ascending; when two routes need equally many solutions, the lexicographically smaller identifier list wins, so the result never depends on edge order.
 - `LilPoi`: Point of interest inside a node.
   - Has unique `Id` (GUID), unique across entire graph so conditions can reference a specific POI.
   - Has type: `Start`, `Exit`, `Goal` or `Solution`.
@@ -85,6 +86,8 @@ Configuration must be (de)serializable to/from JSON.
 All builders share the `AGraphBuilder` abstract base class, which stores the setup inputs in protected fields (`Config`, `PrepData`, `Graph`). Every builder must be deterministic for the same configuration (IDs derived from the seed, never random GUIDs) and must produce a solvable graph (no softlock).
 
 Graph build can fail (a false return or an exception), though builders should make it as unlikely as possible. A failed build fails the whole run: the world is discarded and never published, and the run cannot be resumed, so a partially mutated graph is never re-run - builders need no rollback.
+
+After a successful build and before validation, the metadata pass (`GraphMetadata`) fills `LilNode.Reach` for every node - see the `Reach` bullet above. The pass never verifies the graph: a null or empty graph is a no-op and dangling edge or condition references are skipped, so metadata generation cannot fail a run.
 
 Validation failure is special: when the built graph is rejected by the validator (when `CnfValidGraphOpt.Enabled`, or via the `CnfDebug.FailGraphValidation` debug hook), the run ends with `EnGenResult.ValidationError` instead of `EnGenResult.Error`. The reason is reported in `GenerationStatus.FailureReason` (no exception), and - unlike an error - the fully built world is published alongside the status, so the editor can show the rejected graph and debug the failing check. The result is terminal: only a fresh `Start` can run again.
 
