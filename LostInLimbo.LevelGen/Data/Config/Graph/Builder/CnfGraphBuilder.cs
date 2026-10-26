@@ -30,8 +30,11 @@ public sealed record CnfGraphBuilder
   public CnfGraphBuilderLinear? CnfLinear { get; init; } = null;
 
   /// <summary>
-  /// 
+  /// Checks that this builder config can be used for graph generation: the builder enum
+  /// is defined, the matching section is present and its values are in range.
   /// </summary>
+  /// <exception cref="ArgumentOutOfRangeException">The builder is not a defined enum value, or a section value is out of range.</exception>
+  /// <exception cref="ArgumentException">The section required by the selected builder is null.</exception>
   public void Validate()
   {
     if (!Enum.IsDefined(typeof(EnGraphBuilder), Builder))
@@ -42,10 +45,12 @@ public sealed record CnfGraphBuilder
       case EnGraphBuilder.Simple:
         if (CnfSimple is null)
           throw new ArgumentException("CnfSimple config must not be null.", nameof(CnfSimple));
+        CnfSimple.Validate();
         break;
       case EnGraphBuilder.Linear:
         if (CnfLinear is null)
           throw new ArgumentException("CnfLinear config must not be null.", nameof(CnfLinear));
+        CnfLinear.Validate();
         break;
       default:
         break;

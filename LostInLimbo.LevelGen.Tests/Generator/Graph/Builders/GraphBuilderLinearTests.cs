@@ -756,11 +756,16 @@ public sealed class GraphBuilderLinearTests
 
     /// <summary>
     /// Asserts that every relationship runs from the earlier node to the later node of the
-    /// chain and skips no more than <see cref="MaxSkipDistance"/> nodes.
+    /// chain and skips no more than <paramref name="maxSkipDistance"/> nodes.
     /// </summary>
     /// <param name="graph">Graph to check.</param>
-    public static void AssertForwardAndSkipWindow(LilGraph graph)
+    /// <param name="maxSkipDistance">
+    /// Skip window to enforce; defaults to <see cref="MaxSkipDistance"/> (the default
+    /// config value) when omitted.
+    /// </param>
+    public static void AssertForwardAndSkipWindow(LilGraph graph, int? maxSkipDistance = null)
     {
+      var skipLimit = maxSkipDistance ?? MaxSkipDistance;
       var positions = GetPositions(graph);
       foreach (var edge in graph.Edges)
       {
@@ -772,19 +777,24 @@ public sealed class GraphBuilderLinearTests
 
         // Assert: The relationship skips no more nodes than the skip window allows.
         Assert.True(
-          to - from <= MaxSkipDistance + 1,
-          $"Edge skips {to - from - 1} nodes, limit is {MaxSkipDistance}.");
+          to - from <= skipLimit + 1,
+          $"Edge skips {to - from - 1} nodes, limit is {skipLimit}.");
       }
     }
 
     /// <summary>
-    /// Asserts that no chain node gained more than <see cref="MaxExtraDegree"/> extra
+    /// Asserts that no chain node gained more than <paramref name="maxExtraDegree"/> extra
     /// relationships as source and as target; the skeleton's own single in and single out
     /// relationships are subtracted from the raw counts.
     /// </summary>
     /// <param name="graph">Graph to check.</param>
-    public static void AssertExtraDegreeCaps(LilGraph graph)
+    /// <param name="maxExtraDegree">
+    /// Per-direction cap to enforce; defaults to <see cref="MaxExtraDegree"/> (the default
+    /// config value) when omitted.
+    /// </param>
+    public static void AssertExtraDegreeCaps(LilGraph graph, int? maxExtraDegree = null)
     {
+      var extraDegreeCap = maxExtraDegree ?? MaxExtraDegree;
       var positions = GetPositions(graph);
       var outCounts = new int[graph.Nodes.Count];
       var inCounts = new int[graph.Nodes.Count];
@@ -801,8 +811,8 @@ public sealed class GraphBuilderLinearTests
         // the first; anything on top is an extra that must stay under the cap in both directions.
         var extraOut = outCounts[i] - (i < graph.Nodes.Count - 1 ? 1 : 0);
         var extraIn = inCounts[i] - (i > 0 ? 1 : 0);
-        Assert.InRange(extraOut, 0, MaxExtraDegree);
-        Assert.InRange(extraIn, 0, MaxExtraDegree);
+        Assert.InRange(extraOut, 0, extraDegreeCap);
+        Assert.InRange(extraIn, 0, extraDegreeCap);
       }
     }
 
@@ -841,6 +851,277 @@ public sealed class GraphBuilderLinearTests
       }
 
       return counts;
+    }
+  }
+
+  /// <summary>Tests that non-default builder configs flow into generation.</summary>
+  public sealed class CustomConfigTests
+  {
+    [Theory]
+    [InlineData(2)]
+    [InlineData(5)]
+    [InlineData(10)]
+    [InlineData(50)]
+    public void Build_WithMaxExtraDegreeZero_ProducesExactChain(int size)
+    {
+      // Arrange: A per-direction extra cap of zero blocks the extras pass entirely.
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with { MaxExtraDegree = 0 },
+      };
+
+      // Act: Request plenty of extras, without the default secret node.
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      {
+        Size = size,
+        Connectivity = 100,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      }, builderConfig: builderConfig);
+
+      // Assert: The skeleton is exactly the chain over all nodes and stays connected.
+      Assert.True(result.Success);
+      Assert.Equal(Math.Max(0, size - 1), graph.Edges.Count);
+      GraphAssertions.AssertExactChain(graph, size);
+      GraphTestAssert.AssertBeatable(graph, "Chain graph must be connected.");
+    }
+
+    [Fact]
+    public void Build_WithMaxEdgesTwo_ProducesExactChainAndSetsNodeCap()
+    {
+      // Arrange: A hard cap of two matches the interior chain degree exactly, so no
+      // node has room for an extra relationship.
+      const int maxEdges = 2;
+      const int size = 10;
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with { MaxEdges = maxEdges },
+      };
+
+      // Act: Request far more extras than the cap can ever allow.
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      {
+        Size = size,
+        Connectivity = 100,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      }, builderConfig: builderConfig);
+
+      // Assert: The skeleton remains exactly the chain, every node carries the custom
+      // hard cap and the graph stays connected.
+      Assert.True(result.Success);
+      Assert.Equal(size - 1, graph.Edges.Count);
+      GraphAssertions.AssertExactChain(graph, size);
+      Assert.All(graph.Nodes, node => Assert.Equal(maxEdges, node.MaxEdges));
+      GraphTestAssert.AssertBeatable(graph, "Chain graph must be connected.");
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void Build_WithCustomMaxEdgesUnderExcessiveConnectivity_ObeysTotalDegreeCap(int maxEdges)
+    {
+      // Arrange: A hard cap at or above the interior chain degree keeps every node
+      // within its own cap; extras (when the cap leaves room) must respect it too.
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with { MaxEdges = maxEdges },
+      };
+
+      for (var seed = 0; seed < 5; seed++)
+      {
+        // Act: Request far more extras than the caps allow, without the default secret
+        // node (secret edges are not builder-capped).
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+        {
+          Size = 10,
+          Connectivity = 100,
+          ProcOpts = GraphTestSupport.NoSecrets,
+        }, seed, builderConfig);
+
+        // Assert: Every node respects its own hard cap and the graph stays connected.
+        Assert.True(result.Success, $"Build failed for seed {seed}.");
+        GraphTestAssert.AssertMaxEdges(graph);
+        GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (seed {seed}).");
+      }
+    }
+
+    [Fact]
+    public void Build_WithMaxSkipDistanceZero_AddsOnlyParallelAdjacentPassages()
+    {
+      // Arrange: A skip window of zero restricts extras to parallel passages on
+      // adjacent chain pairs; all other caps stay at their defaults.
+      const int size = 8;
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with { MaxSkipDistance = 0 },
+      };
+
+      for (var seed = 0; seed < 10; seed++)
+      {
+        // Act: Request many extras, without the default secret node.
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+        {
+          Size = size,
+          Connectivity = 100,
+          ProcOpts = GraphTestSupport.NoSecrets,
+        }, seed, builderConfig);
+
+        // Assert: Extras were added, every relationship spans at most one chain step,
+        // no pair carries more than the two-passage rule allows and caps still hold.
+        Assert.True(result.Success, $"Build failed for seed {seed}.");
+        Assert.True(graph.Edges.Count > size - 1, $"No extra added (seed {seed}).");
+        GraphAssertions.AssertForwardAndSkipWindow(graph, 0);
+        GraphAssertions.AssertPairPassageCounts(graph);
+        GraphAssertions.AssertExtraDegreeCaps(graph);
+        GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (seed {seed}).");
+      }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(10)]
+    public void Build_WithMaxConditionPerRelOne_CarriesAtMostOneConditionPerRelationship(int complexity)
+    {
+      // Arrange: A condition cap of one saturates each guarded relationship after its
+      // first obstacle, so excess complexity must truncate silently.
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with { MaxConditionPerRel = 1 },
+      };
+
+      // Act: Request many obstacles on a plain chain, without the default secret node.
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      {
+        Size = 8,
+        Connectivity = 0,
+        Complexity = complexity,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      }, builderConfig: builderConfig);
+
+      // Assert: No relationship carries more than one condition, solutions exist when
+      // obstacles were requested and the graph stays beatable.
+      Assert.True(result.Success);
+      Assert.All(graph.Edges, edge => Assert.True(
+        edge.Conditions.Count <= 1,
+        $"Edge {edge.Id} carries {edge.Conditions.Count} conditions, cap is 1."));
+      if (complexity > 0)
+      {
+        Assert.NotEmpty(GraphTestSupport.GetPois(graph, EnPoiType.Solution));
+      }
+
+      GraphTestAssert.AssertBeatable(graph, "Obstacle graph must stay connected.");
+    }
+
+    [Fact]
+    public void Build_WithMaxConditionDistanceZero_PlacesEverySolutionOnChainPredecessor()
+    {
+      // Arrange: A solution distance of zero forces every solution onto the chain
+      // predecessor of its guarded node.
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with { MaxConditionDistance = 0 },
+      };
+
+      // Act: Request obstacles on a plain chain, without the default secret node.
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      {
+        Size = 8,
+        Connectivity = 0,
+        Complexity = 10,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      }, builderConfig: builderConfig);
+
+      // Assert: Every solution requirement points at a POI held by the guarded node's
+      // direct chain predecessor.
+      Assert.True(result.Success);
+      var positions = GraphAssertions.GetPositions(graph);
+      var guardedEdges = graph.Edges.Where(edge => edge.Conditions.Count > 0).ToList();
+      Assert.NotEmpty(guardedEdges);
+      foreach (var edge in guardedEdges)
+      {
+        foreach (var condition in edge.Conditions)
+        {
+          var holder = graph.Nodes.Single(node => node.Pois.Any(poi => poi.Id == condition.RequiresPoi));
+
+          // Assert: The solution sits exactly one chain step before the guarded node.
+          Assert.Equal(positions[edge.To] - 1, positions[holder.Id]);
+        }
+      }
+
+      GraphTestAssert.AssertBeatable(graph, "Obstacle graph must stay connected.");
+    }
+
+    [Fact]
+    public void Build_WithExcessiveConstraintsUnderCustomCaps_SucceedsWithValidStructure()
+    {
+      // Arrange: Every builder knob tightened away from its default value.
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with
+        {
+          MaxEdges = 3,
+          MaxExtraDegree = 1,
+          MaxSkipDistance = 1,
+          MaxConditionPerRel = 1,
+          MaxConditionDistance = 1,
+        },
+      };
+
+      for (var seed = 0; seed < 5; seed++)
+      {
+        // Act: Request far more extras and obstacles than the tight caps allow.
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+        {
+          Size = 8,
+          Connectivity = 50,
+          Complexity = 20,
+          ProcOpts = GraphTestSupport.NoSecrets,
+        }, seed, builderConfig);
+
+        // Assert: The build succeeds, all custom caps hold and the graph stays valid
+        // and beatable - excess constraints truncate silently.
+        Assert.True(result.Success, $"Build failed for seed {seed}.");
+        GraphTestAssert.AssertValidEdges(graph, allowDuplicates: true);
+        GraphTestAssert.AssertMaxEdges(graph);
+        GraphAssertions.AssertExtraDegreeCaps(graph, 1);
+        GraphAssertions.AssertForwardAndSkipWindow(graph, 1);
+        Assert.All(graph.Edges, edge => Assert.True(
+          edge.Conditions.Count <= 1,
+          $"Edge {edge.Id} carries {edge.Conditions.Count} conditions, cap is 1 (seed {seed})."));
+        GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (seed {seed}).");
+      }
+    }
+
+    [Fact]
+    public void Build_WithUntypicalConfig_ProducesIdenticalGraphsForSameSeed()
+    {
+      // Arrange: A builder config differing from the default on all five knobs.
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with
+        {
+          MaxEdges = 3,
+          MaxExtraDegree = 1,
+          MaxConditionPerRel = 1,
+          MaxConditionDistance = 0,
+          MaxSkipDistance = 1,
+        },
+      };
+      var graphConfig = new CnfGraph { Size = 12, Connectivity = 10, Complexity = 6 };
+
+      // Act: Build the same config twice with the same seed.
+      var (_, first) = GraphTestSupport.Build(EnGraphBuilder.Linear, graphConfig, 7, builderConfig);
+      var (_, second) = GraphTestSupport.Build(EnGraphBuilder.Linear, graphConfig, 7, builderConfig);
+
+      // Assert: The two graphs are structurally identical.
+      GraphTestAssert.AssertEqualGraphs(first, second);
     }
   }
 
@@ -917,6 +1198,23 @@ public sealed class GraphBuilderLinearTests
       // Assert: Validation rejects the value.
       var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
       Assert.Equal(nameof(CnfGraphBuilderLinear.MaxSkipDistance), ex.ParamName);
+    }
+
+    [Fact]
+    public void Validate_MinimalBoundaryValues_DoesNotThrow()
+    {
+      // Arrange: The smallest valid values for every knob of the config.
+      var config = CnfGraphBuilderLinear.Default with
+      {
+        MaxEdges = 1,
+        MaxExtraDegree = 0,
+        MaxConditionPerRel = 1,
+        MaxConditionDistance = 0,
+        MaxSkipDistance = 0,
+      };
+
+      // Assert: The boundary values are inside the allowed ranges.
+      config.Validate();
     }
   }
 }

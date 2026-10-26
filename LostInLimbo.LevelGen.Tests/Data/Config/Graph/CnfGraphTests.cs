@@ -120,4 +120,51 @@ public sealed class CnfGraphTests
     // Assert: Valid custom options pass validation.
     graph.Validate();
   }
+
+  [Fact]
+  public void Validate_WithNullGraphBuilder_ThrowsArgumentExceptionNamingGraphBuilder()
+  {
+    // Arrange: Graph config with the builder section explicitly nulled out.
+    var graph = new CnfGraph { GraphBuilder = null! };
+
+    // Act/Assert: The null section is rejected naming the offending property.
+    var exception = Assert.Throws<ArgumentException>(() => graph.Validate());
+    Assert.Equal("GraphBuilder", exception.ParamName);
+  }
+
+  [Fact]
+  public void Validate_WithInvalidCnfSimple_ThrowsNamingNestedProperty()
+  {
+    // Arrange: Graph config whose Simple builder section violates its own invariants.
+    var graph = new CnfGraph
+    {
+      GraphBuilder = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Simple,
+        CnfSimple = CnfGraphBuilderSimple.Default with { ChokepointChance = 1.5f },
+      },
+    };
+
+    // Act/Assert: Validation cascades into the section and names the nested property.
+    var exception = Assert.Throws<ArgumentOutOfRangeException>(() => graph.Validate());
+    Assert.Equal(nameof(CnfGraphBuilderSimple.ChokepointChance), exception.ParamName);
+  }
+
+  [Fact]
+  public void Validate_WithInvalidCnfLinear_ThrowsNamingNestedProperty()
+  {
+    // Arrange: Graph config whose Linear builder section violates its own invariants.
+    var graph = new CnfGraph
+    {
+      GraphBuilder = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with { MaxEdges = 0 },
+      },
+    };
+
+    // Act/Assert: Validation cascades into the section and names the nested property.
+    var exception = Assert.Throws<ArgumentOutOfRangeException>(() => graph.Validate());
+    Assert.Equal(nameof(CnfGraphBuilderLinear.MaxEdges), exception.ParamName);
+  }
 }

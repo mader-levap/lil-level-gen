@@ -39,11 +39,11 @@ public sealed record CnfGraphBuilderSimple
   /// <exception cref="ArgumentOutOfRangeException">A value is out of range.</exception>
   public void Validate()
   {
-    if (ChokepointChance < 0f || ChokepointChance > 1f)
-      throw new ArgumentOutOfRangeException(nameof(ChokepointChance), ChokepointChance, "ChokepointChance must be between 0 and 1.");
+    if (float.IsNaN(ChokepointChance) || ChokepointChance < 0f || ChokepointChance > 1f)
+      throw new ArgumentOutOfRangeException(nameof(ChokepointChance), ChokepointChance, "ChokepointChance must be a number between 0 and 1.");
     if (MaxExtraDegree < 0)
       throw new ArgumentOutOfRangeException(nameof(MaxExtraDegree), MaxExtraDegree, "MaxExtraDegree must be at least 0.");
-    if (MaxExtraDegreeStar < 1)
-      throw new ArgumentOutOfRangeException(nameof(MaxExtraDegreeStar), MaxExtraDegreeStar, "MaxExtraDegreeStar must be at least 1.");
+    if (MaxExtraDegreeStar < 2)
+      throw new ArgumentOutOfRangeException(nameof(MaxExtraDegreeStar), MaxExtraDegreeStar, "MaxExtraDegreeStar must be at least 2.");
   }
 }

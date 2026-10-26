@@ -45,14 +45,20 @@ internal static class GraphTestSupport
   /// <param name="builder">Which builder the factory should create.</param>
   /// <param name="graphConfig">Graph config to use; defaults to a plain config for <paramref name="builder"/>.</param>
   /// <param name="seedGraph">Graph sub-seed to use.</param>
+  /// <param name="builderConfig">
+  /// Builder configuration to inject; defaults to the default section for
+  /// <paramref name="builder"/>. The sub-config sections must match the builder kind -
+  /// e.g. pass <c>CnfSimple</c> for <see cref="EnGraphBuilder.Simple"/>.
+  /// </param>
   /// <returns>The reported build result and the filled target graph.</returns>
   public static (LilResult Result, LilGraph Graph) Build(
     EnGraphBuilder builder,
     CnfGraph? graphConfig = null,
-    long seedGraph = DefaultSeedGraph)
+    long seedGraph = DefaultSeedGraph,
+    CnfGraphBuilder? builderConfig = null)
   {
     // Arrange: Fresh builder from the factory, config and an empty target graph.
-    CnfGraphBuilder defBuilder = CreateDefBuilder(builder);
+    CnfGraphBuilder defBuilder = (builderConfig ?? CreateDefBuilder(builder)) with { Builder = builder };
     var graphBuilder = GraphBuilderFactory.Create(defBuilder);
     var config = CnfLevelGeneration.Default with
     {

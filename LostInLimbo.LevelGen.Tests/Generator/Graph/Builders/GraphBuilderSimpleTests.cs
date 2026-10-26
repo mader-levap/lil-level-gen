@@ -452,6 +452,192 @@ public sealed class GraphBuilderSimpleTests
     }
   }
 
+  /// <summary>Tests that non-default builder configs flow into generation.</summary>
+  public sealed class CustomConfigTests
+  {
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(1f)]
+    public void Build_WithExtremeChokepointChance_AppliesItToEveryEdge(float chokepointChance)
+    {
+      // Arrange: A builder config forcing every edge either open or choked.
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Simple,
+        CnfSimple = CnfGraphBuilderSimple.Default with { ChokepointChance = chokepointChance },
+      };
+
+      for (var seed = 0; seed < 5; seed++)
+      {
+        // Act: Build with default secret node disabled, so every edge is builder-made.
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+        {
+          Size = 10,
+          Connectivity = 20,
+          ProcOpts = GraphTestSupport.NoSecrets,
+        }, seed, builderConfig);
+
+        // Assert: The edge list is non-empty and every edge carries the forced outcome.
+        Assert.True(result.Success, $"Build failed for seed {seed}.");
+        Assert.NotEmpty(graph.Edges);
+        Assert.All(
+          graph.Edges,
+          edge => Assert.Equal(chokepointChance == 1f, edge.Chokepoint));
+      }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void Build_WithMaxExtraDegreeBelowTwo_AddsNoExtraRelationships(int maxExtraDegree)
+    {
+      // Arrange: Every connected node has degree at least one, so a total-degree
+      // eligibility threshold below two excludes every candidate pair.
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Simple,
+        CnfSimple = CnfGraphBuilderSimple.Default with { MaxExtraDegree = maxExtraDegree },
+      };
+
+      // Act: Request far more extras than the cap can ever allow.
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      {
+        Size = 10,
+        Connectivity = 100,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      }, builderConfig: builderConfig);
+
+      // Assert: Only the skeleton remains - a tree over all nodes - and it stays connected.
+      Assert.True(result.Success);
+      Assert.Equal(9, graph.Edges.Count);
+      GraphTestAssert.AssertBeatable(graph);
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void Build_WithCustomMaxExtraDegree_NeverPushesNodesAboveCap(int maxExtraDegree)
+    {
+      // Arrange: Skeleton-only baseline for the same seed; the build is identical up to
+      // the extras pass, so its degrees are the starting point under the custom cap.
+      var size = 10;
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Simple,
+        CnfSimple = CnfGraphBuilderSimple.Default with { MaxExtraDegree = maxExtraDegree },
+      };
+
+      for (var seed = 0; seed < 10; seed++)
+      {
+        var (_, skeleton) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+        {
+          Size = size,
+          ProcOpts = GraphTestSupport.NoSecrets,
+        }, seed, builderConfig);
+        var skeletonDegrees = GraphTestSupport.GetDegrees(skeleton);
+
+        // Act: Same seed with connectivity that saturates the extras pass.
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+        {
+          Size = size,
+          Connectivity = 100,
+          ProcOpts = GraphTestSupport.NoSecrets,
+        }, seed, builderConfig);
+        var degrees = GraphTestSupport.GetDegrees(graph);
+
+        // Assert: No node ends above max(skeleton degree, cap): nodes already at or
+        // above the cap never gain an extra, nodes below it stop at the cap.
+        Assert.True(result.Success, $"Build failed for seed {seed}.");
+        foreach (var node in graph.Nodes)
+        {
+          var allowed = Math.Max(skeletonDegrees[node.Id], maxExtraDegree);
+          Assert.True(
+            degrees[node.Id] <= allowed,
+            $"Node {node.Id} has degree {degrees[node.Id]}, skeleton {skeletonDegrees[node.Id]}, cap {maxExtraDegree} (seed {seed}).");
+        }
+
+        GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (seed {seed}).");
+      }
+    }
+
+    [Fact]
+    public void Build_WithMaxExtraDegreeStarTwo_SkeletonStaysWithinCap()
+    {
+      // Arrange: The tightest valid skeleton cap, which forces central handover often.
+      const int size = 20;
+      const int skeletonCap = 2;
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Simple,
+        CnfSimple = CnfGraphBuilderSimple.Default with { MaxExtraDegreeStar = skeletonCap },
+      };
+
+      for (var seed = 0; seed < 20; seed++)
+      {
+        // Act: Skeleton only (no extras), without the default secret node.
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+        {
+          Size = size,
+          ProcOpts = GraphTestSupport.NoSecrets,
+        }, seed, builderConfig);
+
+        // Assert: The skeleton is a minimal tree, no node exceeds the custom cap and
+        // the graph stays connected.
+        Assert.True(result.Success, $"Build failed for seed {seed}.");
+        Assert.Equal(size - 1, graph.Edges.Count);
+        GraphTestAssert.AssertDegreeCap(graph, skeletonCap);
+        GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (seed {seed}).");
+      }
+    }
+
+    [Fact]
+    public void Build_WithCustomMaxExtraDegreeStar_SetsNodeMaxEdges()
+    {
+      // Arrange: A custom skeleton cap that is not the default value.
+      const int skeletonCap = 4;
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Simple,
+        CnfSimple = CnfGraphBuilderSimple.Default with { MaxExtraDegreeStar = skeletonCap },
+      };
+
+      // Act: Build a plain graph with the custom builder config.
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      {
+        Size = 10,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      }, builderConfig: builderConfig);
+
+      // Assert: Every node carries the configured hard cap.
+      Assert.True(result.Success);
+      Assert.All(graph.Nodes, node => Assert.Equal(skeletonCap, node.MaxEdges));
+    }
+
+    [Fact]
+    public void Build_WithCustomConfig_ProducesIdenticalGraphsForSameSeed()
+    {
+      // Arrange: A builder config differing from the default on all three knobs.
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Simple,
+        CnfSimple = CnfGraphBuilderSimple.Default with
+        {
+          ChokepointChance = 0.25f,
+          MaxExtraDegree = 2,
+          MaxExtraDegreeStar = 3,
+        },
+      };
+      var graphConfig = new CnfGraph { Size = 15, Connectivity = 12 };
+
+      // Act: Build the same config twice with the same seed.
+      var (_, first) = GraphTestSupport.Build(EnGraphBuilder.Simple, graphConfig, 7, builderConfig);
+      var (_, second) = GraphTestSupport.Build(EnGraphBuilder.Simple, graphConfig, 7, builderConfig);
+
+      // Assert: The two graphs are structurally identical.
+      GraphTestAssert.AssertEqualGraphs(first, second);
+    }
+  }
+
   /// <summary>Tests for config validation.</summary>
   public sealed class ConfigValidationTests
   {
@@ -468,9 +654,11 @@ public sealed class GraphBuilderSimpleTests
     [Theory]
     [InlineData(-0.1f)]
     [InlineData(1.1f)]
+    [InlineData(float.NaN)]
     public void Validate_InvalidChokepointChance_ThrowsArgumentOutOfRange(float chance)
     {
-      // Arrange: A chokepoint chance outside [0, 1] is invalid.
+      // Arrange: A chokepoint chance outside [0, 1] - including NaN, which comparisons
+      // never catch - is invalid.
       var config = CnfGraphBuilderSimple.Default with { ChokepointChance = chance };
 
       // Assert: Validation rejects the value.
@@ -491,16 +679,44 @@ public sealed class GraphBuilderSimpleTests
     }
 
     [Theory]
+    [InlineData(1)]
     [InlineData(0)]
     [InlineData(-1)]
-    public void Validate_ZeroOrNegativeMaxExtraDegreeStar_ThrowsArgumentOutOfRange(int maxExtraDegreeStar)
+    public void Validate_MaxExtraDegreeStarBelowTwo_ThrowsArgumentOutOfRange(int maxExtraDegreeStar)
     {
-      // Arrange: The skeleton cap must be at least 1.
+      // Arrange: The skeleton cap must be at least 2 - the builder's central-handover
+      // eligibility window (degree >= 1 && degree < cap) is empty at a cap of 1.
       var config = CnfGraphBuilderSimple.Default with { MaxExtraDegreeStar = maxExtraDegreeStar };
 
       // Assert: Validation rejects the value.
       var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
       Assert.Equal(nameof(CnfGraphBuilderSimple.MaxExtraDegreeStar), ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(1f)]
+    public void Validate_BoundaryChokepointChance_DoesNotThrow(float chance)
+    {
+      // Arrange: The inclusive endpoints of the allowed probability range.
+      var config = CnfGraphBuilderSimple.Default with { ChokepointChance = chance };
+
+      // Assert: The boundary value is inside the allowed range.
+      config.Validate();
+    }
+
+    [Fact]
+    public void Validate_MinimalDegreeCaps_DoesNotThrow()
+    {
+      // Arrange: The smallest valid values for both degree caps.
+      var config = CnfGraphBuilderSimple.Default with
+      {
+        MaxExtraDegree = 0,
+        MaxExtraDegreeStar = 2,
+      };
+
+      // Assert: The boundary values are inside the allowed ranges.
+      config.Validate();
     }
   }
 }
