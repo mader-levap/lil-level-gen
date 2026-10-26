@@ -1,6 +1,6 @@
 using System;
 
-namespace LostInLimbo.LevelGen.Api;
+namespace LostInLimbo.LevelGen.Data.Status;
 
 /// <summary>
 /// Outcome of a level generation attempt: a success flag plus a human-readable

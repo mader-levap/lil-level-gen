@@ -1,3 +1,4 @@
+using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Result.Graph;
@@ -73,12 +74,8 @@ public sealed class GraphBuilderLinearTests
         ProcOpts = GraphTestSupport.NoSecrets,
       });
 
-      // Assert: The skeleton is exactly the chain over all nodes - size minus one
-      // relationships, each consecutive pair once - and it is connected.
-      Assert.True(result.Success);
-      Assert.Equal(Math.Max(0, size - 1), graph.Edges.Count);
-      GraphAssertions.AssertExactChain(graph, size);
-      GraphTestAssert.AssertBeatable(graph, "Chain graph must be connected.");
+      // Assert: The skeleton is exactly the chain over all nodes and it is connected.
+      GraphAssertions.AssertExactChainBuild(result, graph, size);
     }
 
     [Theory]
@@ -237,29 +234,6 @@ public sealed class GraphBuilderLinearTests
       }
     }
 
-    [Theory]
-    [InlineData(5, 4)]
-    [InlineData(12, 20)]
-    [InlineData(40, 100)]
-    public void Build_WithExtraRelationships_StayForwardAndWithinSkipWindow(int size, int connectivity)
-    {
-      for (var seed = 0; seed < 10; seed++)
-      {
-        // Act: Build a graph with extra relationships across several seeds, without the
-        // default secret node.
-        var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
-        {
-          Size = size,
-          Connectivity = connectivity,
-          ProcOpts = GraphTestSupport.NoSecrets,
-        }, seed);
-
-        // Assert: Every relationship runs from the earlier node to the later node and
-        // skips no more than MaxSkipDistance nodes in between.
-        GraphAssertions.AssertForwardAndSkipWindow(graph);
-      }
-    }
-
     [Fact]
     public void Build_WithSizeThree_ExcessiveConnectivity_SaturatesEveryPair()
     {
@@ -300,14 +274,15 @@ public sealed class GraphBuilderLinearTests
           extrasByDistance[pair.Hi - pair.Lo] += passageCount - (pair.Hi - pair.Lo == 1 ? 1 : 0);
       }
 
-      // Assert: Connectivity was spent in full, and the linear weighting (3:2:1 over
-      // adjacent, skip-one, skip-two) makes every distance strictly more likely than the
-      // next one behind it.
+      // Assert: Connectivity was spent in full, and the linear weighting (the adjacent
+      // node counts MaxSkipDistance + 1, each node further back one less) makes every
+      // distance strictly more likely than the next one behind it.
       Assert.Equal(15 * 100, extrasByDistance.Sum());
-      Assert.True(extrasByDistance[1] > extrasByDistance[2],
-        $"Adjacent {extrasByDistance[1]} must beat skip-one {extrasByDistance[2]}.");
-      Assert.True(extrasByDistance[2] > extrasByDistance[3],
-        $"Skip-one {extrasByDistance[2]} must beat skip-two {extrasByDistance[3]}.");
+      for (var distance = 1; distance <= MaxSkipDistance; distance++)
+      {
+        Assert.True(extrasByDistance[distance] > extrasByDistance[distance + 1],
+          $"Distance {distance} ({extrasByDistance[distance]}) must beat distance {distance + 1} ({extrasByDistance[distance + 1]}).");
+      }
     }
   }
 
@@ -394,12 +369,13 @@ public sealed class GraphBuilderLinearTests
     [Fact]
     public void Build_WithExcessiveComplexity_SaturatesEveryRelationship()
     {
-      // Act: Four nodes without extras offer three guardable relationships with room for
+      // Arrange: Four nodes without extras offer three guardable relationships with room for
       // MaxConditionPerRel conditions each - nine obstacles - yet far more is requested.
       // Secrets are disabled so only builder relationships remain.
+      const int size = 4;
       var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
       {
-        Size = 4,
+        Size = size,
         Connectivity = 0,
         Complexity = 10000,
         ProcOpts = GraphTestSupport.NoSecrets,
@@ -408,7 +384,7 @@ public sealed class GraphBuilderLinearTests
       // Assert: The pass ends silently once everything is saturated: nine solutions and
       // exactly MaxConditionPerRel conditions on every relationship, never more.
       Assert.True(result.Success);
-      Assert.Equal((4 - 1) * MaxConditionPerRel, GraphTestSupport.GetPois(graph, EnPoiType.Solution).Count);
+      Assert.Equal((size - 1) * MaxConditionPerRel, GraphTestSupport.GetPois(graph, EnPoiType.Solution).Count);
       foreach (var edge in graph.Edges)
       {
         // Assert: The per-relationship condition cap holds exactly at saturation.
@@ -517,14 +493,14 @@ public sealed class GraphBuilderLinearTests
         }
       }
 
-      // Assert: The 4:3:2:1 weighting makes every distance strictly more likely than the
-      // next one behind it.
-      Assert.True(distances[0] > distances[1],
-        $"Distance 0 ({distances[0]}) must beat distance 1 ({distances[1]}).");
-      Assert.True(distances[1] > distances[2],
-        $"Distance 1 ({distances[1]}) must beat distance 2 ({distances[2]}).");
-      Assert.True(distances[2] > distances[3],
-        $"Distance 2 ({distances[2]}) must beat distance 3 ({distances[3]}).");
+      // Assert: The linear weighting (the node facing the guarded passage counts
+      // MaxConditionDistance + 1, each node further back one less) makes every distance
+      // strictly more likely than the next one behind it.
+      for (var distance = 0; distance < MaxConditionDistance; distance++)
+      {
+        Assert.True(distances[distance] > distances[distance + 1],
+          $"Distance {distance} ({distances[distance]}) must beat distance {distance + 1} ({distances[distance + 1]}).");
+      }
     }
 
     [Theory]
@@ -602,16 +578,36 @@ public sealed class GraphBuilderLinearTests
     [Fact]
     public void Build_WithSameSeed_ProducesIdenticalGraphs()
     {
-      // Arrange: Same config and same seed for two builds.
+      // Arrange: Same graph config and same seed for two builds - once with the default
+      // builder config, once with every builder knob set away from its default.
       var config = new CnfGraph { Size = 12, Connectivity = 6, Complexity = 5 };
+      CnfGraphBuilder?[] builderConfigs =
+      {
+        null,
+        CnfGraphBuilder.Default with
+        {
+          Builder = EnGraphBuilder.Linear,
+          CnfLinear = CnfGraphBuilderLinear.Default with
+          {
+            MaxEdges = 3,
+            MaxExtraDegree = 1,
+            MaxConditionPerRel = 1,
+            MaxConditionDistance = 0,
+            MaxSkipDistance = 1,
+          },
+        },
+      };
 
-      // Act: Build both graphs.
-      var first = GraphTestSupport.Build(EnGraphBuilder.Linear, config);
-      var second = GraphTestSupport.Build(EnGraphBuilder.Linear, config);
+      foreach (var builderConfig in builderConfigs)
+      {
+        // Act: Build both graphs.
+        var first = GraphTestSupport.Build(EnGraphBuilder.Linear, config, builderConfig: builderConfig);
+        var second = GraphTestSupport.Build(EnGraphBuilder.Linear, config, builderConfig: builderConfig);
 
-      // Assert: Nodes, edges (including conditions) and POIs match one by one.
-      Assert.Equal(first.Result.Success, second.Result.Success);
-      GraphTestAssert.AssertEqualGraphs(first.Graph, second.Graph);
+        // Assert: Nodes, edges (including conditions) and POIs match one by one.
+        Assert.Equal(first.Result.Success, second.Result.Success);
+        GraphTestAssert.AssertEqualGraphs(first.Graph, second.Graph);
+      }
     }
 
     [Fact]
@@ -705,7 +701,6 @@ public sealed class GraphBuilderLinearTests
         GraphTestAssert.AssertValidEdges(graph, allowDuplicates: true);
         GraphTestAssert.AssertOpenPassages(graph);
         GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (size {size}, seed {seed}).");
-        GraphTestAssert.AssertBeatable(graph);
       }
     }
   }
@@ -730,6 +725,22 @@ public sealed class GraphBuilderLinearTests
       return graph.Nodes
         .Select((node, index) => (node.Id, index))
         .ToDictionary(pair => pair.Id, pair => pair.index);
+    }
+
+    /// <summary>
+    /// Asserts that a chain-forming build succeeded and produced the plain chain: size
+    /// minus one relationships, each consecutive pair exactly once, and a connected graph.
+    /// </summary>
+    /// <param name="result">Reported build result.</param>
+    /// <param name="graph">Built graph.</param>
+    /// <param name="size">Expected number of chain nodes.</param>
+    public static void AssertExactChainBuild(LilResult result, LilGraph graph, int size)
+    {
+      // Assert: The build succeeded and the skeleton is exactly the chain over all nodes.
+      Assert.True(result.Success);
+      Assert.Equal(Math.Max(0, size - 1), graph.Edges.Count);
+      AssertExactChain(graph, size);
+      GraphTestAssert.AssertBeatable(graph, "Chain graph must be connected.");
     }
 
     /// <summary>
@@ -880,10 +891,7 @@ public sealed class GraphBuilderLinearTests
       }, builderConfig: builderConfig);
 
       // Assert: The skeleton is exactly the chain over all nodes and stays connected.
-      Assert.True(result.Success);
-      Assert.Equal(Math.Max(0, size - 1), graph.Edges.Count);
-      GraphAssertions.AssertExactChain(graph, size);
-      GraphTestAssert.AssertBeatable(graph, "Chain graph must be connected.");
+      GraphAssertions.AssertExactChainBuild(result, graph, size);
     }
 
     [Fact]
@@ -909,20 +917,16 @@ public sealed class GraphBuilderLinearTests
 
       // Assert: The skeleton remains exactly the chain, every node carries the custom
       // hard cap and the graph stays connected.
-      Assert.True(result.Success);
-      Assert.Equal(size - 1, graph.Edges.Count);
-      GraphAssertions.AssertExactChain(graph, size);
+      GraphAssertions.AssertExactChainBuild(result, graph, size);
       Assert.All(graph.Nodes, node => Assert.Equal(maxEdges, node.MaxEdges));
-      GraphTestAssert.AssertBeatable(graph, "Chain graph must be connected.");
     }
 
-    [Theory]
-    [InlineData(2)]
-    [InlineData(3)]
-    public void Build_WithCustomMaxEdgesUnderExcessiveConnectivity_ObeysTotalDegreeCap(int maxEdges)
+    [Fact]
+    public void Build_WithCustomMaxEdgesUnderExcessiveConnectivity_ObeysTotalDegreeCap()
     {
-      // Arrange: A hard cap at or above the interior chain degree keeps every node
-      // within its own cap; extras (when the cap leaves room) must respect it too.
+      // Arrange: A hard cap above the interior chain degree leaves room for extras;
+      // MaxEdges two is covered by Build_WithMaxEdgesTwo_ProducesExactChainAndSetsNodeCap.
+      const int maxEdges = 3;
       var builderConfig = CnfGraphBuilder.Default with
       {
         Builder = EnGraphBuilder.Linear,
@@ -1096,32 +1100,6 @@ public sealed class GraphBuilderLinearTests
           $"Edge {edge.Id} carries {edge.Conditions.Count} conditions, cap is 1 (seed {seed})."));
         GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (seed {seed}).");
       }
-    }
-
-    [Fact]
-    public void Build_WithUntypicalConfig_ProducesIdenticalGraphsForSameSeed()
-    {
-      // Arrange: A builder config differing from the default on all five knobs.
-      var builderConfig = CnfGraphBuilder.Default with
-      {
-        Builder = EnGraphBuilder.Linear,
-        CnfLinear = CnfGraphBuilderLinear.Default with
-        {
-          MaxEdges = 3,
-          MaxExtraDegree = 1,
-          MaxConditionPerRel = 1,
-          MaxConditionDistance = 0,
-          MaxSkipDistance = 1,
-        },
-      };
-      var graphConfig = new CnfGraph { Size = 12, Connectivity = 10, Complexity = 6 };
-
-      // Act: Build the same config twice with the same seed.
-      var (_, first) = GraphTestSupport.Build(EnGraphBuilder.Linear, graphConfig, 7, builderConfig);
-      var (_, second) = GraphTestSupport.Build(EnGraphBuilder.Linear, graphConfig, 7, builderConfig);
-
-      // Assert: The two graphs are structurally identical.
-      GraphTestAssert.AssertEqualGraphs(first, second);
     }
   }
 

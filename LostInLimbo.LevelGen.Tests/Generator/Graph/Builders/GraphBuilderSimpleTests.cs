@@ -22,6 +22,23 @@ public sealed class GraphBuilderSimpleTests
   /// <summary>Mirrors <c>CnfGraphBuilderSimple.Default.MaxExtraDegreeStar</c>: cap of the skeleton phase.</summary>
   private static readonly int MaxDegreeStar = CnfGraphBuilderSimple.Default.MaxExtraDegreeStar;
 
+  /// <summary>
+  /// Builds a builder config for skeleton-shape tests: <c>null</c> keeps the default
+  /// skeleton cap, any other value overrides <c>MaxExtraDegreeStar</c>.
+  /// </summary>
+  /// <param name="starCap">Skeleton cap to enforce, or <c>null</c> for the default.</param>
+  /// <returns>Builder config for the build, or <c>null</c> when the default fits.</returns>
+  private static CnfGraphBuilder? CreateSimpleSkeletonConfig(int? starCap)
+  {
+    return starCap is null
+      ? null
+      : CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Simple,
+        CnfSimple = CnfGraphBuilderSimple.Default with { MaxExtraDegreeStar = starCap.Value },
+      };
+  }
+
   /// <summary>Tests for the skeleton shape: node count, minimality, connectivity, scenarios.</summary>
   public sealed class ShapeTests
   {
@@ -222,13 +239,19 @@ public sealed class GraphBuilderSimpleTests
     }
 
     [Theory]
-    [InlineData(6)]
-    [InlineData(8)]
-    [InlineData(10)]
-    [InlineData(50)]
-    [InlineData(100)]
-    public void Build_WithAnySeed_ProducesBoundedConnectedSkeleton(int size)
+    [InlineData(6, null)]
+    [InlineData(8, null)]
+    [InlineData(10, null)]
+    [InlineData(50, null)]
+    [InlineData(100, null)]
+    [InlineData(20, 2)] // tightest valid cap - forces central handover
+    public void Build_WithAnySkeletonCap_ProducesBoundedConnectedSkeleton(int size, int? starCap)
     {
+      // Arrange: A null cap keeps the default skeleton cap; two is the tightest valid
+      // value, which forces central handover often.
+      var builderConfig = CreateSimpleSkeletonConfig(starCap);
+      var expectedCap = starCap ?? MaxDegreeStar;
+
       // Act: Build minimal skeletons across many seeds; every scenario must respect the
       // skeleton degree cap and stay a connected tree.
       for (var seed = 0; seed < 30; seed++)
@@ -236,20 +259,28 @@ public sealed class GraphBuilderSimpleTests
         var (result, graph) = GraphTestSupport.Build(
           EnGraphBuilder.Simple,
           new CnfGraph { Size = size, ProcOpts = GraphTestSupport.NoSecrets },
-          seed);
+          seed,
+          builderConfig);
 
         // Assert: Success, exactly size minus one skeleton relationships, connectivity
-        // and the degree cap hold no matter which scenario was rolled.
-        Assert.True(result.Success);
+        // and the degree cap hold no matter which scenario or cap was rolled.
+        Assert.True(result.Success, $"Build failed for seed {seed}.");
         Assert.Equal(size - 1, graph.Edges.Count);
-        GraphTestAssert.AssertDegreeCap(graph, MaxDegreeStar);
+        GraphTestAssert.AssertDegreeCap(graph, expectedCap);
         GraphTestAssert.AssertBeatable(graph, $"Skeleton graph must be connected (size {size}, seed {seed}).");
       }
     }
 
-    [Fact]
-    public void Build_WithLargeSizeAcrossSeeds_SkeletonCentralHandsOverAtCap()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(2)] // tightest valid cap - handover is exercised almost every seed
+    public void Build_WithLargeSizeAcrossSeeds_SkeletonCentralHandsOverAtCap(int? starCap)
     {
+      // Arrange: A null cap keeps the default skeleton cap; two is the tightest valid
+      // value, which forces central handover often.
+      var builderConfig = CreateSimpleSkeletonConfig(starCap);
+      var cap = starCap ?? MaxDegreeStar;
+
       // Act: Build 100-node skeletons across many seeds; star and mixed rolls fill a
       // central node to the cap and must hand over instead of growing beyond it.
       var maxDegrees = new List<int>();
@@ -258,14 +289,15 @@ public sealed class GraphBuilderSimpleTests
         var (_, graph) = GraphTestSupport.Build(
           EnGraphBuilder.Simple,
           new CnfGraph { Size = 100, ProcOpts = GraphTestSupport.NoSecrets },
-          seed);
+          seed,
+          builderConfig);
         maxDegrees.Add(GraphTestSupport.GetDegrees(graph).Values.Max());
       }
 
       // Assert: At least one seed reached the cap exactly - proving the handover path
       // was exercised - and no seed ever went beyond it.
-      Assert.Contains(maxDegrees, maxDegree => maxDegree == MaxDegreeStar);
-      Assert.All(maxDegrees, maxDegree => Assert.True(maxDegree <= MaxDegreeStar, $"Max degree {maxDegree} exceeds cap {MaxDegreeStar}."));
+      Assert.Contains(maxDegrees, maxDegree => maxDegree == cap);
+      Assert.All(maxDegrees, maxDegree => Assert.True(maxDegree <= cap, $"Max degree {maxDegree} exceeds cap {cap}."));
     }
 
     [Theory]
@@ -339,16 +371,34 @@ public sealed class GraphBuilderSimpleTests
     [Fact]
     public void Build_WithSameSeed_ProducesIdenticalGraphs()
     {
-      // Arrange: Same config and same seed for two builds.
+      // Arrange: Same graph config and same seed for two builds - once with the default
+      // builder config, once with every builder knob set away from its default.
       var config = new CnfGraph { Size = 12, Connectivity = 6 };
+      CnfGraphBuilder?[] builderConfigs =
+      {
+        null,
+        CnfGraphBuilder.Default with
+        {
+          Builder = EnGraphBuilder.Simple,
+          CnfSimple = CnfGraphBuilderSimple.Default with
+          {
+            ChokepointChance = 0.25f,
+            MaxExtraDegree = 2,
+            MaxExtraDegreeStar = 3,
+          },
+        },
+      };
 
-      // Act: Build both graphs.
-      var first = GraphTestSupport.Build(EnGraphBuilder.Simple, config);
-      var second = GraphTestSupport.Build(EnGraphBuilder.Simple, config);
+      foreach (var builderConfig in builderConfigs)
+      {
+        // Act: Build both graphs.
+        var first = GraphTestSupport.Build(EnGraphBuilder.Simple, config, builderConfig: builderConfig);
+        var second = GraphTestSupport.Build(EnGraphBuilder.Simple, config, builderConfig: builderConfig);
 
-      // Assert: Nodes, edges and POIs match one by one.
-      Assert.Equal(first.Result.Success, second.Result.Success);
-      GraphTestAssert.AssertEqualGraphs(first.Graph, second.Graph);
+        // Assert: Nodes, edges and POIs match one by one.
+        Assert.Equal(first.Result.Success, second.Result.Success);
+        GraphTestAssert.AssertEqualGraphs(first.Graph, second.Graph);
+      }
     }
 
     [Fact]
@@ -493,6 +543,7 @@ public sealed class GraphBuilderSimpleTests
     {
       // Arrange: Every connected node has degree at least one, so a total-degree
       // eligibility threshold below two excludes every candidate pair.
+      const int size = 10;
       var builderConfig = CnfGraphBuilder.Default with
       {
         Builder = EnGraphBuilder.Simple,
@@ -502,14 +553,14 @@ public sealed class GraphBuilderSimpleTests
       // Act: Request far more extras than the cap can ever allow.
       var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
       {
-        Size = 10,
+        Size = size,
         Connectivity = 100,
         ProcOpts = GraphTestSupport.NoSecrets,
       }, builderConfig: builderConfig);
 
       // Assert: Only the skeleton remains - a tree over all nodes - and it stays connected.
       Assert.True(result.Success);
-      Assert.Equal(9, graph.Edges.Count);
+      Assert.Equal(size - 1, graph.Edges.Count);
       GraphTestAssert.AssertBeatable(graph);
     }
 
@@ -561,36 +612,6 @@ public sealed class GraphBuilderSimpleTests
     }
 
     [Fact]
-    public void Build_WithMaxExtraDegreeStarTwo_SkeletonStaysWithinCap()
-    {
-      // Arrange: The tightest valid skeleton cap, which forces central handover often.
-      const int size = 20;
-      const int skeletonCap = 2;
-      var builderConfig = CnfGraphBuilder.Default with
-      {
-        Builder = EnGraphBuilder.Simple,
-        CnfSimple = CnfGraphBuilderSimple.Default with { MaxExtraDegreeStar = skeletonCap },
-      };
-
-      for (var seed = 0; seed < 20; seed++)
-      {
-        // Act: Skeleton only (no extras), without the default secret node.
-        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
-        {
-          Size = size,
-          ProcOpts = GraphTestSupport.NoSecrets,
-        }, seed, builderConfig);
-
-        // Assert: The skeleton is a minimal tree, no node exceeds the custom cap and
-        // the graph stays connected.
-        Assert.True(result.Success, $"Build failed for seed {seed}.");
-        Assert.Equal(size - 1, graph.Edges.Count);
-        GraphTestAssert.AssertDegreeCap(graph, skeletonCap);
-        GraphTestAssert.AssertBeatable(graph, $"Graph must stay connected (seed {seed}).");
-      }
-    }
-
-    [Fact]
     public void Build_WithCustomMaxExtraDegreeStar_SetsNodeMaxEdges()
     {
       // Arrange: A custom skeleton cap that is not the default value.
@@ -611,30 +632,6 @@ public sealed class GraphBuilderSimpleTests
       // Assert: Every node carries the configured hard cap.
       Assert.True(result.Success);
       Assert.All(graph.Nodes, node => Assert.Equal(skeletonCap, node.MaxEdges));
-    }
-
-    [Fact]
-    public void Build_WithCustomConfig_ProducesIdenticalGraphsForSameSeed()
-    {
-      // Arrange: A builder config differing from the default on all three knobs.
-      var builderConfig = CnfGraphBuilder.Default with
-      {
-        Builder = EnGraphBuilder.Simple,
-        CnfSimple = CnfGraphBuilderSimple.Default with
-        {
-          ChokepointChance = 0.25f,
-          MaxExtraDegree = 2,
-          MaxExtraDegreeStar = 3,
-        },
-      };
-      var graphConfig = new CnfGraph { Size = 15, Connectivity = 12 };
-
-      // Act: Build the same config twice with the same seed.
-      var (_, first) = GraphTestSupport.Build(EnGraphBuilder.Simple, graphConfig, 7, builderConfig);
-      var (_, second) = GraphTestSupport.Build(EnGraphBuilder.Simple, graphConfig, 7, builderConfig);
-
-      // Assert: The two graphs are structurally identical.
-      GraphTestAssert.AssertEqualGraphs(first, second);
     }
   }
 

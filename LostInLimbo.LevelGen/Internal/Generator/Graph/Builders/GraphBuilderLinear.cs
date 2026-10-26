@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using LostInLimbo.LevelGen.Api;
+using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;

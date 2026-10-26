@@ -1,4 +1,4 @@
-using LostInLimbo.LevelGen.Api;
+using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Utils;
 

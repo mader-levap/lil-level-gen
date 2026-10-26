@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result.Graph;
+using LostInLimbo.LevelGen.Data.Status;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 

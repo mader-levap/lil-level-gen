@@ -1,4 +1,4 @@
-using LostInLimbo.LevelGen.Api;
+using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result.Map;
 

@@ -1,5 +1,5 @@
 using System;
-using LostInLimbo.LevelGen.Api;
+using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result.Graph;
