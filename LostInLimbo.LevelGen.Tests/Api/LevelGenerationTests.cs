@@ -12,7 +12,7 @@ namespace LostInLimbo.LevelGen.Tests.Api;
 /// (Start, Resume, Pause, Cancel, Clear) plus a suite for the command races.
 /// </summary>
 /// <remarks>
-/// Every test method gets a fresh <see cref="LevelGenerationSession"/> (xunit constructs a new
+/// Every test method gets a fresh <see cref="LevelGenSession"/> (xunit constructs a new
 /// test-class instance per test), so each test starts from the pristine never-ran state with
 /// no teardown, no shared global state, and no dependence on test order or suite selection.
 /// </remarks>
@@ -52,7 +52,7 @@ public sealed class LevelGenerationTests
   private static CnfLevelGeneration InFlightConfig() => Config(sleep: 5_000, steps: 50);
 
   /// <summary>Polls the given session until no run is in flight; fails the test on timeout.</summary>
-  private static void WaitForTerminal(LevelGenerationSession session)
+  private static void WaitForTerminal(LevelGenSession session)
   {
     var stopwatch = Stopwatch.StartNew();
     while (session.Status().Result == EnGenResult.Running)
@@ -66,7 +66,7 @@ public sealed class LevelGenerationTests
   /// <summary>Tests the pristine never-ran state exposed before any command runs.</summary>
   public sealed class InitialStateTests
   {
-    private readonly LevelGenerationSession _session = new();
+    private readonly LevelGenSession _session = new();
 
     [Fact]
     public void Status_BeforeAnyRun_ReportsNoneWithNullWorld()
@@ -80,10 +80,10 @@ public sealed class LevelGenerationTests
     }
   }
 
-  /// <summary>Tests <see cref="LevelGenerationSession.Start(EnRunKind, CnfLevelGeneration, CancellationToken)"/>: claims, validation and start failures.</summary>
+  /// <summary>Tests <see cref="LevelGenSession.Start(EnRunKind, CnfLevelGeneration, CancellationToken)"/>: claims, validation and start failures.</summary>
   public sealed class StartTests
   {
-    private readonly LevelGenerationSession _session = new();
+    private readonly LevelGenSession _session = new();
 
     [Fact]
     public void Start_WithStepKind_ReportsRunningWorldNull_ThenPausedWorldVisible()
@@ -288,10 +288,10 @@ public sealed class LevelGenerationTests
     }
   }
 
-  /// <summary>Tests <see cref="LevelGenerationSession.Resume(EnRunKind)"/>: stepwise and whole-level resumes.</summary>
+  /// <summary>Tests <see cref="LevelGenSession.Resume(EnRunKind)"/>: stepwise and whole-level resumes.</summary>
   public sealed class ResumeTests
   {
-    private readonly LevelGenerationSession _session = new();
+    private readonly LevelGenSession _session = new();
 
     [Fact]
     public void Start_WithStepKind_ThenResumeWithAllKind_Finishes()
@@ -420,10 +420,10 @@ public sealed class LevelGenerationTests
     }
   }
 
-  /// <summary>Tests <see cref="LevelGenerationSession.Pause()"/>: accepted pauses and no-op refusals.</summary>
+  /// <summary>Tests <see cref="LevelGenSession.Pause()"/>: accepted pauses and no-op refusals.</summary>
   public sealed class PauseTests
   {
-    private readonly LevelGenerationSession _session = new();
+    private readonly LevelGenSession _session = new();
 
     [Fact]
     public void Pause_WhileRunningAllKind_PublishesPausedAndWorldVisible()
@@ -498,10 +498,10 @@ public sealed class LevelGenerationTests
     }
   }
 
-  /// <summary>Tests <see cref="LevelGenerationSession.Cancel()"/>: accepted cancellations, token cancellation and post-cancel recovery.</summary>
+  /// <summary>Tests <see cref="LevelGenSession.Cancel()"/>: accepted cancellations, token cancellation and post-cancel recovery.</summary>
   public sealed class CancelTests
   {
-    private readonly LevelGenerationSession _session = new();
+    private readonly LevelGenSession _session = new();
 
     [Fact]
     public void Cancel_WhileRunning_PublishesCancelledWorldNullErrorNull()
@@ -632,10 +632,10 @@ public sealed class LevelGenerationTests
     }
   }
 
-  /// <summary>Tests <see cref="LevelGenerationSession.Clear()"/>: resets of idle, running and terminal state.</summary>
+  /// <summary>Tests <see cref="LevelGenSession.Clear()"/>: resets of idle, running and terminal state.</summary>
   public sealed class ClearTests
   {
-    private readonly LevelGenerationSession _session = new();
+    private readonly LevelGenSession _session = new();
 
     [Fact]
     public void Clear_WhenIdle_RestoresPristineState()
@@ -783,12 +783,12 @@ public sealed class LevelGenerationTests
   }
 
   /// <summary>
-  /// Tests that <see cref="LevelGenerationSession.World()"/> hands out defensive copies:
+  /// Tests that <see cref="LevelGenSession.World()"/> hands out defensive copies:
   /// consumers can never affect the generator or later reads by mutating the returned world.
   /// </summary>
   public sealed class WorldIsolationTests
   {
-    private readonly LevelGenerationSession _session = new();
+    private readonly LevelGenSession _session = new();
 
     [Fact]
     public void World_AfterFinished_ReturnsFreshCopyEachCall()
@@ -882,7 +882,7 @@ public sealed class LevelGenerationTests
   /// <summary>Tests command races through the test seams: Clear/Start, Cancel/Pause during claim windows and World sampling.</summary>
   public sealed class RaceTests
   {
-    private readonly LevelGenerationSession _session = new();
+    private readonly LevelGenSession _session = new();
 
     [Fact]
     public async Task Clear_And_Start_WhenRaced_NeverLeaveInconsistentState()

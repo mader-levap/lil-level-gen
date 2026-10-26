@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace System.Runtime.CompilerServices;
 
 // Compile-time marker needed to use `required` members when targeting netstandard2.1.
@@ -7,12 +9,14 @@ namespace System.Runtime.CompilerServices;
 
 /// <summary>Marks a member as required to be set in an object initializer.</summary>
 [AttributeUsage(AttributeTargets.All, AllowMultiple = false, Inherited = false)]
+[ExcludeFromCodeCoverage]
 internal sealed class RequiredMemberAttribute : Attribute
 {
 }
 
 /// <summary>Indicates that a compiler feature is required to use the annotated member.</summary>
 [AttributeUsage(AttributeTargets.All, AllowMultiple = false, Inherited = false)]
+[ExcludeFromCodeCoverage]
 internal sealed class CompilerFeatureRequiredAttribute : Attribute
 {
   /// <summary>Creates an instance of the attribute.</summary>

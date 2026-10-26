@@ -16,7 +16,7 @@ namespace LostInLimbo.LevelGen.Api;
 /// enum values are rejected during parsing so a file can never depend on the order of enum members.
 /// Only strings cross this boundary; file reading and writing stay with the callers.
 /// </remarks>
-public static class LevelGenerationSerializer
+public static class LevelGenSerializer
 {
   /// <summary>Serializer options shared by reading and writing, so the format stays consistent.</summary>
   private static readonly JsonSerializerOptions Options = new()

@@ -8,6 +8,7 @@ namespace System.Diagnostics.CodeAnalysis;
 
 /// <summary>Indicates that the annotated constructor sets all required members.</summary>
 [AttributeUsage(AttributeTargets.Constructor, AllowMultiple = false, Inherited = false)]
+[ExcludeFromCodeCoverage]
 internal sealed class SetsRequiredMembersAttribute : Attribute
 {
 }

@@ -14,14 +14,14 @@ namespace LostInLimbo.LevelGen.Tests.Api;
 /// </summary>
 public sealed class LevelGenerationSerializerTests
 {
-  /// <summary>Tests <see cref="LevelGenerationSerializer.SerializeConfig"/>: canonical output, validation and the roundtrip.</summary>
+  /// <summary>Tests <see cref="LevelGenSerializer.SerializeConfig"/>: canonical output, validation and the roundtrip.</summary>
   public sealed class SerializeTests
   {
     [Fact]
     public void Serialize_WithNullConfig_ThrowsArgumentNullException()
     {
       // Act/Assert: Null config is rejected.
-      Assert.Throws<ArgumentNullException>(() => LevelGenerationSerializer.SerializeConfig(null!));
+      Assert.Throws<ArgumentNullException>(() => LevelGenSerializer.SerializeConfig(null!));
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public sealed class LevelGenerationSerializerTests
       var config = CnfLevelGeneration.Default;
 
       // Act: Serialize to canonical JSON.
-      var json = LevelGenerationSerializer.SerializeConfig(config);
+      var json = LevelGenSerializer.SerializeConfig(config);
 
       // Assert: Property names are camelCase and every key starts a new indented line.
       Assert.Contains("\"configVersion\": 1", json);
@@ -53,7 +53,7 @@ public sealed class LevelGenerationSerializerTests
       };
 
       // Act/Assert: Serialization validates before producing output.
-      Assert.Throws<ArgumentOutOfRangeException>(() => LevelGenerationSerializer.SerializeConfig(config));
+      Assert.Throws<ArgumentOutOfRangeException>(() => LevelGenSerializer.SerializeConfig(config));
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public sealed class LevelGenerationSerializerTests
       };
 
       // Act: Serialize to canonical JSON.
-      var json = LevelGenerationSerializer.SerializeConfig(config);
+      var json = LevelGenSerializer.SerializeConfig(config);
 
       // Assert: The builder crosses the boundary as its member name, never as a number.
       Assert.Contains("\"builder\": \"Linear\"", json);
@@ -84,7 +84,7 @@ public sealed class LevelGenerationSerializerTests
 
       // Act/Assert: Validation runs before any JSON is produced and names the property.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => LevelGenerationSerializer.SerializeConfig(config));
+        () => LevelGenSerializer.SerializeConfig(config));
       Assert.Equal("Builder", exception.ParamName);
     }
 
@@ -101,8 +101,8 @@ public sealed class LevelGenerationSerializerTests
       };
 
       // Act: Serialize then deserialize.
-      var roundtripped = LevelGenerationSerializer.DeserializeConfig(
-        LevelGenerationSerializer.SerializeConfig(config));
+      var roundtripped = LevelGenSerializer.DeserializeConfig(
+        LevelGenSerializer.SerializeConfig(config));
 
       // Assert: The roundtrip is lossless (structural record equality).
       Assert.Equal(config, roundtripped);
@@ -125,7 +125,7 @@ public sealed class LevelGenerationSerializerTests
       };
 
       // Act: Serialize to canonical JSON.
-      var json = LevelGenerationSerializer.SerializeConfig(config);
+      var json = LevelGenSerializer.SerializeConfig(config);
 
       // Assert: The proc options cross the boundary as nested camelCase objects.
       Assert.Contains("\"procOpts\"", json);
@@ -164,22 +164,22 @@ public sealed class LevelGenerationSerializerTests
       };
 
       // Act: Serialize then deserialize.
-      var roundtripped = LevelGenerationSerializer.DeserializeConfig(
-        LevelGenerationSerializer.SerializeConfig(config));
+      var roundtripped = LevelGenSerializer.DeserializeConfig(
+        LevelGenSerializer.SerializeConfig(config));
 
       // Assert: The roundtrip is lossless (structural record equality).
       Assert.Equal(config, roundtripped);
     }
   }
 
-  /// <summary>Tests <see cref="LevelGenerationSerializer.DeserializeConfig"/> error paths: rejected inputs, parse failures and validation failures.</summary>
+  /// <summary>Tests <see cref="LevelGenSerializer.DeserializeConfig"/> error paths: rejected inputs, parse failures and validation failures.</summary>
   public sealed class DeserializeErrorTests
   {
     [Fact]
     public void Deserialize_WithNull_ThrowsArgumentNullException()
     {
       // Act/Assert: Null input is rejected.
-      Assert.Throws<ArgumentNullException>(() => LevelGenerationSerializer.DeserializeConfig(null!));
+      Assert.Throws<ArgumentNullException>(() => LevelGenSerializer.DeserializeConfig(null!));
     }
 
     [Theory]
@@ -188,7 +188,7 @@ public sealed class LevelGenerationSerializerTests
     public void Deserialize_WithEmptyJson_ThrowsArgumentException(string json)
     {
       // Act/Assert: Empty input is rejected before parsing, naming the parameter.
-      var exception = Assert.Throws<ArgumentException>(() => LevelGenerationSerializer.DeserializeConfig(json));
+      var exception = Assert.Throws<ArgumentException>(() => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("json", exception.ParamName);
     }
 
@@ -198,7 +198,7 @@ public sealed class LevelGenerationSerializerTests
       // Act/Assert: Parse failure surfaces as ArgumentException naming the parameter,
       // keeping the original JsonException as the inner exception.
       var exception = Assert.Throws<ArgumentException>(
-        () => LevelGenerationSerializer.DeserializeConfig("{ not json }"));
+        () => LevelGenSerializer.DeserializeConfig("{ not json }"));
       Assert.Equal("json", exception.ParamName);
       Assert.IsType<JsonException>(exception.InnerException);
     }
@@ -208,7 +208,7 @@ public sealed class LevelGenerationSerializerTests
     {
       // Act/Assert: Valid JSON that decodes to nothing is rejected.
       var exception = Assert.Throws<ArgumentException>(
-        () => LevelGenerationSerializer.DeserializeConfig("null"));
+        () => LevelGenSerializer.DeserializeConfig("null"));
       Assert.Equal("json", exception.ParamName);
     }
 
@@ -219,7 +219,7 @@ public sealed class LevelGenerationSerializerTests
       var json = "{ \"configVersion\": 999 }";
 
       // Act/Assert: The version gate rejects it and names the offending version.
-      var exception = Assert.Throws<ArgumentException>(() => LevelGenerationSerializer.DeserializeConfig(json));
+      var exception = Assert.Throws<ArgumentException>(() => LevelGenSerializer.DeserializeConfig(json));
       Assert.Contains("999", exception.Message);
     }
 
@@ -230,7 +230,7 @@ public sealed class LevelGenerationSerializerTests
       var json = "{ \"general\": { \"degeneration\": -1 } }";
 
       // Act/Assert: Validation runs on the deserialized result.
-      Assert.Throws<ArgumentOutOfRangeException>(() => LevelGenerationSerializer.DeserializeConfig(json));
+      Assert.Throws<ArgumentOutOfRangeException>(() => LevelGenSerializer.DeserializeConfig(json));
     }
 
     [Fact]
@@ -241,7 +241,7 @@ public sealed class LevelGenerationSerializerTests
 
       // Act/Assert: Validation runs on the deserialized result and names the nested property.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => LevelGenerationSerializer.DeserializeConfig(json));
+        () => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("PlaceholderSleep", exception.ParamName);
     }
 
@@ -253,7 +253,7 @@ public sealed class LevelGenerationSerializerTests
 
       // Act/Assert: Validation runs on the deserialized result and names the nested property.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => LevelGenerationSerializer.DeserializeConfig(json));
+        () => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("PlaceholderSteps", exception.ParamName);
     }
 
@@ -265,7 +265,7 @@ public sealed class LevelGenerationSerializerTests
 
       // Act/Assert: Validation runs after parsing and names the offending section.
       var exception = Assert.Throws<ArgumentException>(
-        () => LevelGenerationSerializer.DeserializeConfig(json));
+        () => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("Graph", exception.ParamName);
     }
 
@@ -277,7 +277,7 @@ public sealed class LevelGenerationSerializerTests
 
       // Act/Assert: Validation runs after parsing and names the offending section.
       var exception = Assert.Throws<ArgumentException>(
-        () => LevelGenerationSerializer.DeserializeConfig(json));
+        () => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("ProcOpts", exception.ParamName);
     }
 
@@ -289,7 +289,7 @@ public sealed class LevelGenerationSerializerTests
 
       // Act/Assert: Validation cascades into the section and names it.
       var exception = Assert.Throws<ArgumentException>(
-        () => LevelGenerationSerializer.DeserializeConfig(json));
+        () => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("RelSecrets", exception.ParamName);
     }
 
@@ -301,7 +301,7 @@ public sealed class LevelGenerationSerializerTests
 
       // Act/Assert: Validation runs on the deserialized result and names the nested property.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => LevelGenerationSerializer.DeserializeConfig(json));
+        () => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("Amount", exception.ParamName);
     }
 
@@ -313,7 +313,7 @@ public sealed class LevelGenerationSerializerTests
 
       // Act/Assert: Validation runs on the deserialized result and names the nested property.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => LevelGenerationSerializer.DeserializeConfig(json));
+        () => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("GroupCount", exception.ParamName);
     }
 
@@ -326,7 +326,7 @@ public sealed class LevelGenerationSerializerTests
       // Act/Assert: The parse fails and surfaces as ArgumentException naming the parameter,
       // keeping the original JsonException as the inner exception.
       var exception = Assert.Throws<ArgumentException>(
-        () => LevelGenerationSerializer.DeserializeConfig(json));
+        () => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("json", exception.ParamName);
       Assert.IsType<JsonException>(exception.InnerException);
     }
@@ -340,7 +340,7 @@ public sealed class LevelGenerationSerializerTests
 
       // Act/Assert: Numbers are rejected during parsing, before validation ever runs.
       var exception = Assert.Throws<ArgumentException>(
-        () => LevelGenerationSerializer.DeserializeConfig(json));
+        () => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("json", exception.ParamName);
       Assert.IsType<JsonException>(exception.InnerException);
     }
@@ -353,13 +353,13 @@ public sealed class LevelGenerationSerializerTests
 
       // Act/Assert: The unknown member is rejected during parsing instead of silently dropped.
       var ex = Assert.Throws<ArgumentException>(
-        () => LevelGenerationSerializer.DeserializeConfig(json));
+        () => LevelGenSerializer.DeserializeConfig(json));
       Assert.Equal("json", ex.ParamName);
       Assert.IsType<JsonException>(ex.InnerException);
     }
   }
 
-  /// <summary>Tests <see cref="LevelGenerationSerializer.DeserializeConfig"/> success paths: defaults, case-insensitive keys and enum-name parsing.</summary>
+  /// <summary>Tests <see cref="LevelGenSerializer.DeserializeConfig"/> success paths: defaults, case-insensitive keys and enum-name parsing.</summary>
   public sealed class DeserializeParsingTests
   {
     [Fact]
@@ -369,7 +369,7 @@ public sealed class LevelGenerationSerializerTests
       var json = "{ \"general\": { \"seed\": 42 } }";
 
       // Act: Deserialize.
-      var config = LevelGenerationSerializer.DeserializeConfig(json);
+      var config = LevelGenSerializer.DeserializeConfig(json);
 
       // Assert: Missing properties keep their defaults; missing version counts as current.
       Assert.Equal(CnfLevelGeneration.CurrentConfigVersion, config.ConfigVersion);
@@ -386,7 +386,7 @@ public sealed class LevelGenerationSerializerTests
       var json = "{ \"CONFIGVERSION\": 1, \"GENERAL\": { \"SEED\": 7 } }";
 
       // Act: Deserialize.
-      var config = LevelGenerationSerializer.DeserializeConfig(json);
+      var config = LevelGenSerializer.DeserializeConfig(json);
 
       // Assert: Property matching ignores case on read.
       Assert.Equal(7, config.General.Seed);
@@ -399,7 +399,7 @@ public sealed class LevelGenerationSerializerTests
       var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"Simple\", \"CnfSimple\": { \"ChokepointChance\": 0.5, \"MaxExtraDegree\": 4, \"MaxExtraDegreeStar\": 7 } } } }";
 
       // Act: Deserialize.
-      var config = LevelGenerationSerializer.DeserializeConfig(json);
+      var config = LevelGenSerializer.DeserializeConfig(json);
 
       // Assert: The enum member name maps back to its value.
       Assert.Equal(EnGraphBuilder.Simple, config.Graph.GraphBuilder.Builder);
@@ -412,7 +412,7 @@ public sealed class LevelGenerationSerializerTests
       var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"simple\", \"CnfSimple\": { \"ChokepointChance\": 0.5, \"MaxExtraDegree\": 4, \"MaxExtraDegreeStar\": 7 } } } }";
 
       // Act: Deserialize.
-      var config = LevelGenerationSerializer.DeserializeConfig(json);
+      var config = LevelGenSerializer.DeserializeConfig(json);
 
       // Assert: Enum name matching on read forgives casing, like property names do.
       Assert.Equal(EnGraphBuilder.Simple, config.Graph.GraphBuilder.Builder);
@@ -425,7 +425,7 @@ public sealed class LevelGenerationSerializerTests
       var json = "{ \"graph\": { \"graphBuilder\": { \"builder\": \"Simple\", \"CnfSimple\": { \"ChokepointChance\": 0.5, \"MaxExtraDegree\": 4, \"MaxExtraDegreeStar\": 7 } } } }";
 
       // Act: Deserialize.
-      var config = LevelGenerationSerializer.DeserializeConfig(json);
+      var config = LevelGenSerializer.DeserializeConfig(json);
 
       // Assert: Missing proc options keep the defaults matching the legacy hardcoded ones.
       Assert.Equal(CnfProcOpt.Default, config.Graph.ProcOpts);
@@ -438,7 +438,7 @@ public sealed class LevelGenerationSerializerTests
       var json = "{ \"graph\": { \"procOpts\": { \"relSecrets\": { \"amount\": 0 } } } }";
 
       // Act: Deserialize.
-      var config = LevelGenerationSerializer.DeserializeConfig(json);
+      var config = LevelGenSerializer.DeserializeConfig(json);
 
       // Assert: The overridden section carries the custom value, every other section its
       // default.
@@ -458,7 +458,7 @@ public sealed class LevelGenerationSerializerTests
       var json = "{ \"graph\": { \"procOpts\": { \"nodeRelSize\": { \"curve\": \"linear\" } } } }";
 
       // Act: Deserialize.
-      var config = LevelGenerationSerializer.DeserializeConfig(json);
+      var config = LevelGenSerializer.DeserializeConfig(json);
 
       // Assert: The enum member name maps back to its value, case-insensitively like
       // every other name on read.

@@ -23,7 +23,7 @@ namespace LostInLimbo.LevelGen.Api;
 /// it pauses the run and waits (up to a timeout) for the worker to stop before clearing.
 /// </para>
 /// </summary>
-public sealed class LevelGenerationSession
+public sealed class LevelGenSession
 {
   /// <summary>
   /// Single source of truth for generation status of this session. Owned here; generators

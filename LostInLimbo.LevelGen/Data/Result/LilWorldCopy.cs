@@ -12,7 +12,7 @@ namespace LostInLimbo.LevelGen.Data.Result;
 /// <see cref="LilWorld"/> is a mutable record: a plain <c>with</c> expression would only copy
 /// the top-level references and leave the copy sharing the source's graph containers, stats
 /// and nested lists with the source. This helper detaches every mutable part instead, so the
-/// copy can be handed to consumers (e.g. <see cref="Api.LevelGenerationSession.World"/>) or
+/// copy can be handed to consumers (e.g. <see cref="Api.LevelGenSession.World"/>) or
 /// stored without either side being able to affect the other through shared state.
 /// <para>
   /// Maintenance rule: when mutable state is added to <see cref="LilWorld"/>, <see cref="LilGraph"/>,

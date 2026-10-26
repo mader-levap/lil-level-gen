@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <!--
+            [LostInLimbo.LevelGen.Tests]*  - the test assembly has no production value to
+            measure (test classes and helpers).
+            [LostInLimbo.LevelGen]System.*  - netstandard2.1 compiler shims live in System.*
+            namespaces, are never instantiated and are also marked with
+            [ExcludeFromCodeCoverage] on the types.
+            Both exclusions are also applied via attributes so every coverage collector
+            honors them, not only coverlet.
+          -->
+          <Exclude>[LostInLimbo.LevelGen.Tests]*,[LostInLimbo.LevelGen]System.*</Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

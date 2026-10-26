@@ -56,3 +56,24 @@ Notes:
 
 - NuGet caches packages by version. After changing the library, bump `<Version>` in `LostInLimbo.LevelGen.csproj` before packing again, otherwise consumers keep resolving the cached copy.
 - You can clear the cache with `dotnet nuget locals global-packages --clear`.
+
+## Testing
+
+### With coverage
+
+#### In Visual Studio Code
+You need C# Dev Kit extension from Microsoft.
+
+- Open Test Explorer (flask icon in the Activity Bar) — your xUnit tests appear grouped by class.
+- Click Run All Tests with Coverage (the coverage play-button next to the normal Run button), or right-click a subset.
+- Results: per-file coverage percentages in the Explorer view, inline green/red coverage overlay in the editor, and a Test Coverage toolbar to jump between uncovered blocks. Toggle the overlay via Test: Show Inline Coverage (Ctrl+; Ctrl+Shift+I).
+
+#### In CLI
+
+Run in terminal:
+
+```bash
+dotnet test LostInLimbo.slnx --collect:"XPlat Code Coverage" --settings coverlet.runsettings --nologo
+```
+
+It will generate report `coverage.cobertura.xml` in directory `LostInLimbo.LevelGen.Tests\TestResults\<guid>\`.
