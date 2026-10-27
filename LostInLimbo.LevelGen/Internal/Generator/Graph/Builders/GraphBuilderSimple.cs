@@ -37,7 +37,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGraphBuilder
 {
   /// <summary>Builder configuration; defaults to <see cref="CnfGraphBuilderSimple.Default"/>.</summary>
-  private CnfGraphBuilderSimple _config = cnfGraphBuilder.CnfSimple ?? CnfGraphBuilderSimple.Default;
+  private readonly CnfGraphBuilderSimple _config = cnfGraphBuilder.CnfSimple ?? CnfGraphBuilderSimple.Default;
 
   /// <summary>Minimum size where scenarios differ.</summary>
   private const int ScenarioSize = 3;

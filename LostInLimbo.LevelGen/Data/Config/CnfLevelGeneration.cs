@@ -7,14 +7,17 @@ namespace LostInLimbo.LevelGen.Data.Config;
 
 /// <summary>
 /// <para>
-/// Very detailed configuration for generating a level. This is the lowest level. In the future, you will be
-/// able to generate this config using less detailed settings.
+/// Very, very detailed and extensive configuration for generating a level.
+/// To simplify it, you can generate configuration using <see cref="LevelGenConfig"/>.
 /// </para>
-/// <para>This is the root of the JSON configuration file.</para>
 /// </summary>
 /// <remarks>
-/// <para>The same seed with the same configuration always produces the same level. The shape maps one-to-one to
-/// JSON via <c>LostInLimbo.LevelGen.Api.LevelGenerationSerializer</c>.</para>
+/// <para>
+/// The same seed with the same configuration always produces the same level.
+/// </para>
+/// <para>
+/// This is the root of the JSON configuration file. The shape maps one-to-one to JSON via <see cref="LevelGenerationSerializer"/>.
+/// </para>
 /// </remarks>
 public sealed record CnfLevelGeneration
 {
@@ -55,7 +58,7 @@ public sealed record CnfLevelGeneration
   /// Validates the invariants of this configuration and its general, graph and debug sections.
   /// </summary>
   /// <exception cref="ArgumentOutOfRangeException">A numeric setting is out of range, or a section carries an invalid value.</exception>
-  /// <exception cref="ArgumentException">The <see cref="General"/> or <see cref="Graph"/> section is <see langword="null"/>.</exception>
+  /// <exception cref="ArgumentException">A section is <see langword="null"/>.</exception>
   public void Validate()
   {
     if (ConfigVersion < 1)
@@ -70,6 +73,7 @@ public sealed record CnfLevelGeneration
       throw new ArgumentException("Map config must not be null.", nameof(Map));
     // Debug can be null.
 
+    // Validate all sections.
     General.Validate();
     Style.Validate();
     Graph.Validate();

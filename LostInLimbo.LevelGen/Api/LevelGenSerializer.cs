@@ -2,19 +2,24 @@ using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using LostInLimbo.LevelGen.Data.Config;
+using LostInLimbo.LevelGen.Data.Prop;
 
 namespace LostInLimbo.LevelGen.Api;
 
 /// <summary>
-/// Serializes and deserializes <see cref="CnfLevelGeneration"/> to and from JSON strings.
+/// Serializes and deserializes data to and from JSON strings.
 /// </summary>
 /// <remarks>
-/// This type defines the single canonical JSON format shared by all consumers (editor, game):
+/// <para>Supported data classes:</para>
+/// <list type="bullet">
+/// <item><see cref="CnfLevelGeneration"/></item>
+/// </list>
+/// <para>This type defines the single canonical JSON format shared by all consumers (editor, game):
 /// camelCase property names, indented output for hand-editable files. Reading is case-insensitive
 /// to be forgiving of hand-written files, but everything this type writes is camelCase.
 /// Enum values cross this boundary as PascalCase member names (e.g. <c>"Linear"</c>); numeric
 /// enum values are rejected during parsing so a file can never depend on the order of enum members.
-/// Only strings cross this boundary; file reading and writing stay with the callers.
+/// Only strings cross this boundary; file reading and writing stay with the callers.</para>
 /// </remarks>
 public static class LevelGenSerializer
 {
@@ -30,11 +35,14 @@ public static class LevelGenSerializer
     Converters = { new JsonStringEnumConverter(allowIntegerValues: false) },
   };
 
+  // ///////////////////////////////////////////////////////////////////////////
+  // CnfLevelGeneration
+
   /// <summary>
   /// Serializes a configuration into canonical JSON.
   /// </summary>
   /// <param name="config">Configuration to write. Validated before writing.</param>
-  /// <returns>JSON text representing <paramref name="config"/>.</returns>
+  /// <returns>JSON text representing configuration.</returns>
   /// <exception cref="ArgumentNullException"><paramref name="config"/> is <see langword="null"/>.</exception>
   /// <exception cref="ArgumentException">The configuration violates its own invariants.</exception>
   public static string SerializeConfig(CnfLevelGeneration config)
@@ -89,5 +97,69 @@ public static class LevelGenSerializer
 
     config.Validate();
     return config;
+  }
+
+  // ///////////////////////////////////////////////////////////////////////////
+  // PropMain
+
+  /// <summary>
+  /// Serializes a properties dataset into canonical JSON.
+  /// </summary>
+  /// <param name="props">Properties to write. Validated before writing.</param>
+  /// <returns>JSON text representing properties.</returns>
+  /// <exception cref="ArgumentNullException"><paramref name="props"/> is <see langword="null"/>.</exception>
+  /// <exception cref="ArgumentException">The properties violate their own invariants.</exception>
+  public static string SerializeProperties(PropMain props)
+  {
+    if (props is null) throw new ArgumentNullException(nameof(props));
+
+    props.Validate();
+
+    return JsonSerializer.Serialize(props, Options);
+  }
+
+  /// <summary>
+  /// Deserializes canonical JSON into a properties dataset and validates the result.
+  /// </summary>
+  /// <param name="json">JSON text previously produced by <see cref="SerializeProperties"/> or written by hand.</param>
+  /// <returns>The deserialized, validated properties dataset. Properties missing from the JSON keep their defaults.</returns>
+  /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
+  /// <exception cref="ArgumentException">
+  /// The JSON is empty, malformed, describes a newer <c>ConfigVersion</c> than this library
+  /// supports, or violates properties dataset invariants.
+  /// </exception>
+  public static PropMain DeserializeProperties(string json)
+  {
+    if (json is null) throw new ArgumentNullException(nameof(json));
+
+    if (string.IsNullOrWhiteSpace(json))
+      throw new ArgumentException("JSON must not be empty.", nameof(json));
+
+    PropMain? props;
+    try
+    {
+      props = JsonSerializer.Deserialize<PropMain>(json, Options);
+    }
+    catch (JsonException exception)
+    {
+      throw new ArgumentException(
+        $"JSON is not a valid {nameof(PropMain)}: {exception.Message}",
+        nameof(json),
+        exception);
+    }
+
+    if (props is null)
+      throw new ArgumentException("JSON deserialized to null.", nameof(json));
+
+    if (props.ConfigVersion != CnfLevelGeneration.CurrentConfigVersion)
+    {
+      throw new ArgumentException(
+        $"Config version {props.ConfigVersion} is different than the supported version " +
+        $"{CnfLevelGeneration.CurrentConfigVersion}. Update the library or the config file.",
+        nameof(json));
+    }
+
+    props.Validate();
+    return props;
   }
 }

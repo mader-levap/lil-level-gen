@@ -48,7 +48,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGraphBuilder
 {
   /// <summary>Builder configuration; defaults to <see cref="CnfGraphBuilderLinear.Default"/>.</summary>
-  private CnfGraphBuilderLinear _config = cnfGraphBuilder.CnfLinear ?? CnfGraphBuilderLinear.Default;
+  private readonly CnfGraphBuilderLinear _config = cnfGraphBuilder.CnfLinear ?? CnfGraphBuilderLinear.Default;
 
   /// <summary>
   /// Initial relative size of every node; replaced by the <see cref="ProcNodeRelSize"/>

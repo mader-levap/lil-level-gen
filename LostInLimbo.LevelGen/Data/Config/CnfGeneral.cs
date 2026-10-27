@@ -11,7 +11,7 @@ namespace LostInLimbo.LevelGen.Data.Config;
 public sealed record CnfGeneral
 {
   /// <summary>Default seed.</summary>
-  public const int DefaultSeed = 0;
+  public const long DefaultSeed = 0L;
 
   /// <summary>Default degeneration degree - no degeneration at all.</summary>
   public const float DefaultDegeneration = 0.0f;
@@ -31,7 +31,7 @@ public sealed record CnfGeneral
 
   /// <summary>
   /// Level of degeneration. The more the world is degenerated, the worse are the effects on map generation.
-  /// 0 means no corruption.
+  /// 0.0 means no corruption.
   /// </summary>
   public float Degeneration { get; init; } = DefaultDegeneration;
 
