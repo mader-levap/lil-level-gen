@@ -1,8 +1,10 @@
+using System;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Map;
 using LostInLimbo.LevelGen.Data.Config.Style;
 using LostInLimbo.LevelGen.Data.Prop;
+using LostInLimbo.LevelGen.Internal.Prop.Resolvers;
 
 namespace LostInLimbo.LevelGen.Internal.Prop;
 
@@ -10,10 +12,32 @@ namespace LostInLimbo.LevelGen.Internal.Prop;
 /// Main class handling config generation.
 /// </summary>
 /// <param name="propMain">Property dataset.</param>
-internal sealed class ConfigGenerator(PropMain propMain)
+internal sealed class ConfigGenerator
 {
   /// <summary>Property dataset.</summary>
-  private readonly PropMain _propMain = propMain;
+  private readonly PropMain _propMain;
+  /// <summary>Supporting data.</summary>
+  private PropData _propData;
+
+  public ConfigGenerator(PropMain propMain)
+  {
+    _propMain = propMain;
+    _propData = ResolvePropData();
+  }
+
+  /// <summary>
+  /// Resolve supporting data.
+  /// </summary>
+  /// <returns>Supporting data.</returns>
+  private PropData ResolvePropData()
+  {
+    return new PropData
+    {
+      Seed = DateTime.UtcNow.Ticks - 1000000, // Prevent collision with actual config seed.
+    };
+  }
+
+  // ///////////////////////////////////////////////////////////////////////////
 
   /// <summary>
   /// Create generation configuration based on given property dataset.
@@ -37,7 +61,7 @@ internal sealed class ConfigGenerator(PropMain propMain)
   /// <returns>Generated general configuration.</returns>
   private CnfGeneral ResolveGeneral()
   {
-    GeneralResolver generalResolver = new(_propMain);
+    GeneralResolver generalResolver = new(_propMain, _propData);
     return generalResolver.Execute();
   }
 
@@ -47,7 +71,7 @@ internal sealed class ConfigGenerator(PropMain propMain)
   /// <returns>Generated style configuration.</returns>
   private CnfStyle ResolveStyle()
   {
-    StyleResolver styleResolver = new(_propMain);
+    StyleResolver styleResolver = new(_propMain, _propData);
     return styleResolver.Execute();
   }
 
@@ -57,7 +81,7 @@ internal sealed class ConfigGenerator(PropMain propMain)
   /// <returns>Generated graph configuration.</returns>
   private CnfGraph ResolveGraph()
   {
-    GraphResolver graphResolver = new(_propMain);
+    GraphResolver graphResolver = new(_propMain, _propData);
     return graphResolver.Execute();
   }
 
@@ -67,7 +91,7 @@ internal sealed class ConfigGenerator(PropMain propMain)
   /// <returns>Generated map configuration.</returns>
   private CnfMap ResolveMap()
   {
-    MapResolver mapResolver = new(_propMain);
+    MapResolver mapResolver = new(_propMain, _propData);
     return mapResolver.Execute();
   }
 }

@@ -1,3 +1,6 @@
+using System;
+using System.Text;
+
 namespace LostInLimbo.LevelGen.Internal.Utils;
 
 /// <summary>
@@ -65,5 +68,46 @@ internal static class SeedDerivation
   public static long Derive(long worldSeed, long channel, long subChannel)
   {
     return Mix(Derive(worldSeed, channel) ^ Mix(subChannel));
+  }
+
+  /// <summary>
+  /// Hashes arbitrary text into a seed.
+  /// </summary>
+  /// <remarks>
+  /// <para>
+  /// FNV-1a 64-bit over the UTF-8 bytes of <paramref name="text"/>, finished with one
+  /// <see cref="Mix"/> step so a one-character change anywhere avalanches the whole seed.
+  /// The text is normalized to Unicode form C first, so composed and decomposed spellings
+  /// of the same visible characters hash identically.
+  /// </para>
+  /// <para>
+  /// Case-sensitive and culture-independent by design: <c>"Mordor"</c> and <c>"mordor"</c>
+  /// are different seeds. Never uses <c>string.GetHashCode()</c>, whose result is
+  /// randomized per process. Deterministic for the same text.
+  /// </para>
+  /// </remarks>
+  /// <param name="text">Non-empty, non-whitespace text to hash.</param>
+  /// <returns>Seed for the same text on every platform and process run.</returns>
+  /// <exception cref="ArgumentNullException"><paramref name="text"/> is <see langword="null"/>.</exception>
+  /// <exception cref="ArgumentException"><paramref name="text"/> is empty or whitespace.</exception>
+  public static long FromText(string text)
+  {
+    if (text is null)
+      throw new ArgumentNullException(nameof(text));
+
+    if (string.IsNullOrWhiteSpace(text))
+      throw new ArgumentException("Seed text must not be empty or whitespace.", nameof(text));
+
+    var bytes = Encoding.UTF8.GetBytes(text.Normalize(NormalizationForm.FormC));
+
+    // FNV-1a 64-bit: offset basis and prime as published at http://www.isthe.com/chongo/tech/comp/fnv/.
+    var hash = 0xcbf29ce484222325UL;
+    for (var i = 0; i < bytes.Length; i++)
+    {
+      hash ^= bytes[i];
+      hash *= 0x100000001b3UL;
+    }
+
+    return Mix(unchecked((long)hash));
   }
 }

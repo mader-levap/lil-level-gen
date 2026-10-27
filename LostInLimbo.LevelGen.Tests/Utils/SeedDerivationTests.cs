@@ -4,7 +4,8 @@ namespace LostInLimbo.LevelGen.Tests.Utils;
 
 /// <summary>
 /// Tests deterministic sub-seed derivation, grouped into suites by concern:
-/// the Mix primitive, two-argument Derive and nested three-argument Derive.
+/// the Mix primitive, two-argument Derive, nested three-argument Derive and
+/// text-to-seed hashing.
 /// </summary>
 public sealed class SeedDerivationTests
 {
@@ -170,6 +171,103 @@ public sealed class SeedDerivationTests
 
       // Assert: Sub-channels address independent streams.
       Assert.NotEqual(first, second);
+    }
+  }
+
+  /// <summary>Tests <see cref="SeedDerivation.FromText"/>: text-to-seed hashing.</summary>
+  public sealed class FromTextTests
+  {
+    [Fact]
+    public void FromText_WithKnownText_MatchesPinnedValues()
+    {
+      // Act: Hash texts chosen at implementation time: an ASCII word, a numeric string
+      // and a non-ASCII string with diacritics.
+      var mordor = SeedDerivation.FromText("mordor");
+      var numeric = SeedDerivation.FromText("42");
+      var unicode = SeedDerivation.FromText("Poznań");
+
+      // Assert: Outputs match values pinned at implementation time; any change breaks
+      // reproducibility of previously generated levels and must be a conscious decision.
+      Assert.Equal(-8341167147440548823L, mordor);
+      Assert.Equal(3332507518487421172L, numeric);
+      Assert.Equal(7468663056517749686L, unicode);
+    }
+
+    [Theory]
+    [InlineData("mordor")]
+    [InlineData("MORDOR")]
+    [InlineData("")]
+    [InlineData("a much longer seed text with spaces and punctuation!")]
+    [InlineData("Poznań 日本語")]
+    [InlineData("ǅungla")]
+    public void FromText_WithSameText_IsDeterministic(string text)
+    {
+      // Arrange: Empty and whitespace inputs are rejected, so skip them here.
+      if (string.IsNullOrWhiteSpace(text)) return;
+
+      // Act: Hash the same text twice.
+      var first = SeedDerivation.FromText(text);
+      var second = SeedDerivation.FromText(text);
+
+      // Assert: Both calls produce the identical output.
+      Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void FromText_DifferingOnlyByCase_ProducesDifferentSeeds()
+    {
+      // Act: Hash a word in two casings.
+      var lower = SeedDerivation.FromText("mordor");
+      var upper = SeedDerivation.FromText("Mordor");
+
+      // Assert: Text hashing is case-sensitive.
+      Assert.NotEqual(lower, upper);
+    }
+
+    [Fact]
+    public void FromText_WithSimilarTexts_ProducesDistinctSeeds()
+    {
+      // Arrange: Words differing by a single character.
+      string[] texts = ["mordor", "morbor", "mordol", "lordor", "mordoo"];
+
+      // Act: Hash every word.
+      var seeds = texts.Select(SeedDerivation.FromText).ToArray();
+
+      // Assert: No two words collapse onto the same seed.
+      Assert.Equal(seeds.Length, seeds.Distinct().Count());
+    }
+
+    [Fact]
+    public void FromText_WithNull_ThrowsArgumentNullException()
+    {
+      // Act/Assert: Null text is rejected.
+      Assert.Throws<ArgumentNullException>(() => SeedDerivation.FromText(null!));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t\n")]
+    public void FromText_WithEmptyOrWhitespace_ThrowsArgumentException(string text)
+    {
+      // Act/Assert: Empty and whitespace-only text is rejected.
+      Assert.Throws<ArgumentException>(() => SeedDerivation.FromText(text));
+    }
+
+    [Fact]
+    public void FromText_WithComposedAndDecomposedUnicode_ProducesSameSeed()
+    {
+      // Arrange: "Poznań" with a composed n-acute (U+0144) versus decomposed
+      // "n" + combining acute (U+0301); visually identical text from different inputs.
+      const string composed = "Pozna\u0144";
+      const string decomposed = "Poznan\u0301";
+
+      // Act: Hash both spellings.
+      var composedSeed = SeedDerivation.FromText(composed);
+      var decomposedSeed = SeedDerivation.FromText(decomposed);
+
+      // Assert: Unicode normalization makes both spellings hash identically.
+      Assert.Equal(composedSeed, decomposedSeed);
     }
   }
 }

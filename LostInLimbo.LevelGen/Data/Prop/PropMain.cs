@@ -15,7 +15,6 @@ namespace LostInLimbo.LevelGen.Data.Prop;
 /// <para>
 /// This is the root of the JSON configuration file. The shape maps one-to-one to JSON via <see cref="LevelGenerationSerializer"/>.
 /// </para>
-/// 
 /// </remarks>
 public sealed record PropMain
 {
@@ -33,9 +32,15 @@ public sealed record PropMain
   public int ConfigVersion { get; init; } = CnfLevelGeneration.CurrentConfigVersion;
 
   /// <summary>
-  /// Provided text seed that will be hashed into actual seed. If null, use current time as seed.
+  /// Provided text seed that will be hashed into actual seed. If null, empty or whitespace,
+  /// current time is used as seed.
   /// </summary>
   public string? TextSeed { get; init; } = null;
+
+  /// <summary>
+  /// Difficulty. In game these would be descriptive texts like "easy" or "hard", but here we represent it as number.
+  /// </summary>
+  public int Difficulty { get; init; } = 0;
 
   // Helpers.
 
