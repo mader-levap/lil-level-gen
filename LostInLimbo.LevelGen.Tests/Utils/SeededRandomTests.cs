@@ -158,6 +158,186 @@ public sealed class SeededRandomTests
     }
   }
 
+  /// <summary>Sub-suite covering bounded float draws.</summary>
+  public sealed class NextFloatTests
+  {
+    [Fact]
+    public void NextFloat_WithSameSeed_ProducesIdenticalSequence()
+    {
+      // Arrange: Two generators seeded identically.
+      var first = new SeededRandom(7);
+      var second = new SeededRandom(7);
+
+      // Act: Draw short sequences from both overloads.
+      var firstUnit = Enumerable.Range(0, 50).Select(_ => first.NextFloat(1f)).ToArray();
+      var secondUnit = Enumerable.Range(0, 50).Select(_ => second.NextFloat(1f)).ToArray();
+      var firstRange = Enumerable.Range(0, 50).Select(_ => first.NextFloat(-2f, 8f)).ToArray();
+      var secondRange = Enumerable.Range(0, 50).Select(_ => second.NextFloat(-2f, 8f)).ToArray();
+
+      // Assert: The sequences match draw for draw.
+      Assert.Equal(firstUnit, secondUnit);
+      Assert.Equal(firstRange, secondRange);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(-1f)]
+    public void NextFloat_WithNonPositiveBound_ThrowsArgumentOutOfRangeException(float maxExclusive)
+    {
+      // Arrange: Generator with a valid seed.
+      var random = new SeededRandom(1);
+
+      // Act/Assert: A zero or negative upper bound is rejected naming the parameter.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => random.NextFloat(maxExclusive));
+      Assert.Equal("maxExclusive", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(float.NegativeInfinity)]
+    public void NextFloat_WithNonFiniteBound_ThrowsArgumentOutOfRangeException(float maxExclusive)
+    {
+      // Arrange: Generator with a valid seed.
+      var random = new SeededRandom(1);
+
+      // Act/Assert: A NaN or infinite upper bound is rejected naming the parameter.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => random.NextFloat(maxExclusive));
+      Assert.Equal("maxExclusive", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(float.NaN, 1f)]
+    [InlineData(float.NegativeInfinity, 1f)]
+    public void NextFloat_WithNonFiniteLowerBound_ThrowsArgumentOutOfRangeException(float minInclusive, float maxExclusive)
+    {
+      // Arrange: Generator with a valid seed.
+      var random = new SeededRandom(1);
+
+      // Act/Assert: A NaN or infinite lower bound is rejected naming the parameter.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => random.NextFloat(minInclusive, maxExclusive));
+      Assert.Equal("minInclusive", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(0f, float.NaN)]
+    [InlineData(0f, float.PositiveInfinity)]
+    public void NextFloat_WithNonFiniteUpperBound_ThrowsArgumentOutOfRangeException(float minInclusive, float maxExclusive)
+    {
+      // Arrange: Generator with a valid seed.
+      var random = new SeededRandom(1);
+
+      // Act/Assert: A NaN or infinite upper bound is rejected naming the parameter.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => random.NextFloat(minInclusive, maxExclusive));
+      Assert.Equal("maxExclusive", exception.ParamName);
+    }
+
+    [Fact]
+    public void NextFloat_WithUnitBound_StaysWithinRange()
+    {
+      // Arrange: Generator with a valid seed.
+      var random = new SeededRandom(1234);
+
+      // Act: Draw many values over [0, 1).
+      var draws = Enumerable.Range(0, 500).Select(_ => random.NextFloat(1f)).ToArray();
+
+      // Assert: Every value is inside the half-open range and the draws are not constant.
+      Assert.All(draws, value => Assert.True(value >= 0f && value < 1f, $"Value {value} is outside [0, 1)."));
+      Assert.True(draws.Distinct().Count() > 1, "Expected more than one distinct value.");
+    }
+
+    [Fact]
+    public void NextFloat_WithRange_ReturnsValuesInsideRange()
+    {
+      // Arrange: Generator with a closed lower bound.
+      var random = new SeededRandom(99);
+
+      // Act: Draw many values over [10, 20).
+      var draws = Enumerable.Range(0, 500).Select(_ => random.NextFloat(10f, 20f)).ToArray();
+
+      // Assert: Every value is inside the inclusive-exclusive range.
+      Assert.All(draws, value => Assert.True(value >= 10f && value < 20f, $"Value {value} is outside [10, 20)."));
+    }
+
+    [Fact]
+    public void NextFloat_WithNegativeRange_ReturnsValuesInsideRange()
+    {
+      // Arrange: Generator with a fully negative range.
+      var random = new SeededRandom(42);
+
+      // Act: Draw many values over [-5, -1).
+      var draws = Enumerable.Range(0, 500).Select(_ => random.NextFloat(-5f, -1f)).ToArray();
+
+      // Assert: Every value is inside the inclusive-exclusive range.
+      Assert.All(draws, value => Assert.True(value >= -5f && value < -1f, $"Value {value} is outside [-5, -1)."));
+    }
+
+    [Fact]
+    public void NextFloat_WithEqualBounds_ReturnsThatBound()
+    {
+      // Arrange: Generator and a degenerate range.
+      var random = new SeededRandom(5);
+
+      // Act/Assert: An empty range yields the bound without drawing.
+      Assert.Equal(7.5f, random.NextFloat(7.5f, 7.5f));
+    }
+
+    [Fact]
+    public void NextFloat_WithInvertedBounds_ThrowsArgumentOutOfRangeException()
+    {
+      // Arrange: Generator with an upper bound below the lower bound.
+      var random = new SeededRandom(5);
+
+      // Act/Assert: The inverted range is rejected naming the parameter.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => random.NextFloat(10f, 5f));
+      Assert.Equal("maxExclusive", exception.ParamName);
+    }
+
+    [Fact]
+    public void NextFloat_WithTinyRange_NeverReachesUpperBound()
+    {
+      // Arrange: A range one float step wide, where naive mapping rounds up to the bound.
+      var random = new SeededRandom(3);
+      const float minInclusive = 1.0f;
+      const float maxExclusive = 1.0000001f;
+      Assert.True(minInclusive < maxExclusive, "Range must span at least one float step.");
+
+      // Act: Draw many values over the tiny range.
+      var draws = Enumerable.Range(0, 1000).Select(_ => random.NextFloat(minInclusive, maxExclusive)).ToArray();
+
+      // Assert: Rounding never lets a draw reach the exclusive upper bound.
+      Assert.All(draws, value => Assert.True(value >= minInclusive && value < maxExclusive, $"Value {value} reached the upper bound."));
+    }
+
+    [Fact]
+    public void NextFloat_WithSeed42_MatchesPinnedSequence()
+    {
+      // Arrange: Generator with a known seed.
+      var random = new SeededRandom(42);
+
+      // Act: Draw ten bounded values.
+      var draws = Enumerable.Range(0, 10).Select(_ => random.NextFloat(10f)).ToArray();
+
+      // Assert: The sequence matches the pinned reference (reproducibility guard).
+      float[] expected = [7.4156485f, 1.5991038f, 2.7860112f, 3.4419065f, 0.38030148f, 8.682281f, 2.184052f, 8.006318f, 3.39931f, 6.1848207f];
+      Assert.Equal(expected, draws);
+    }
+
+    [Fact]
+    public void NextFloat_OverUnitRange_HasRoughlyHalfMean()
+    {
+      // Arrange: Generator with a valid seed.
+      var random = new SeededRandom(1234);
+
+      // Act: Draw ten thousand values over [0, 1).
+      var draws = Enumerable.Range(0, 10_000).Select(_ => random.NextFloat(1f)).ToArray();
+
+      // Assert: The mean stays near 0.5, so the distribution is not skewed to an edge.
+      var mean = draws.Average();
+      Assert.InRange(mean, 0.45, 0.55);
+    }
+  }
+
   /// <summary>Sub-suite covering probabilistic boolean draws.</summary>
   public sealed class NextBoolTests
   {

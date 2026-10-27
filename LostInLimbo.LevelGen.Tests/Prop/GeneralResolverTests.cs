@@ -69,4 +69,57 @@ public sealed class GeneralResolverTests
       Assert.InRange(seed, before, after);
     }
   }
+
+  /// <summary>Tests degeneration level resolution from the resolver sub-seed stream.</summary>
+  public sealed class DegenerationTests
+  {
+    /// <summary>Creates a resolver over a property dataset with the given internal seed and difficulty.</summary>
+    private static GeneralResolver CreateResolver(long propSeed, int difficulty)
+    {
+      return new GeneralResolver(new PropMain { TextSeed = "mordor", Difficulty = difficulty }, new PropData { Seed = propSeed });
+    }
+
+    [Fact]
+    public void Execute_WithFixedPropSeed_IsDeterministic()
+    {
+      // Act: Resolve twice from the same internal seed; the clock must not leak in.
+      var first = CreateResolver(42, 0).Execute();
+      var second = CreateResolver(42, 0).Execute();
+
+      // Assert: The degeneration level is identical draw for draw.
+      Assert.Equal(first.Degeneration, second.Degeneration);
+    }
+
+    [Fact]
+    public void Execute_WithFixedPropSeed_MatchesPinnedValue()
+    {
+      // Act: Resolve degeneration from a known internal seed at difficulty 0.
+      var config = CreateResolver(42, 0).Execute();
+
+      // Assert: The value matches the pinned reference, so the resolver salt cannot
+      // silently change without breaking reproducibility of generated configs.
+      Assert.Equal(3.10072184f, config.Degeneration);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(3)]
+    public void Execute_WithDifficulty_StaysInsideDegenerationRange(int difficulty)
+    {
+      // Act: Resolve degeneration for a difficulty step.
+      var config = CreateResolver(7, difficulty).Execute();
+
+      // Assert: The value stays inside the difficulty step's range, with the lower
+      // bound clamped at 0.0 and the value finite (so CnfGeneral.Validate passes).
+      var baseValue = difficulty * 10.0f;
+      var from = Math.Max(0.0f, baseValue - 20.0f);
+      var to = baseValue + 20.0f;
+
+      Assert.True(float.IsFinite(config.Degeneration), "Degeneration must be finite.");
+      Assert.True(
+        config.Degeneration >= from && config.Degeneration < to,
+        $"Degeneration {config.Degeneration} is outside [{from}, {to}).");
+    }
+  }
 }

@@ -54,6 +54,9 @@ public sealed record PropMain
     if (ConfigVersion < 1)
       throw new ArgumentOutOfRangeException(nameof(ConfigVersion), ConfigVersion, "Config version must be at least 1.");
 
+    if (Difficulty < 0)
+      throw new ArgumentOutOfRangeException(nameof(ConfigVersion), ConfigVersion, "Difficulty must be at least 0.");
+
     // Validate all sections.
     // PLACEHOLDER
   }

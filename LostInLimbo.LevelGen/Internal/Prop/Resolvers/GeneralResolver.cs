@@ -11,10 +11,16 @@ namespace LostInLimbo.LevelGen.Internal.Prop.Resolvers;
 /// <param name="propMain">Property dataset.</param>
 internal sealed class GeneralResolver(PropMain propMain, PropData propData)
 {
+  /// <summary>Salt for the general resolver sub-seed; keeps this pass off other passes' streams.</summary>
+  private const long SaltGeneralResolver = 0x63666767656E; // "cfggen"
+
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain = propMain;
   /// <summary>Supporting data.</summary>
   private PropData _propData = propData;
+
+  /// <summary>Random for sub-seed.</summary>
+  private readonly SeededRandom _random = new(SeedDerivation.Derive(propData.Seed, SaltGeneralResolver));
 
   /// <summary>
   /// Resolve general configuration based on given property dataset.
@@ -57,7 +63,9 @@ internal sealed class GeneralResolver(PropMain propMain, PropData propData)
   /// <returns>Degeneration level.</returns>
   private float ResolveDegeneration()
   {
-    // TODO
-    return 0.0f;
+    float baseValue = _propMain.Difficulty * 10.0f;
+    float from = Math.Max(0.0f, baseValue - 20.0f);
+    float to = baseValue + 20.0f;
+    return _random.NextFloat(from, to);
   }
 }
