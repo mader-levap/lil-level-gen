@@ -12,14 +12,15 @@ namespace LostInLimbo.LevelGen.Tests.Prop;
 /// generated configuration validates end to end and stays inside the resolver's
 /// difficulty-driven ranges. All runs are deterministic; a failing (difficulty, seed)
 /// pair reproduces the exact configuration. After each sweep the collected samples are
-/// reported through <see cref="ITestOutputHelper"/> as a min/max/average/median table,
-/// followed by one table per graph builder that appeared in the sweep, covering that
-/// builder's own configuration variables.
+/// reported through <see cref="ITestOutputHelper"/> as a min/max/average/median table
+/// plus a graph-diversity line (unique configs and Shannon entropy), followed by one
+/// table per graph builder that appeared in the sweep, covering that builder's own
+/// configuration variables.
 /// </summary>
 public sealed class ConfigGeneratorStressTests
 {
   /// <summary>Number of seeded generations per difficulty step.</summary>
-  private const int GenerationsPerDifficulty = 1000;
+  private const int GenerationsPerDifficulty = 1024;
 
   /// <summary>Fixed text seed so only the supporting draw stream varies across the sweep.</summary>
   private const string TextSeed = "mordor";
@@ -57,6 +58,7 @@ public sealed class ConfigGeneratorStressTests
     var complexitySamples = new List<int>(GenerationsPerDifficulty);
     var goalAmountSamples = new List<int>(GenerationsPerDifficulty);
     var optGoalAmountSamples = new List<int>(GenerationsPerDifficulty);
+    var secretsAmountSamples = new List<int>(GenerationsPerDifficulty);
 
     // Arrange: Per-builder sample buffers for the builder-specific tables.
     var simpleChokepointChanceSamples = new List<float>(GenerationsPerDifficulty);
@@ -67,6 +69,10 @@ public sealed class ConfigGeneratorStressTests
     var linearMaxConditionPerRelSamples = new List<int>(GenerationsPerDifficulty);
     var linearMaxConditionDistanceSamples = new List<int>(GenerationsPerDifficulty);
     var linearMaxSkipDistanceSamples = new List<int>(GenerationsPerDifficulty);
+
+    // Arrange: Occurrence counts per distinct graph config for the diversity line;
+    // CnfGraph is a record, so the key compares full structural equality.
+    var graphCounts = new Dictionary<CnfGraph, int>(GenerationsPerDifficulty);
 
     for (int i = 0; i < GenerationsPerDifficulty; i++)
     {
@@ -113,6 +119,7 @@ public sealed class ConfigGeneratorStressTests
       complexitySamples.Add(graph.Complexity);
       goalAmountSamples.Add(graph.ProcOpts.NodeObjectives.GoalAmount);
       optGoalAmountSamples.Add(graph.ProcOpts.NodeObjectives.OptGoalAmount);
+      secretsAmountSamples.Add(graph.ProcOpts.RelSecrets.Amount);
 
       switch (graph.GraphBuilder.Builder)
       {
@@ -133,6 +140,10 @@ public sealed class ConfigGeneratorStressTests
         default:
           throw new InvalidOperationException($"Unexpected builder {graph.GraphBuilder.Builder}.");
       }
+
+      // Act: Tally this graph config for the diversity line.
+      graphCounts.TryGetValue(graph, out int seen);
+      graphCounts[graph] = seen + 1;
     }
 
     // Act: Summarize the sweep.
@@ -143,7 +154,8 @@ public sealed class ConfigGeneratorStressTests
       connectivitySamples,
       complexitySamples,
       goalAmountSamples,
-      optGoalAmountSamples);
+      optGoalAmountSamples,
+      secretsAmountSamples);
 
     var culture = CultureInfo.InvariantCulture;
 
@@ -169,6 +181,59 @@ public sealed class ConfigGeneratorStressTests
         FormatStatsRow("MaxConditionDistance", linearMaxConditionDistanceSamples, culture),
         FormatStatsRow("MaxSkipDistance", linearMaxSkipDistanceSamples, culture));
     }
+
+    PrintDiversityLine(GenerationsPerDifficulty, graphCounts);
+  }
+
+  // Diversity line.
+
+  /// <summary>
+  /// Reports how diverse the sweep's graph configs were: number of structurally distinct
+  /// configs, their share of the sweep, and Shannon entropy (bits plus a 0-1 evenness
+  /// normalization). Low difficulties collapse toward a handful of configs, which is what
+  /// makes graph-space collisions - and flaky divergence assertions - possible there.
+  /// </summary>
+  /// <remarks>
+  /// <para>
+  /// <c>entropy x.xxx bits</c>: How much the sweep actually explored (capped by sample size).
+  /// Low entropy compared to sample size means identical values repeat often.
+  /// </para>
+  /// <para>
+  /// <c>(x.xxx normalized)</c>: Measures evenness.
+  ///  1.0 = the unique configs appeared equally often. A low value would mean a few configs dominate despite many being seen.
+  /// </para>
+  /// </remarks>
+  /// <param name="total">Number of generations in the sweep.</param>
+  /// <param name="graphCounts">Occurrence count per distinct graph config.</param>
+  private void PrintDiversityLine(int total, IReadOnlyDictionary<CnfGraph, int> graphCounts)
+  {
+    var culture = CultureInfo.InvariantCulture;
+    int unique = graphCounts.Count;
+    double share = unique * 100.0 / total;
+    double entropyBits = ShannonEntropyBits(graphCounts.Values);
+    double normalized = unique > 1 ? entropyBits / Math.Log2(unique) : 0.0;
+
+    _output.WriteLine(
+      $"Diversity: {unique} unique graphs / {total} ({share.ToString("F1", culture)}%), " +
+      $"entropy {entropyBits.ToString("F3", culture)} bits ({normalized.ToString("F3", culture)} normalized)");
+    _output.WriteLine(string.Empty);
+  }
+
+  /// <summary>Computes the Shannon entropy of an occurrence-count distribution, in bits.</summary>
+  /// <param name="counts">Occurrence counts; sum is the sample total. Order does not matter.</param>
+  /// <returns>Entropy in bits; 0 when all samples share one outcome.</returns>
+  private static double ShannonEntropyBits(IEnumerable<int> counts)
+  {
+    int total = counts.Sum();
+    double entropy = 0.0;
+    foreach (int count in counts)
+    {
+      if (count == 0) continue;
+
+      double probability = (double)count / total;
+      entropy -= probability * Math.Log2(probability);
+    }
+    return entropy;
   }
 
   // Statistics table.
@@ -184,6 +249,7 @@ public sealed class ConfigGeneratorStressTests
   /// <param name="complexitySamples">Collected <c>CnfGraph.Complexity</c> values.</param>
   /// <param name="goalAmountSamples">Collected <c>CnfProcNodeObjectivesOpt.GoalAmount</c> values.</param>
   /// <param name="optGoalAmountSamples">Collected <c>CnfProcNodeObjectivesOpt.OptGoalAmount</c> values.</param>
+  /// <param name="secretsAmountSamples">Collected <c>CnfProcRelSecretsOpt.Amount</c> values.</param>
   private void PrintStatsTable(
     int difficulty,
     IReadOnlyList<float> degenerationSamples,
@@ -191,7 +257,8 @@ public sealed class ConfigGeneratorStressTests
     IReadOnlyList<int> connectivitySamples,
     IReadOnlyList<int> complexitySamples,
     IReadOnlyList<int> goalAmountSamples,
-    IReadOnlyList<int> optGoalAmountSamples)
+    IReadOnlyList<int> optGoalAmountSamples,
+    IReadOnlyList<int> secretsAmountSamples)
   {
     var culture = CultureInfo.InvariantCulture;
 
@@ -203,6 +270,7 @@ public sealed class ConfigGeneratorStressTests
     _output.WriteLine(FormatStatsRow("Complexity", complexitySamples, culture));
     _output.WriteLine(FormatStatsRow("GoalAmount", goalAmountSamples, culture));
     _output.WriteLine(FormatStatsRow("OptGoalAmount", optGoalAmountSamples, culture));
+    _output.WriteLine(FormatStatsRow("SecretsAmount", secretsAmountSamples, culture));
     _output.WriteLine(string.Empty);
   }
 
