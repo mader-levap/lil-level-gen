@@ -24,7 +24,17 @@ internal sealed class ConfigGenerator
   public ConfigGenerator(PropMain propMain)
   {
     _propMain = propMain;
+    _propMain.Validate();
+    
     _propData = ResolvePropData();
+  }
+
+  public ConfigGenerator(PropMain propMain, PropData propData)
+  {
+    _propMain = propMain;
+    _propMain.Validate();
+    
+    _propData = propData;
   }
 
   /// <summary>

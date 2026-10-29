@@ -18,6 +18,9 @@ namespace LostInLimbo.LevelGen.Data.Prop;
 /// </remarks>
 public sealed record PropMain
 {
+  /// <summary>Maximum allowed difficulty.</summary>
+  public const int MaxDifficulty = 100;
+
   // Defaults.
 
   /// <summary>Default instance.</summary>
@@ -55,7 +58,9 @@ public sealed record PropMain
       throw new ArgumentOutOfRangeException(nameof(ConfigVersion), ConfigVersion, "Config version must be at least 1.");
 
     if (Difficulty < 0)
-      throw new ArgumentOutOfRangeException(nameof(ConfigVersion), ConfigVersion, "Difficulty must be at least 0.");
+      throw new ArgumentOutOfRangeException(nameof(Difficulty), Difficulty, "Difficulty must be at least 0.");
+    if (Difficulty > MaxDifficulty)
+      throw new ArgumentOutOfRangeException(nameof(Difficulty), Difficulty, $"Difficulty must not exceed {MaxDifficulty}.");
 
     // Validate all sections.
     // PLACEHOLDER
