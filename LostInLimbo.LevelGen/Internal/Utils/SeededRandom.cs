@@ -137,7 +137,7 @@ internal sealed class SeededRandom
   /// </summary>
   /// <param name="minInclusive">Lower bound, inclusive.</param>
   /// <param name="maxExclusive">Upper bound, exclusive.</param>
-  /// <returns>Value in <c>[minInclusive, maxExclusive)</c>; <paramref name="minInclusive"/> when the range is empty.</returns>
+  /// <returns>Value in <c>[minInclusive, maxExclusive)</c> range; <paramref name="minInclusive"/> when the range is empty.</returns>
   /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxExclusive"/> is less than <paramref name="minInclusive"/>.</exception>
   public int NextInt(int minInclusive, int maxExclusive)
   {

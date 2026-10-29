@@ -8,6 +8,7 @@ namespace LostInLimbo.LevelGen.Internal.Prop.Resolvers;
 /// Resolves style configuration.
 /// </summary>
 /// <param name="propMain">Property dataset.</param>
+/// <param name="propData">Internal data supporting config generation.</param>
 internal sealed class StyleResolver(PropMain propMain, PropData propData)
 {
   /// <summary>Salt for the style resolver sub-seed; keeps this pass off other passes' streams.</summary>
@@ -27,7 +28,9 @@ internal sealed class StyleResolver(PropMain propMain, PropData propData)
   /// <returns>Resolved style configuration.</returns>
   public CnfStyle Execute()
   {
-    // PLACEHOLDER: for now return default.
-    return CnfStyle.Default;
+    return CnfStyle.Default with
+    {
+      // For now nothing in style configuration.      
+    };
   }
 }

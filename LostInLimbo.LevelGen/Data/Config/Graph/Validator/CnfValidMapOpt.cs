@@ -16,7 +16,7 @@ public sealed record CnfValidMapOpt
   // Fields.
 
   /// <summary>
-  /// If true, perform graph validation when graph generation is finished.
+  /// If true, perform map validation when map generation is finished.
   /// </summary>
   public bool Enabled { get; init; } = false;
 }

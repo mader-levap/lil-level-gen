@@ -38,7 +38,7 @@ public sealed record PropMain
   public string? TextSeed { get; init; } = null;
 
   /// <summary>
-  /// Difficulty. In game these would be descriptive texts like "easy" or "hard", but here we represent it as number.
+  /// Difficulty. In game these would be descriptive texts like "easy" or "hard", but here we represent it as number. Smallest is 0.
   /// </summary>
   public int Difficulty { get; init; } = 0;
 

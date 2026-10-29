@@ -9,6 +9,7 @@ namespace LostInLimbo.LevelGen.Internal.Prop.Resolvers;
 /// Resolves general configuration.
 /// </summary>
 /// <param name="propMain">Property dataset.</param>
+/// <param name="propData">Internal data supporting config generation.</param>
 internal sealed class GeneralResolver(PropMain propMain, PropData propData)
 {
   /// <summary>Salt for the general resolver sub-seed; keeps this pass off other passes' streams.</summary>
@@ -28,12 +29,14 @@ internal sealed class GeneralResolver(PropMain propMain, PropData propData)
   /// <returns>Resolved general configuration.</returns>
   public CnfGeneral Execute()
   {
-    return new CnfGeneral
+    return CnfGeneral.Default with
     {
       Seed = ResolveSeed(),
       Degeneration = ResolveDegeneration(),
     };
   }
+
+  // Field resolvers.
 
   /// <summary>
   /// Resolve seed from the text seed, or from the current time if no text seed is given.
