@@ -180,17 +180,22 @@ public sealed class ConfigGeneratorTests
     [Fact]
     public void Execute_WithTextSeed_KeepsGeneralSeedStableAcrossRuns()
     {
-      // Arrange: Property dataset with a text seed; two clock-seeded generators whose
-      // supporting seeds cannot collide (the clock is allowed to advance in between).
+      // Arrange: Property dataset with a text seed and two clock-seeded generators
+      // whose supporting seeds cannot collide (spin until the clock ticks between
+      // constructions, so sleep granularity can never let them share a tick).
       var propMain = PropMain.Default with { TextSeed = "mordor" };
       var first = new ConfigGenerator(propMain).Execute();
-      Thread.Sleep(20);
+      WaitForNextClockTick();
       var second = new ConfigGenerator(propMain).Execute();
 
       // Assert: The general seed comes from the text seed, so it is stable, while the
-      // supporting seed comes from the clock, so the graph draws diverge.
+      // supporting seed comes from the clock, so the resolver's random draws diverge.
+      // Degeneration is used as the divergence probe because at difficulty 0 the graph
+      // draw space is only a handful of combinations (two clock seeds could legitimately
+      // draw the same graph), whereas a continuous float draw colliding is impossible
+      // in practice.
       Assert.Equal(first.General.Seed, second.General.Seed);
-      Assert.NotEqual(first.Graph, second.Graph);
+      Assert.NotEqual(first.General.Degeneration, second.General.Degeneration);
     }
 
     [Fact]
@@ -204,6 +209,16 @@ public sealed class ConfigGeneratorTests
 
       // Assert: The general seed is a timestamp taken between the two clock reads.
       Assert.InRange(config.General.Seed, before, after);
+    }
+
+    /// <summary>Spins until the wall clock advances, so two clock-seeded constructions cannot share a tick.</summary>
+    private static void WaitForNextClockTick()
+    {
+      var previous = DateTime.UtcNow;
+      while (DateTime.UtcNow == previous)
+      {
+        // Busy-wait: a tick is shorter than any sleep granularity.
+      }
     }
   }
 
