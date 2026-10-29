@@ -122,7 +122,7 @@ public sealed class GraphResolverTests
           case EnGraphBuilder.Simple:
             Assert.NotNull(builder.CnfSimple);
             Assert.Null(builder.CnfLinear);
-            Assert.Equal(0.5f, builder.CnfSimple!.ChokepointChance);
+            Assert.InRange(builder.CnfSimple!.ChokepointChance, 0.2f, 0.95f);
             Assert.Equal(4, builder.CnfSimple!.MaxExtraDegree);
             Assert.Equal(7, builder.CnfSimple!.MaxExtraDegreeStar);
             seenSimple = true;

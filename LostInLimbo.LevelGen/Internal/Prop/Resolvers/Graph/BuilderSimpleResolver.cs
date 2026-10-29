@@ -28,7 +28,7 @@ internal sealed class BuilderSimpleResolver(PropMain propMain, PropData propData
     // TODO: set actual random varying values.
     return CnfGraphBuilderSimple.Default with
     {
-      ChokepointChance = 0.5f,
+      ChokepointChance = _random.NextFloat(0.2f, 0.95f),
       MaxExtraDegree = 4,
       MaxExtraDegreeStar = 7,
     };

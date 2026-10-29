@@ -5,8 +5,8 @@ using LostInLimbo.LevelGen.Internal.Utils;
 namespace LostInLimbo.LevelGen.Tests.Prop;
 
 /// <summary>
-/// Tests simple graph builder option resolution. Values are currently fixed placeholders
-/// until the planned randomization lands.
+/// Tests simple graph builder option resolution: ChokepointChance is randomized inside
+/// its planned range, while the Max* caps are still fixed placeholders.
 /// </summary>
 public sealed class BuilderSimpleResolverTests
 {
@@ -22,11 +22,22 @@ public sealed class BuilderSimpleResolverTests
     // Act: Resolve simple builder options.
     var config = CreateResolver(42).Execute();
 
-    // Assert: Values match the pinned placeholders, so the planned conversion to
-    // randomized values shows up as an intentional test update.
-    Assert.Equal(0.5f, config.ChokepointChance);
+    // Assert: The still-fixed caps match the pinned placeholders, so their planned
+    // conversion to randomized values shows up as an intentional test update.
     Assert.Equal(4, config.MaxExtraDegree);
     Assert.Equal(7, config.MaxExtraDegreeStar);
+  }
+
+  [Fact]
+  public void Execute_RandomizesChokepointChance_MatchesPinnedValue()
+  {
+    // Act: Resolve simple builder options from a known stream.
+    var config = CreateResolver(42).Execute();
+
+    // Assert: The value matches the pinned draw, so the resolver salt and stream order
+    // cannot silently change, and it stays inside the planned randomization range.
+    Assert.Equal(0.75617367f, config.ChokepointChance);
+    Assert.InRange(config.ChokepointChance, 0.2f, 0.95f);
   }
 
   [Fact]

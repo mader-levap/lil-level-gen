@@ -13,9 +13,9 @@ namespace LostInLimbo.LevelGen.Tests.Prop;
 /// difficulty-driven ranges. All runs are deterministic; a failing (difficulty, seed)
 /// pair reproduces the exact configuration. After each sweep the collected samples are
 /// reported through <see cref="ITestOutputHelper"/> as a min/max/average/median table
-/// plus a graph-diversity line (unique configs and Shannon entropy), followed by one
-/// table per graph builder that appeared in the sweep, covering that builder's own
-/// configuration variables.
+/// plus a graph-diversity line (unique integer signatures and Shannon entropy),
+/// followed by one table per graph builder that appeared in the sweep, covering that
+/// builder's own configuration variables.
 /// </summary>
 public sealed class ConfigGeneratorStressTests
 {
@@ -70,9 +70,10 @@ public sealed class ConfigGeneratorStressTests
     var linearMaxConditionDistanceSamples = new List<int>(GenerationsPerDifficulty);
     var linearMaxSkipDistanceSamples = new List<int>(GenerationsPerDifficulty);
 
-    // Arrange: Occurrence counts per distinct graph config for the diversity line;
-    // CnfGraph is a record, so the key compares full structural equality.
-    var graphCounts = new Dictionary<CnfGraph, int>(GenerationsPerDifficulty);
+    // Arrange: Occurrence counts per distinct graph signature for the diversity line.
+    // The signature covers only the integer/enum variables shown in the tables, so
+    // float chance randomization cannot inflate the metric with fake diversity.
+    var graphCounts = new Dictionary<GraphSignature, int>(GenerationsPerDifficulty);
 
     for (int i = 0; i < GenerationsPerDifficulty; i++)
     {
@@ -141,9 +142,10 @@ public sealed class ConfigGeneratorStressTests
           throw new InvalidOperationException($"Unexpected builder {graph.GraphBuilder.Builder}.");
       }
 
-      // Act: Tally this graph config for the diversity line.
-      graphCounts.TryGetValue(graph, out int seen);
-      graphCounts[graph] = seen + 1;
+      // Act: Tally this graph's structural signature for the diversity line.
+      var signature = CreateGraphSignature(graph);
+      graphCounts.TryGetValue(signature, out int seen);
+      graphCounts[signature] = seen + 1;
     }
 
     // Act: Summarize the sweep.
@@ -188,10 +190,106 @@ public sealed class ConfigGeneratorStressTests
   // Diversity line.
 
   /// <summary>
-  /// Reports how diverse the sweep's graph configs were: number of structurally distinct
-  /// configs, their share of the sweep, and Shannon entropy (bits plus a 0-1 evenness
-  /// normalization). Low difficulties collapse toward a handful of configs, which is what
-  /// makes graph-space collisions - and flaky divergence assertions - possible there.
+  /// Structural signature of a generated graph: the integer and enum variables shown in
+  /// the statistics tables (main table minus Degeneration, plus the picked builder's own
+  /// int fields). Deliberately excludes all float chance values, so randomizing those
+  /// within a range cannot inflate unique counts or entropy with fake diversity. The
+  /// builder's Max* fields are additionally banded (0=Low, 1=Mid, 2=High) because a cap
+  /// wobbling by one is not a meaningfully different graph.
+  /// </summary>
+  /// <param name="Builder">Picked graph builder.</param>
+  /// <param name="Size">Graph size.</param>
+  /// <param name="Connectivity">Graph connectivity.</param>
+  /// <param name="Complexity">Graph complexity.</param>
+  /// <param name="GoalAmount">Mandatory objective POI count.</param>
+  /// <param name="OptGoalAmount">Optional objective POI count.</param>
+  /// <param name="SecretsAmount">Secret node count.</param>
+  /// <param name="BuilderVar0">First picked builder's banded Max* variable; -1 when unused.</param>
+  /// <param name="BuilderVar1">Second picked builder's banded Max* variable; -1 when unused.</param>
+  /// <param name="BuilderVar2">Third picked builder's banded Max* variable; -1 when unused.</param>
+  /// <param name="BuilderVar3">Fourth picked builder's banded Max* variable; -1 when unused.</param>
+  /// <param name="BuilderVar4">Fifth picked builder's banded Max* variable; -1 when unused.</param>
+  private readonly record struct GraphSignature(
+    EnGraphBuilder Builder,
+    int Size,
+    int Connectivity,
+    int Complexity,
+    int GoalAmount,
+    int OptGoalAmount,
+    int SecretsAmount,
+    int BuilderVar0,
+    int BuilderVar1,
+    int BuilderVar2,
+    int BuilderVar3,
+    int BuilderVar4);
+
+  /// <summary>
+  /// Builds the diversity signature of a graph from its integer and enum variables.
+  /// The picked builder's Max* caps are banded (0=Low, 1=Mid, 2=High); unused slots are
+  /// -1 so they can never collide with a real Low band. Band edges: each default sits
+  /// mid-band, and a plus/minus one wobble around a default stays inside its band.
+  /// </summary>
+  /// <param name="graph">Graph configuration; its builder sub-config must be populated (validated beforehand).</param>
+  /// <returns>Structural signature carrying only the table's non-float variables.</returns>
+  private static GraphSignature CreateGraphSignature(CnfGraph graph)
+  {
+    var objectives = graph.ProcOpts.NodeObjectives;
+    var (
+      builder,
+      size,
+      connectivity,
+      complexity,
+      goalAmount,
+      optGoalAmount,
+      secretsAmount) = (
+      graph.GraphBuilder.Builder,
+      graph.Size,
+      graph.Connectivity,
+      graph.Complexity,
+      objectives.GoalAmount,
+      objectives.OptGoalAmount,
+      graph.ProcOpts.RelSecrets.Amount);
+
+    return graph.GraphBuilder.Builder switch
+    {
+      // Simple: MaxExtraDegree 0-2 / 3-5 / 6+, MaxExtraDegreeStar 2-4 / 5-8 / 9+.
+      EnGraphBuilder.Simple => new GraphSignature(
+        builder, size, connectivity, complexity, goalAmount, optGoalAmount, secretsAmount,
+        Band(graph.GraphBuilder.CnfSimple!.MaxExtraDegree, 2, 5),
+        Band(graph.GraphBuilder.CnfSimple!.MaxExtraDegreeStar, 4, 8),
+        -1, -1, -1),
+      // Linear: MaxEdges 1-3 / 4-6 / 7+, MaxExtraDegree 0-1 / 2-3 / 4+,
+      // MaxConditionPerRel 1-2 / 3-4 / 5+, MaxConditionDistance 0-2 / 3-4 / 5+,
+      // MaxSkipDistance 0-1 / 2-3 / 4+.
+      EnGraphBuilder.Linear => new GraphSignature(
+        builder, size, connectivity, complexity, goalAmount, optGoalAmount, secretsAmount,
+        Band(graph.GraphBuilder.CnfLinear!.MaxEdges, 3, 6),
+        Band(graph.GraphBuilder.CnfLinear!.MaxExtraDegree, 1, 3),
+        Band(graph.GraphBuilder.CnfLinear!.MaxConditionPerRel, 2, 4),
+        Band(graph.GraphBuilder.CnfLinear!.MaxConditionDistance, 2, 4),
+        Band(graph.GraphBuilder.CnfLinear!.MaxSkipDistance, 1, 3)),
+      _ => throw new InvalidOperationException($"Unexpected builder {graph.GraphBuilder.Builder}."),
+    };
+  }
+
+  /// <summary>Maps a raw Max* cap value onto its Low/Mid/High band code.</summary>
+  /// <param name="value">Raw cap value.</param>
+  /// <param name="lowMaxInclusive">Upper bound of the Low band (inclusive).</param>
+  /// <param name="midMaxInclusive">Upper bound of the Mid band (inclusive); High is everything above.</param>
+  /// <returns>0 for Low, 1 for Mid, 2 for High.</returns>
+  private static int Band(int value, int lowMaxInclusive, int midMaxInclusive)
+  {
+    if (value <= lowMaxInclusive) return 0;
+    return value <= midMaxInclusive ? 1 : 2;
+  }
+
+  /// <summary>
+  /// Reports how diverse the sweep's graph signatures were: number of structurally
+  /// distinct graphs, their share of the sweep, and Shannon entropy (bits plus a 0-1
+  /// evenness normalization). Uniqueness is defined by <see cref="GraphSignature"/>, so
+  /// float chance values never affect the metric. Low difficulties collapse toward a
+  /// handful of signatures, which is what makes graph-space collisions - and flaky
+  /// divergence assertions - possible there.
   /// </summary>
   /// <remarks>
   /// <para>
@@ -200,12 +298,12 @@ public sealed class ConfigGeneratorStressTests
   /// </para>
   /// <para>
   /// <c>(x.xxx normalized)</c>: Measures evenness.
-  ///  1.0 = the unique configs appeared equally often. A low value would mean a few configs dominate despite many being seen.
+  ///  1.0 = the unique signatures appeared equally often. A low value would mean a few signatures dominate despite many being seen.
   /// </para>
   /// </remarks>
   /// <param name="total">Number of generations in the sweep.</param>
-  /// <param name="graphCounts">Occurrence count per distinct graph config.</param>
-  private void PrintDiversityLine(int total, IReadOnlyDictionary<CnfGraph, int> graphCounts)
+  /// <param name="graphCounts">Occurrence count per distinct graph signature.</param>
+  private void PrintDiversityLine(int total, IReadOnlyDictionary<GraphSignature, int> graphCounts)
   {
     var culture = CultureInfo.InvariantCulture;
     int unique = graphCounts.Count;
