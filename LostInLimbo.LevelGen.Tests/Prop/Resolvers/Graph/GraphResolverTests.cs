@@ -159,6 +159,87 @@ public sealed class GraphResolverTests
     }
   }
 
+  /// <summary>Tests the effect of <see cref="PropMain.ManyThemes"/> on resolved style options.</summary>
+  public sealed class ManyThemesTests
+  {
+    /// <summary>Creates a resolver over a property dataset with full control over size and ManyThemes.</summary>
+    private static GraphResolver CreateResolver(long propSeed, int difficulty, int size, bool manyThemes)
+    {
+      return new GraphResolver(
+        new PropMain { TextSeed = "mordor", Difficulty = difficulty, ManyThemes = manyThemes },
+        PropData.Default with { Seed = propSeed, Size = size });
+    }
+
+    [Fact]
+    public void Execute_ManyThemesFalse_GroupCountIsOne()
+    {
+      // Act: Resolve with ManyThemes disabled across several sizes.
+      for (int size = 2; size <= 10; size++)
+      {
+        var config = CreateResolver(42, 3, size, manyThemes: false).Execute();
+
+        // Assert: Group count stays at its default of 1 when themes are not requested.
+        Assert.Equal(1, config.ProcOpts.NodeStyle.GroupCount);
+      }
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(5)]
+    [InlineData(10)]
+    public void Execute_ManyThemesTrue_GroupCountInsideRange(int size)
+    {
+      // Arrange: Expected inclusive upper bound from the resolver's rule.
+      int groupCountMax = Math.Max(2, size * 2 / 3 + 1);
+
+      // Act: Resolve with ManyThemes enabled.
+      var config = CreateResolver(7, 3, size, manyThemes: true).Execute();
+
+      // Assert: Group count lands in [2, groupCountMax]; the empty-range collapse at
+      // Size==2 yields 2, matching the upper bound.
+      Assert.InRange(config.ProcOpts.NodeStyle.GroupCount, 2, groupCountMax);
+    }
+
+    [Fact]
+    public void Execute_ManyThemesTrue_WithFixedSeed_IsDeterministic()
+    {
+      // Act: Resolve twice from the same supporting seed and settings.
+      var first = CreateResolver(42, 3, 10, manyThemes: true).Execute();
+      var second = CreateResolver(42, 3, 10, manyThemes: true).Execute();
+
+      // Assert: Identical inputs produce identical group counts.
+      Assert.Equal(first.ProcOpts.NodeStyle.GroupCount, second.ProcOpts.NodeStyle.GroupCount);
+    }
+
+    [Fact]
+    public void Execute_ManyThemesTrue_WithDifferentSeeds_CanDiverge()
+    {
+      // Arrange: Collect distinct group counts across a seed sweep.
+      var seen = new HashSet<int>();
+
+      // Act: Resolve across many supporting seeds at a size that admits multiple groups.
+      for (long seed = 0; seed < 64; seed++)
+      {
+        var config = CreateResolver(seed, 3, 10, manyThemes: true).Execute();
+        seen.Add(config.ProcOpts.NodeStyle.GroupCount);
+      }
+
+      // Assert: More than one group count is reachable, confirming the random draw is active.
+      Assert.True(seen.Count > 1, $"Only one group count observed: {string.Join(", ", seen)}.");
+    }
+
+    [Fact]
+    public void Execute_ManyThemesTrue_SizeTwo_GroupCountIsTwo()
+    {
+      // Act: Resolve at Size==2, where groupCountMax collapses to 2 and NextInt(2, 2) returns 2.
+      var config = CreateResolver(42, 3, 2, manyThemes: true).Execute();
+
+      // Assert: The empty-range collapse yields exactly two groups.
+      Assert.Equal(2, config.ProcOpts.NodeStyle.GroupCount);
+    }
+  }
+
   /// <summary>
   /// Tests difficulty boundaries at the resolver level. GraphResolver does not call
   /// <c>PropMain.Validate</c>, so these tests reach values the generator would reject.

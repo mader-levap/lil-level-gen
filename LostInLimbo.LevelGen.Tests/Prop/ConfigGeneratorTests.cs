@@ -222,4 +222,26 @@ public sealed class ConfigGeneratorTests
       }
     }
   }
+
+  /// <summary>Tests end-to-end behavior of <see cref="PropMain.ManyThemes"/>.</summary>
+  public sealed class ManyThemesTests
+  {
+    [Fact]
+    public void Execute_WithManyThemesTrue_OutputValidatesAndGroupCountInRange()
+    {
+      // Arrange: Property dataset requesting many themes at difficulty 3.
+      var propMain = new PropMain { TextSeed = "mordor", Difficulty = 3, ManyThemes = true };
+
+      // Act: Generate from a fixed supporting seed.
+      var config = new ConfigGenerator(propMain, PropData.DefaultSeed).Execute();
+
+      // Assert: The full configuration validates end to end.
+      config.Validate();
+
+      // Assert: Group count is at least two and within the resolver's upper bound.
+      var size = config.Graph.Size;
+      int groupCountMax = Math.Max(2, size * 2 / 3 + 1);
+      Assert.InRange(config.Graph.ProcOpts.NodeStyle.GroupCount, 2, groupCountMax);
+    }
+  }
 }

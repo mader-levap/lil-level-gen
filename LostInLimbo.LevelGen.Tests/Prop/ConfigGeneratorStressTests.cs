@@ -60,6 +60,7 @@ public sealed class ConfigGeneratorStressTests
     var goalAmountSamples = new List<int>(GenerationsPerDifficulty);
     var optGoalAmountSamples = new List<int>(GenerationsPerDifficulty);
     var secretsAmountSamples = new List<int>(GenerationsPerDifficulty);
+    var groupCountSamples = new List<int>(GenerationsPerDifficulty);
 
     // Arrange: Per-builder sample buffers for the builder-specific tables.
     var simpleChokepointChanceSamples = new List<float>(GenerationsPerDifficulty);
@@ -82,7 +83,7 @@ public sealed class ConfigGeneratorStressTests
       // a thousand distinct draw streams and any failure is exactly reproducible.
       long seed = (long)difficulty * GenerationsPerDifficulty + i;
       var generator = new ConfigGenerator(
-        new PropMain { TextSeed = TextSeed, Difficulty = difficulty },
+        new PropMain { TextSeed = TextSeed, Difficulty = difficulty, ManyThemes = true },
         seed);
 
       // Act: Generate the full configuration.
@@ -122,6 +123,7 @@ public sealed class ConfigGeneratorStressTests
       goalAmountSamples.Add(graph.ProcOpts.NodeObjectives.GoalAmount);
       optGoalAmountSamples.Add(graph.ProcOpts.NodeObjectives.OptGoalAmount);
       secretsAmountSamples.Add(graph.ProcOpts.RelSecrets.Amount);
+      groupCountSamples.Add(graph.ProcOpts.NodeStyle.GroupCount);
 
       switch (graph.GraphBuilder.Builder)
       {
@@ -158,7 +160,8 @@ public sealed class ConfigGeneratorStressTests
       complexitySamples,
       goalAmountSamples,
       optGoalAmountSamples,
-      secretsAmountSamples);
+      secretsAmountSamples,
+      groupCountSamples);
 
     var culture = CultureInfo.InvariantCulture;
 
@@ -349,6 +352,7 @@ public sealed class ConfigGeneratorStressTests
   /// <param name="goalAmountSamples">Collected <c>CnfProcNodeObjectivesOpt.GoalAmount</c> values.</param>
   /// <param name="optGoalAmountSamples">Collected <c>CnfProcNodeObjectivesOpt.OptGoalAmount</c> values.</param>
   /// <param name="secretsAmountSamples">Collected <c>CnfProcRelSecretsOpt.Amount</c> values.</param>
+  /// <param name="groupCountSamples">Collected <c>CnfProcNodeStyleOpt.groupCount</c> values.</param>
   private void PrintStatsTable(
     int difficulty,
     IReadOnlyList<float> degenerationSamples,
@@ -357,7 +361,8 @@ public sealed class ConfigGeneratorStressTests
     IReadOnlyList<int> complexitySamples,
     IReadOnlyList<int> goalAmountSamples,
     IReadOnlyList<int> optGoalAmountSamples,
-    IReadOnlyList<int> secretsAmountSamples)
+    IReadOnlyList<int> secretsAmountSamples,
+    IReadOnlyList<int> groupCountSamples)
   {
     var culture = CultureInfo.InvariantCulture;
 
@@ -370,6 +375,7 @@ public sealed class ConfigGeneratorStressTests
     _output.WriteLine(FormatStatsRow("GoalAmount", goalAmountSamples, culture));
     _output.WriteLine(FormatStatsRow("OptGoalAmount", optGoalAmountSamples, culture));
     _output.WriteLine(FormatStatsRow("SecretsAmount", secretsAmountSamples, culture));
+    _output.WriteLine(FormatStatsRow("GroupCount", groupCountSamples, culture));
     _output.WriteLine(string.Empty);
   }
 
