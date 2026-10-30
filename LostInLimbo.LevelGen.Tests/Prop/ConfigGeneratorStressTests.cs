@@ -83,7 +83,7 @@ public sealed class ConfigGeneratorStressTests
       long seed = (long)difficulty * GenerationsPerDifficulty + i;
       var generator = new ConfigGenerator(
         new PropMain { TextSeed = TextSeed, Difficulty = difficulty },
-        new PropData { Seed = seed });
+        seed);
 
       // Act: Generate the full configuration.
       var config = generator.Execute();

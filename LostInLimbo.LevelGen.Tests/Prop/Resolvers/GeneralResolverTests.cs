@@ -77,7 +77,7 @@ public sealed class GeneralResolverTests
     /// <summary>Creates a resolver over a property dataset with the given internal seed and difficulty.</summary>
     private static GeneralResolver CreateResolver(long propSeed, int difficulty)
     {
-      return new GeneralResolver(new PropMain { TextSeed = "mordor", Difficulty = difficulty }, new PropData { Seed = propSeed });
+      return new GeneralResolver(new PropMain { TextSeed = "mordor", Difficulty = difficulty }, PropData.Default with { Seed = propSeed });
     }
 
     [Fact]

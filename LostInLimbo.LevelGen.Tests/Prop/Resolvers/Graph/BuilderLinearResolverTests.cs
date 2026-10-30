@@ -14,7 +14,7 @@ public sealed class BuilderLinearResolverTests
   /// <summary>Creates a resolver over a property dataset and a fixed random stream.</summary>
   private static BuilderLinearResolver CreateResolver(long propSeed)
   {
-    return new BuilderLinearResolver(PropMain.Default, new PropData { Seed = propSeed }, new SeededRandom(propSeed));
+    return new BuilderLinearResolver(PropMain.Default, PropData.Default with { Seed = propSeed }, new SeededRandom(propSeed));
   }
 
   [Fact]

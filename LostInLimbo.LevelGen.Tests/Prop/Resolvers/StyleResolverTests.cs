@@ -14,7 +14,7 @@ public sealed class StyleResolverTests
   /// <summary>Creates a resolver over a property dataset with the given internal seed.</summary>
   private static StyleResolver CreateResolver(long propSeed)
   {
-    return new StyleResolver(PropMain.Default, new PropData { Seed = propSeed });
+    return new StyleResolver(PropMain.Default, PropData.Default with { Seed = propSeed });
   }
 
   [Fact]

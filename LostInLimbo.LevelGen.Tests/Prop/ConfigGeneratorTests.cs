@@ -19,7 +19,7 @@ public sealed class ConfigGeneratorTests
   {
     return new ConfigGenerator(
       new PropMain { TextSeed = textSeed, Difficulty = difficulty },
-      new PropData { Seed = propSeed });
+      propSeed);
   }
 
   /// <summary>Tests that the generator rejects invalid property datasets up front.</summary>
@@ -29,7 +29,7 @@ public sealed class ConfigGeneratorTests
     public void Ctor_WithDefaultPropMain_DoesNotThrow()
     {
       // Act/Assert: The default property dataset passes validation at construction.
-      _ = new ConfigGenerator(PropMain.Default, PropData.Default);
+      _ = new ConfigGenerator(PropMain.Default, PropData.DefaultSeed);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class ConfigGeneratorTests
 
       // Act/Assert: Construction rejects the version and names the offending parameter.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ConfigGenerator(propMain, PropData.Default));
+        () => new ConfigGenerator(propMain, PropData.DefaultSeed));
       Assert.Equal(nameof(PropMain.ConfigVersion), exception.ParamName);
     }
 
@@ -52,7 +52,7 @@ public sealed class ConfigGeneratorTests
 
       // Act/Assert: Construction rejects the difficulty before any drawing happens.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ConfigGenerator(propMain, PropData.Default));
+        () => new ConfigGenerator(propMain, PropData.DefaultSeed));
       Assert.Equal(nameof(PropMain.Difficulty), exception.ParamName);
     }
 
@@ -65,7 +65,7 @@ public sealed class ConfigGeneratorTests
 
       // Act/Assert: Construction rejects the difficulty before any drawing happens.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(
-        () => new ConfigGenerator(propMain, PropData.Default));
+        () => new ConfigGenerator(propMain, PropData.DefaultSeed));
       Assert.Equal(nameof(PropMain.Difficulty), exception.ParamName);
     }
 
@@ -74,7 +74,7 @@ public sealed class ConfigGeneratorTests
     {
       // Act/Assert: Null datasets currently surface as NullReferenceException from
       // Validate; pinned so any future ArgumentNullException is an intentional change.
-      Assert.Throws<NullReferenceException>(() => new ConfigGenerator(null!, PropData.Default));
+      Assert.Throws<NullReferenceException>(() => new ConfigGenerator(null!, PropData.DefaultSeed));
     }
   }
 
@@ -102,8 +102,8 @@ public sealed class ConfigGeneratorTests
       // cannot silently change without breaking reproducibility of generated configs.
       Assert.Equal(-8341167147440548823L, config.General.Seed);
       Assert.Equal(16.201443f, config.General.Degeneration);
-      Assert.Equal(5, config.Graph.Size);
-      Assert.Equal(3, config.Graph.Connectivity);
+      Assert.Equal(3, config.Graph.Size);
+      Assert.Equal(5, config.Graph.Connectivity);
       Assert.Equal(1, config.Graph.Complexity);
       Assert.Equal(EnGraphBuilder.Linear, config.Graph.GraphBuilder.Builder);
     }
@@ -220,20 +220,6 @@ public sealed class ConfigGeneratorTests
       {
         // Busy-wait: a tick is shorter than any sleep granularity.
       }
-    }
-  }
-
-  /// <summary>Tests edge cases that currently surface as framework-level exceptions.</summary>
-  public sealed class EdgeCaseTests
-  {
-    [Fact]
-    public void Execute_WithNullPropData_ThrowsNullReferenceException()
-    {
-      // Arrange: Generator carrying a null supporting dataset.
-      var generator = new ConfigGenerator(PropMain.Default, null!);
-
-      // Act/Assert: The first resolver construction dereferences the supporting seed.
-      Assert.Throws<NullReferenceException>(() => generator.Execute());
     }
   }
 }

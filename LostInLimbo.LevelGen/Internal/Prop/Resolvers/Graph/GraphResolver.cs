@@ -22,7 +22,7 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain = propMain;
   /// <summary>Supporting data.</summary>
-  private PropData _propData = propData;
+  private readonly PropData _propData = propData;
 
   /// <summary>Random for sub-seed.</summary>
   private readonly SeededRandom _random = new(SeedDerivation.Derive(propData.Seed, SaltGraphResolver));
@@ -33,14 +33,13 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <returns>Resolved graph configuration.</returns>
   public CnfGraph Execute()
   {
-    int size = ResolveSize();
     return CnfGraph.Default with
     {
-      Size = size,
-      Connectivity = ResolveConnectivity(size),
-      Complexity = ResolveComplexity(size),
+      Size = _propData.Size,
+      Connectivity = ResolveConnectivity(),
+      Complexity = ResolveComplexity(),
       GraphBuilder = ResolveGraphBuilder(),
-      ProcOpts = ResolveProcOpts(size),
+      ProcOpts = ResolveProcOpts(),
       ValidatorOpts = ResolveValidatorOpts(),
     };
   }
@@ -48,39 +47,26 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   // Field resolvers.
 
   /// <summary>
-  /// Resolve size of the graph.
-  /// </summary>
-  /// <returns>Size of the graph.</returns>
-  private int ResolveSize()
-  {
-    int from = 2;
-    int to = _propMain.Difficulty + 3;
-    return _random.NextInt(from, to);
-  }
-
-  /// <summary>
   /// Resolve connectivity of the graph (amount of extra relationships).
   /// </summary>
-  /// <param name="size">Size of graph.</param>
   /// <returns>Connectivity of the graph.</returns>
-  private int ResolveConnectivity(int size)
+  private int ResolveConnectivity()
   {
     // Need to calc amount of extra relationships depending on difficulty and size.
     int from = 0;
-    int to = _propMain.Difficulty + size;
+    int to = _propMain.Difficulty + _propData.Size;
     return _random.NextInt(from, to);
   }
 
   /// <summary>
   /// Resolve complexity of the graph (amount of conditional passages).
   /// </summary>
-  /// <param name="size">Size of graph.</param>
   /// <returns>Complexity of the graph.</returns>
-  private int ResolveComplexity(int size)
+  private int ResolveComplexity()
   {
     // Need to calc amount of conditional passages depending on difficulty and constrained by size.
     int from = 0; // it is ok, we have other obstacles like objectives 
-    int to = Math.Min(size, _propMain.Difficulty/2+1);
+    int to = Math.Min(_propData.Size, _propMain.Difficulty/2+1);
     return _random.NextInt(from, to);
   }
 
@@ -117,15 +103,14 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <summary>
   /// Resolve processor options.
   /// </summary>
-  /// <param name="size">Size of graph.</param>
   /// <returns>Processor options.</returns>
-  private CnfProcOpt ResolveProcOpts(int size)
+  private CnfProcOpt ResolveProcOpts()
   {
     return new CnfProcOpt {
-      RelSecrets = ResolveSecrets(size),
-      NodeObjectives = ResolveObjectives(size),
+      RelSecrets = ResolveSecrets(),
+      NodeObjectives = ResolveObjectives(),
       NodeRelSize = CnfProcNodeRelSizeOpt.Default,
-      NodeStyle = CnfProcNodeStyleOpt.Default,
+      NodeStyle = ResolveStyle(),
     };
   }
 
@@ -134,12 +119,11 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <summary>
   /// Resolve secrets options.
   /// </summary>
-  /// <param name="size">Size of graph.</param>
   /// <returns>Secrets options.</returns>
-  private CnfProcRelSecretsOpt ResolveSecrets(int size)
+  private CnfProcRelSecretsOpt ResolveSecrets()
   {
     int amountFrom = 0;
-    int amountTo = (_propMain.Difficulty+size)/2 + 1;
+    int amountTo = (_propMain.Difficulty+_propData.Size)/2 + 1;
 
     return CnfProcRelSecretsOpt.Default with
     {
@@ -152,9 +136,8 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <summary>
   /// Resolve objectives options.
   /// </summary>
-  /// <param name="size">Size of graph.</param>
   /// <returns>Objectives options.</returns>
-  private CnfProcNodeObjectivesOpt ResolveObjectives(int size)
+  private CnfProcNodeObjectivesOpt ResolveObjectives()
   {
     int from = 1;
     int to = _propMain.Difficulty/2+1;
@@ -162,7 +145,25 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     return CnfProcNodeObjectivesOpt.Default with
     {
       GoalAmount = _random.NextInt(from, to),
-      OptGoalAmount = _random.NextInt(0, size),
+      OptGoalAmount = _random.NextInt(0, _propData.Size),
+    };
+  }
+
+  /// <summary>
+  /// Resolve style options.
+  /// </summary>
+  /// <returns>Style options.</returns>
+  private CnfProcNodeStyleOpt ResolveStyle()
+  {
+    int groupCount = 1;
+    if (_propMain.ManyThemes) {
+      int groupCountMax = Math.Max(2, _propData.Size*2/3+1);
+      groupCount = _random.NextInt(2, groupCountMax);
+    }
+
+    return CnfProcNodeStyleOpt.Default with
+    {
+      GroupCount = groupCount,
     };
   }
 

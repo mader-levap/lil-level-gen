@@ -19,7 +19,7 @@ internal sealed class GeneralResolver(PropMain propMain, PropData propData)
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain = propMain;
   /// <summary>Supporting data.</summary>
-  private PropData _propData = propData;
+  private readonly PropData _propData = propData;
 
   /// <summary>Random for sub-seed.</summary>
   private readonly SeededRandom _random = new(SeedDerivation.Derive(propData.Seed, SaltGeneralResolver));

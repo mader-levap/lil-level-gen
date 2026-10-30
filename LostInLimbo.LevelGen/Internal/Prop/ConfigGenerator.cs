@@ -8,6 +8,7 @@ using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers.Map;
+using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Prop;
 
@@ -17,37 +18,67 @@ namespace LostInLimbo.LevelGen.Internal.Prop;
 /// <param name="propMain">Property dataset.</param>
 internal sealed class ConfigGenerator
 {
+  /// <summary>Salt for the resolver sub-seed; keeps this pass off other passes' streams.</summary>
+  private const long SaltResolver = 0x63666767656e6572; // "cfggener"
+
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain;
   /// <summary>Supporting data.</summary>
-  private PropData _propData;
+  private readonly PropData _propData;
+
+  /// <summary>Random for sub-seed.</summary>
+  private readonly SeededRandom _random;
 
   public ConfigGenerator(PropMain propMain)
   {
     _propMain = propMain;
     _propMain.Validate();
     
-    _propData = ResolvePropData();
+    long seed = ResolveSeed();
+    _random = new(SeedDerivation.Derive(seed, SaltResolver));
+    _propData = ResolvePropData(seed);
   }
 
-  public ConfigGenerator(PropMain propMain, PropData propData)
+  public ConfigGenerator(PropMain propMain, long seed)
   {
     _propMain = propMain;
     _propMain.Validate();
     
-    _propData = propData;
+    _random = new(SeedDerivation.Derive(seed, SaltResolver));
+    _propData = ResolvePropData(seed);
   }
 
   /// <summary>
   /// Resolve supporting data.
   /// </summary>
   /// <returns>Supporting data.</returns>
-  private PropData ResolvePropData()
+  private PropData ResolvePropData(long seed)
   {
     return new PropData
     {
-      Seed = DateTime.UtcNow.Ticks - 1000000, // Prevent collision with actual config seed.
+      Seed = seed,
+      Size = ResolveSize(),
     };
+  }
+
+  /// <summary>
+  /// Resolve seed.
+  /// </summary>
+  /// <returns>Seed.</returns>
+  private long ResolveSeed()
+  {
+    return DateTime.UtcNow.Ticks - 1000000; // Prevent collision with actual config seed.
+  }
+
+  /// <summary>
+  /// Resolve size of the graph.
+  /// </summary>
+  /// <returns>Size of the graph.</returns>
+  private int ResolveSize()
+  {
+    int from = 2;
+    int to = _propMain.Difficulty + 3;
+    return _random.NextInt(from, to);
   }
 
   // ///////////////////////////////////////////////////////////////////////////

@@ -45,6 +45,9 @@ public sealed record PropMain
   /// </summary>
   public int Difficulty { get; init; } = 0;
 
+  /// <summary>If true and possible, map will use different themes.</summary>
+  public bool ManyThemes { get; init; } = false;
+
   // Helpers.
 
   /// <summary>

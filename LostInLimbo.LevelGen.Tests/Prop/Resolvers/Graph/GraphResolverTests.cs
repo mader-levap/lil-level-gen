@@ -18,7 +18,7 @@ public sealed class GraphResolverTests
   {
     return new GraphResolver(
       new PropMain { TextSeed = "mordor", Difficulty = difficulty },
-      new PropData { Seed = propSeed });
+      PropData.Default with { Seed = propSeed, Size = 2 });
   }
 
   /// <summary>Tests reproducibility of the resolver's random draws.</summary>
@@ -43,8 +43,8 @@ public sealed class GraphResolverTests
 
       // Assert: Values match the pinned reference, so the resolver salt and draw order
       // cannot silently change without breaking reproducibility of generated configs.
-      Assert.Equal(5, config.Size);
-      Assert.Equal(3, config.Connectivity);
+      Assert.Equal(2, config.Size);
+      Assert.Equal(2, config.Connectivity);
       Assert.Equal(1, config.Complexity);
       Assert.Equal(1, config.ProcOpts.NodeObjectives.GoalAmount);
       Assert.Equal(0, config.ProcOpts.NodeObjectives.OptGoalAmount);

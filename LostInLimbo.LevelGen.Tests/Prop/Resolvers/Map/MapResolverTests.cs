@@ -13,7 +13,7 @@ public sealed class MapResolverTests
   /// <summary>Creates a resolver over a property dataset with the given internal seed.</summary>
   private static MapResolver CreateResolver(long propSeed)
   {
-    return new MapResolver(PropMain.Default, new PropData { Seed = propSeed });
+    return new MapResolver(PropMain.Default, PropData.Default with { Seed = propSeed });
   }
 
   [Fact]
