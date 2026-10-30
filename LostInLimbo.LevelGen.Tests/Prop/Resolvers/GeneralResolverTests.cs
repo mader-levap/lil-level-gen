@@ -3,7 +3,7 @@ using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
-namespace LostInLimbo.LevelGen.Tests.Prop;
+namespace LostInLimbo.LevelGen.Tests.Prop.Resolvers;
 
 /// <summary>
 /// Tests general configuration resolution, grouped into suites by concern:

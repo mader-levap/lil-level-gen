@@ -1,6 +1,6 @@
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
-namespace LostInLimbo.LevelGen.Tests.Utils;
+namespace LostInLimbo.LevelGen.Tests.Utils.Rng;
 
 /// <summary>
 /// Tests deterministic sub-seed derivation, grouped into suites by concern:

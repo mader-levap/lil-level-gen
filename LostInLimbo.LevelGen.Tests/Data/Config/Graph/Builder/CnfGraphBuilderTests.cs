@@ -2,7 +2,7 @@ using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Tests.Generator.Graph;
 
-namespace LostInLimbo.LevelGen.Tests.Data.Config.Graph;
+namespace LostInLimbo.LevelGen.Tests.Data.Config.Graph.Builder;
 
 /// <summary>
 /// Tests the invariants of the graph builder wrapper section: builder enum, required

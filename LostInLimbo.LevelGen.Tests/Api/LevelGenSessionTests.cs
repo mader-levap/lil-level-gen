@@ -16,7 +16,7 @@ namespace LostInLimbo.LevelGen.Tests.Api;
 /// test-class instance per test), so each test starts from the pristine never-ran state with
 /// no teardown, no shared global state, and no dependence on test order or suite selection.
 /// </remarks>
-public sealed class LevelGenerationTests
+public sealed class LevelGenSessionTests
 {
   private static readonly TimeSpan TerminalTimeout = TimeSpan.FromSeconds(10);
 

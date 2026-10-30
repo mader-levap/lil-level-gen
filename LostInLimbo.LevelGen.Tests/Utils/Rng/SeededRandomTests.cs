@@ -1,6 +1,6 @@
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
-namespace LostInLimbo.LevelGen.Tests.Utils;
+namespace LostInLimbo.LevelGen.Tests.Utils.Rng;
 
 /// <summary>
 /// Tests <see cref="SeededRandom"/>: reproducibility, range compliance, unbiased bounds

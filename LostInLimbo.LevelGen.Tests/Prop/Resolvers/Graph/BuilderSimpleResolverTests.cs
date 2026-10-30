@@ -3,7 +3,7 @@ using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
-namespace LostInLimbo.LevelGen.Tests.Prop;
+namespace LostInLimbo.LevelGen.Tests.Prop.Resolvers.Graph;
 
 /// <summary>
 /// Tests simple graph builder option resolution: all options are randomized inside

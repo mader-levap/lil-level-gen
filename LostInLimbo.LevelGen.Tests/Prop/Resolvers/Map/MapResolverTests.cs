@@ -3,7 +3,7 @@ using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers.Map;
 
-namespace LostInLimbo.LevelGen.Tests.Prop;
+namespace LostInLimbo.LevelGen.Tests.Prop.Resolvers.Map;
 
 /// <summary>
 /// Tests map configuration resolution: validator enablement and defaults.

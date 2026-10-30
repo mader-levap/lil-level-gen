@@ -12,7 +12,7 @@ namespace LostInLimbo.LevelGen.Tests.Api;
 /// Tests the canonical JSON (de)serialization of level generation config, grouped into
 /// suites by direction (serialize, deserialize) and by success vs. error paths.
 /// </summary>
-public sealed class LevelGenerationSerializerTests
+public sealed class LevelGenSerializerTests
 {
   /// <summary>Tests <see cref="LevelGenSerializer.SerializeConfig"/>: canonical output, validation and the roundtrip.</summary>
   public sealed class SerializeTests

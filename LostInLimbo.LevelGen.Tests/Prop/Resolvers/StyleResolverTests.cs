@@ -3,7 +3,7 @@ using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers;
 
-namespace LostInLimbo.LevelGen.Tests.Prop;
+namespace LostInLimbo.LevelGen.Tests.Prop.Resolvers;
 
 /// <summary>
 /// Tests style configuration resolution. Style is currently a placeholder pass that

@@ -1,7 +1,7 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 
-namespace LostInLimbo.LevelGen.Tests.Data.Config.Graph;
+namespace LostInLimbo.LevelGen.Tests.Data.Config.Graph.Proc;
 
 /// <summary>
 /// Tests the invariants of the processor-options config section.

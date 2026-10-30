@@ -1,6 +1,6 @@
 using LostInLimbo.LevelGen.Internal.Prop.Data;
 
-namespace LostInLimbo.LevelGen.Tests.Data.Prop;
+namespace LostInLimbo.LevelGen.Tests.Prop.Data;
 
 /// <summary>
 /// Tests <see cref="PropData"/> defaults and seed passthrough.

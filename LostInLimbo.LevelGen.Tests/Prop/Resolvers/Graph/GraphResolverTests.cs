@@ -4,7 +4,7 @@ using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
 
-namespace LostInLimbo.LevelGen.Tests.Prop;
+namespace LostInLimbo.LevelGen.Tests.Prop.Resolvers.Graph;
 
 /// <summary>
 /// Tests graph configuration resolution, grouped into suites by concern:
