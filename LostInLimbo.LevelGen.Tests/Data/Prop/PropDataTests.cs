@@ -1,4 +1,4 @@
-using LostInLimbo.LevelGen.Data.Prop;
+using LostInLimbo.LevelGen.Internal.Prop.Data;
 
 namespace LostInLimbo.LevelGen.Tests.Data.Prop;
 

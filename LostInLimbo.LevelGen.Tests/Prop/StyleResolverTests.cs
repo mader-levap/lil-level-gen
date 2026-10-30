@@ -1,5 +1,6 @@
 using LostInLimbo.LevelGen.Data.Config.Style;
 using LostInLimbo.LevelGen.Data.Prop;
+using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers;
 
 namespace LostInLimbo.LevelGen.Tests.Prop;

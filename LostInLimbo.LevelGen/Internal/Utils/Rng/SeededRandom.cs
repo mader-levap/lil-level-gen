@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace LostInLimbo.LevelGen.Internal.Utils;
+namespace LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 /// <summary>
 /// Deterministic pseudorandom number generator used by generation algorithms.

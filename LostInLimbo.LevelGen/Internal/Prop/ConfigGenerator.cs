@@ -4,6 +4,7 @@ using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Map;
 using LostInLimbo.LevelGen.Data.Config.Style;
 using LostInLimbo.LevelGen.Data.Prop;
+using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers.Map;

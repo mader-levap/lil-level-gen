@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
-using LostInLimbo.LevelGen.Internal.Utils;
+using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 

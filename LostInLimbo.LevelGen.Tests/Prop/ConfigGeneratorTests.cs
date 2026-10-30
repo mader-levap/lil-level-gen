@@ -3,6 +3,7 @@ using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Style;
 using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop;
+using LostInLimbo.LevelGen.Internal.Prop.Data;
 
 namespace LostInLimbo.LevelGen.Tests.Prop;
 

@@ -1,6 +1,7 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Prop;
+using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
 
 namespace LostInLimbo.LevelGen.Tests.Prop;
@@ -46,7 +47,7 @@ public sealed class GraphResolverTests
       Assert.Equal(3, config.Connectivity);
       Assert.Equal(1, config.Complexity);
       Assert.Equal(1, config.ProcOpts.NodeObjectives.GoalAmount);
-      Assert.Equal(1, config.ProcOpts.NodeObjectives.OptGoalAmount);
+      Assert.Equal(0, config.ProcOpts.NodeObjectives.OptGoalAmount);
       Assert.Equal(EnGraphBuilder.Linear, config.GraphBuilder.Builder);
     }
 
@@ -116,25 +117,25 @@ public sealed class GraphResolverTests
         var builder = CreateResolver(seed, 5).Execute().GraphBuilder;
 
         // Assert: The populated sub-config matches the selected builder and carries
-        // the builder resolver's values; the unselected section stays null.
+        // values inside the builder resolver's ranges; the unselected section stays null.
         switch (builder.Builder)
         {
           case EnGraphBuilder.Simple:
             Assert.NotNull(builder.CnfSimple);
             Assert.Null(builder.CnfLinear);
             Assert.InRange(builder.CnfSimple!.ChokepointChance, 0.2f, 0.95f);
-            Assert.Equal(4, builder.CnfSimple!.MaxExtraDegree);
-            Assert.Equal(7, builder.CnfSimple!.MaxExtraDegreeStar);
+            Assert.InRange(builder.CnfSimple!.MaxExtraDegree, 2, 5);
+            Assert.InRange(builder.CnfSimple!.MaxExtraDegreeStar, 4, 8);
             seenSimple = true;
             break;
           case EnGraphBuilder.Linear:
             Assert.NotNull(builder.CnfLinear);
             Assert.Null(builder.CnfSimple);
-            Assert.Equal(5, builder.CnfLinear!.MaxEdges);
-            Assert.Equal(2, builder.CnfLinear!.MaxExtraDegree);
-            Assert.Equal(3, builder.CnfLinear!.MaxConditionPerRel);
-            Assert.Equal(3, builder.CnfLinear!.MaxConditionDistance);
-            Assert.Equal(2, builder.CnfLinear!.MaxSkipDistance);
+            Assert.InRange(builder.CnfLinear!.MaxEdges, 3, 6);
+            Assert.InRange(builder.CnfLinear!.MaxExtraDegree, 2, 4);
+            Assert.InRange(builder.CnfLinear!.MaxConditionPerRel, 1, 4);
+            Assert.InRange(builder.CnfLinear!.MaxConditionDistance, 2, 4);
+            Assert.InRange(builder.CnfLinear!.MaxSkipDistance, 1, 3);
             seenLinear = true;
             break;
           default:

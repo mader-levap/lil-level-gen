@@ -4,7 +4,7 @@ using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Prepass;
-using LostInLimbo.LevelGen.Internal.Utils;
+using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 

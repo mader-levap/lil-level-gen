@@ -1,4 +1,4 @@
-using LostInLimbo.LevelGen.Internal.Utils;
+using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Tests.Utils;
 

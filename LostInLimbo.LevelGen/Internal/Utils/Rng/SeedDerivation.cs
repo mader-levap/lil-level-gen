@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace LostInLimbo.LevelGen.Internal.Utils;
+namespace LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 /// <summary>
 /// Deterministic derivation of independent sub-seeds from a single world seed.

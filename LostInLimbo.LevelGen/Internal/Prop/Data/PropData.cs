@@ -1,4 +1,4 @@
-namespace LostInLimbo.LevelGen.Data.Prop;
+namespace LostInLimbo.LevelGen.Internal.Prop.Data;
 
 /// <summary>
 /// Internal data supporting config generation.

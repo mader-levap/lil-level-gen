@@ -1,6 +1,7 @@
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Prop;
-using LostInLimbo.LevelGen.Internal.Utils;
+using LostInLimbo.LevelGen.Internal.Prop.Data;
+using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
 
@@ -25,14 +26,13 @@ internal sealed class BuilderLinearResolver(PropMain propMain, PropData propData
   /// <returns>Linear builder configuration.</returns>
   public CnfGraphBuilderLinear Execute()
   {
-    // TODO: set actual random varying values.
     return CnfGraphBuilderLinear.Default with
     {
-      MaxEdges = 5,
-      MaxExtraDegree = 2,
-      MaxConditionPerRel = 3,
-      MaxConditionDistance = 3,
-      MaxSkipDistance = 2,
+      MaxEdges = _random.NextInt(3, 7),
+      MaxExtraDegree = _random.NextInt(2, 5),
+      MaxConditionPerRel = _random.NextInt(1, 5),
+      MaxConditionDistance = _random.NextInt(2, 5),
+      MaxSkipDistance = _random.NextInt(1, 4),
     };
   }
 }

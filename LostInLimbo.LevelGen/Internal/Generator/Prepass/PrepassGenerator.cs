@@ -1,5 +1,5 @@
 using LostInLimbo.LevelGen.Data.Config;
-using LostInLimbo.LevelGen.Internal.Utils;
+using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Prepass;
 

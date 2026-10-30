@@ -1,4 +1,4 @@
-namespace LostInLimbo.LevelGen.Internal.Utils;
+namespace LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 /// <summary>
 /// Well-known salt constants that identify independent sub-seed streams derived from

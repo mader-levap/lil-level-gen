@@ -2,6 +2,7 @@ using System.Globalization;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop;
+using LostInLimbo.LevelGen.Internal.Prop.Data;
 using Xunit.Abstractions;
 
 namespace LostInLimbo.LevelGen.Tests.Prop;

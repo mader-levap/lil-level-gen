@@ -1,6 +1,7 @@
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Prop;
-using LostInLimbo.LevelGen.Internal.Utils;
+using LostInLimbo.LevelGen.Internal.Prop.Data;
+using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
 
@@ -25,12 +26,11 @@ internal sealed class BuilderSimpleResolver(PropMain propMain, PropData propData
   /// <returns>Simple builder configuration.</returns>
   public CnfGraphBuilderSimple Execute()
   {
-    // TODO: set actual random varying values.
     return CnfGraphBuilderSimple.Default with
     {
       ChokepointChance = _random.NextFloat(0.2f, 0.95f),
-      MaxExtraDegree = 4,
-      MaxExtraDegreeStar = 7,
+      MaxExtraDegree = _random.NextInt(2, 6),
+      MaxExtraDegreeStar = _random.NextInt(4, 9),
     };
   }
 }

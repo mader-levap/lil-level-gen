@@ -1,6 +1,6 @@
 using System;
 
-namespace LostInLimbo.LevelGen.Internal.Utils;
+namespace LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 /// <summary>
 /// Deterministic derivation of identifiers (<see cref="Guid"/>) from a seed and a role salt.

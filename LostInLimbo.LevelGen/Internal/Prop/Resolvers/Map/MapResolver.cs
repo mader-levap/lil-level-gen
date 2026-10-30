@@ -1,7 +1,8 @@
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Config.Map;
 using LostInLimbo.LevelGen.Data.Prop;
-using LostInLimbo.LevelGen.Internal.Utils;
+using LostInLimbo.LevelGen.Internal.Prop.Data;
+using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Prop.Resolvers.Map;
 

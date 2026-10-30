@@ -1,12 +1,13 @@
 using LostInLimbo.LevelGen.Data.Prop;
+using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
-using LostInLimbo.LevelGen.Internal.Utils;
+using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Tests.Prop;
 
 /// <summary>
-/// Tests simple graph builder option resolution: ChokepointChance is randomized inside
-/// its planned range, while the Max* caps are still fixed placeholders.
+/// Tests simple graph builder option resolution: all options are randomized inside
+/// their planned ranges.
 /// </summary>
 public sealed class BuilderSimpleResolverTests
 {
@@ -19,18 +20,6 @@ public sealed class BuilderSimpleResolverTests
   [Fact]
   public void Execute_ReturnsPinnedValues()
   {
-    // Act: Resolve simple builder options.
-    var config = CreateResolver(42).Execute();
-
-    // Assert: The still-fixed caps match the pinned placeholders, so their planned
-    // conversion to randomized values shows up as an intentional test update.
-    Assert.Equal(4, config.MaxExtraDegree);
-    Assert.Equal(7, config.MaxExtraDegreeStar);
-  }
-
-  [Fact]
-  public void Execute_RandomizesChokepointChance_MatchesPinnedValue()
-  {
     // Act: Resolve simple builder options from a known stream.
     var config = CreateResolver(42).Execute();
 
@@ -38,6 +27,10 @@ public sealed class BuilderSimpleResolverTests
     // cannot silently change, and it stays inside the planned randomization range.
     Assert.Equal(0.75617367f, config.ChokepointChance);
     Assert.InRange(config.ChokepointChance, 0.2f, 0.95f);
+    Assert.Equal(5, config.MaxExtraDegree);
+    Assert.InRange(config.MaxExtraDegree, 2, 5);
+    Assert.Equal(4, config.MaxExtraDegreeStar);
+    Assert.InRange(config.MaxExtraDegreeStar, 4, 8);
   }
 
   [Fact]
