@@ -109,12 +109,12 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     return new CnfProcOpt {
       RelSecrets = ResolveSecrets(),
       NodeObjectives = ResolveObjectives(),
-      NodeRelSize = CnfProcNodeRelSizeOpt.Default,
+      NodeRelSize = ResolveRelSize(),
       NodeStyle = ResolveStyle(),
     };
   }
 
-  // Objectives.
+  // Processors.
 
   /// <summary>
   /// Resolve secrets options.
@@ -146,6 +146,18 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     {
       GoalAmount = _random.NextInt(from, to),
       OptGoalAmount = _random.NextInt(0, _propData.Size),
+    };
+  }
+
+  /// <summary>
+  /// Resolve relative size options.
+  /// </summary>
+  /// <returns>Relative size options.</returns>
+  private CnfProcNodeRelSizeOpt ResolveRelSize()
+  {
+    return CnfProcNodeRelSizeOpt.Default with
+    {
+      // TODO
     };
   }
 

@@ -1,2 +1,6 @@
 Current tasks:
-- Config generator: field PropMain.ManyThemes was added, we need to add missing tests for its behavior.
+- Config generator: finish GraphResolver.ResolveRelSize().
+- Create new classes in Internal.Utils.Evals for random value generation based on data:
+  - EvalWeights for weighted set. First argument is array of actual values (float/int), second argument is array of int weights.
+  - EvalCurves for various classic curves: gaussian etc
+  
