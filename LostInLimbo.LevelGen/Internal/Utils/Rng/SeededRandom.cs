@@ -17,7 +17,7 @@ namespace LostInLimbo.LevelGen.Internal.Utils.Rng;
 /// <para>
 /// The same seed always produces the same sequence. Generation logic must never share
 /// one instance between independent generation passes; derive one instance per pass
-/// from its own sub-seed (e.g. <c>PrepData.SeedGraph</c>).
+/// from its own sub-seed.
 /// </para>
 /// </remarks>
 internal sealed class SeededRandom
@@ -31,7 +31,7 @@ internal sealed class SeededRandom
   /// <summary>
   /// Creates a generator whose sequence is fully determined by <paramref name="seed"/>.
   /// </summary>
-  /// <param name="seed">Seed for the state; typically a sub-seed such as <c>PrepData.SeedGraph</c>.</param>
+  /// <param name="seed">Seed for the state.</param>
   public SeededRandom(long seed)
   {
     _state = unchecked((ulong)seed);
@@ -107,13 +107,13 @@ internal sealed class SeededRandom
   /// Randomly returns true or false, with true returned with probability
   /// <paramref name="chance"/>.
   /// </summary>
-  /// <param name="chance">Probability of returning true; clamped to <c>[0, 1]</c>.</param>
-  /// <returns>True or false. Deterministic for the same seed and draw position.</returns>
-  /// <exception cref="ArgumentOutOfRangeException"><paramref name="chance"/> is NaN.</exception>
   /// <remarks>
   /// A chance of exactly 0 or exactly 1 short-circuits without consuming the sequence,
   /// so callers can force an outcome without shifting later draws.
   /// </remarks>
+  /// <param name="chance">Probability of returning true; clamped to <c>[0, 1]</c>.</param>
+  /// <returns>True or false. Deterministic for the same seed and draw position.</returns>
+  /// <exception cref="ArgumentOutOfRangeException"><paramref name="chance"/> is NaN.</exception>
   public bool NextBool(float chance)
   {
     if (float.IsNaN(chance))

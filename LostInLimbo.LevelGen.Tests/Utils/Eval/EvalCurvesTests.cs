@@ -36,12 +36,12 @@ public sealed class EvalCurvesTests
     [Fact]
     public void Gaussian_TwoCallsInRow_ProducesDifferentValues()
     {
-      // Act: Evaluate the same range with differently seeded generators.
+      // Act: Evaluate the same range with same generator.
       var random = new SeededRandom(42);
       var first = EvalCurves.Gaussian(random, 0, 100);
       var second = EvalCurves.Gaussian(random, 0, 100);
 
-      // Assert: Calling same SeededRandom produces different results.
+      // Assert: Calling same SeededRandom twice produces different results.
       Assert.NotEqual(first, second);
     }
 
@@ -68,15 +68,6 @@ public sealed class EvalCurvesTests
 
       // Assert: The only representable value is the bound itself.
       Assert.Equal(7, value);
-    }
-
-    [Fact]
-    public void Gaussian_WithFromGreaterThanTo_ThrowsArgumentException()
-    {
-      // Act/Assert: An inverted range is rejected and names the offending parameter.
-      var exception = Assert.Throws<ArgumentException>(
-        () => EvalCurves.Gaussian(new SeededRandom(7), 10, 0));
-      Assert.Equal("from", exception.ParamName);
     }
 
     [Fact]
@@ -114,6 +105,17 @@ public sealed class EvalCurvesTests
 
       // Assert: Tails are clamped to the bounds, confirming edge pile-up of a clamped Gaussian.
       Assert.True(edgeCount > 0, "No values clamped to the range edges.");
+    }
+
+    // Exceptions.
+
+    [Fact]
+    public void Gaussian_WithFromGreaterThanTo_ThrowsArgumentException()
+    {
+      // Act/Assert: An inverted range is rejected and names the offending parameter.
+      var exception = Assert.Throws<ArgumentException>(
+        () => EvalCurves.Gaussian(new SeededRandom(7), 10, 0));
+      Assert.Equal("from", exception.ParamName);
     }
   }
 }
