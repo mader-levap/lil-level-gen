@@ -1,0 +1,60 @@
+# EditorConfig - top-most file
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+indent_style = space
+indent_size = 2
+max_line_length = 160
+
+[*.cs]
+# DOTNET RULES
+
+# Private instance fields: _camelCase, e.g. _userName
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel_case
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+
+# Local variables and method parameters: camelCase, e.g. sampleCount
+dotnet_naming_rule.locals_and_parameters.severity = warning
+dotnet_naming_rule.locals_and_parameters.symbols = locals_and_parameters
+dotnet_naming_rule.locals_and_parameters.style = camel_case_style
+dotnet_naming_symbols.locals_and_parameters.applicable_kinds = local, parameter
+dotnet_naming_style.camel_case_style.capitalization = camel_case
+
+# Constants: PascalCase, e.g. MaxStepValue
+dotnet_naming_rule.constants.severity = warning
+dotnet_naming_rule.constants.symbols = constants
+dotnet_naming_rule.constants.style = pascal_case_style
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.required_modifiers = const
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+
+# Private static readonly fields: PascalCase, e.g. RunningStatus
+dotnet_naming_rule.private_static_readonly.severity = warning
+dotnet_naming_rule.private_static_readonly.symbols = private_static_readonly
+dotnet_naming_rule.private_static_readonly.style = pascal_case_style
+dotnet_naming_symbols.private_static_readonly.applicable_kinds = field
+dotnet_naming_symbols.private_static_readonly.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_readonly.required_modifiers = static, readonly
+
+# Interfaces: PascalCase with I prefix, e.g. ILilGraph
+dotnet_naming_rule.interfaces.severity = warning
+dotnet_naming_rule.interfaces.symbols = interfaces
+dotnet_naming_rule.interfaces.style = interface_style
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.interface_style.required_prefix = I
+dotnet_naming_style.interface_style.capitalization = pascal_case
+
+# Everything else not covered above: PascalCase (types, members, namespaces, ...)
+dotnet_naming_rule.all_members.severity = warning
+dotnet_naming_rule.all_members.symbols = all_members
+dotnet_naming_rule.all_members.style = pascal_case_style
+dotnet_naming_symbols.all_members.applicable_kinds = *

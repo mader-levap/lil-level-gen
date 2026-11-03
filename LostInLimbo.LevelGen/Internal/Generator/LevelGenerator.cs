@@ -62,7 +62,7 @@ internal sealed class LevelGenerator
   private string? _validationFailureReason;
 
   /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
-  private int _totalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
+  private int TotalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
   /// <summary>
   /// Prepares the level generator. Assumes the config was already validated by the API layer
@@ -423,7 +423,7 @@ internal sealed class LevelGenerator
   /// </summary>
   private bool IsMapGenerationComplete()
   {
-    return _world.Stats.Steps >= _totalSteps;
+    return _world.Stats.Steps >= TotalSteps;
   }
 
   /// <summary>

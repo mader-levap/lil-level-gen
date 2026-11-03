@@ -102,6 +102,7 @@ Before considering work complete:
 - Prefer `record` for immutable data-transfer types.
 - Prefer `IReadOnlyList<T>`, `IReadOnlyCollection<T>`, or arrays in public APIs when callers should not mutate the result.
 - Avoid public mutable collections where practical.
+- Observe standard C# conventions about naming of variables, classes etc.
 - Use explicit, descriptive names: `GenerateChunk`, `ChunkData`, `RoomTemplate`, `CorridorSegment`, `SpawnPoint`.
 - Avoid abbreviations except widely understood ones such as `Id`, `X`, `Y`, and `Z`.
 - Keep methods small and focused; extract helper methods when a generation pass becomes complex.

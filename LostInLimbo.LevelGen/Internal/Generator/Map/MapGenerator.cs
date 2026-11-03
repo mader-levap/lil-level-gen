@@ -26,9 +26,9 @@ internal sealed class MapGenerator(CnfLevelGeneration config, PrepData prepData,
 
   /// <summary>World: partial or complete result of generation.</summary>
   private LilWorld _world = world;
-  
+
   /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
-  private int _totalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
+  private int TotalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
   /// <summary>
   /// Executes one step of map generation.
@@ -50,12 +50,12 @@ internal sealed class MapGenerator(CnfLevelGeneration config, PrepData prepData,
   public MapRunResult ExecuteStep()
   {
     var sleepMilliseconds = _config.Debug?.PlaceholderSleep ?? CnfDebug.DefaultPlaceholderSleep;
-    var stepSleepMilliseconds = sleepMilliseconds / _totalSteps;
+    var stepSleepMilliseconds = sleepMilliseconds / TotalSteps;
 
     // Imitation of the work of a single step; deliberately not token-aware, this is handled by LevelGenerator.
     Thread.Sleep(stepSleepMilliseconds);
 
     _world.Stats.Steps++;
-    return MapRunResult.Succeed();  
+    return MapRunResult.Succeed();
   }
 }

@@ -33,7 +33,7 @@ internal sealed class ConfigGenerator
   {
     _propMain = propMain;
     _propMain.Validate();
-    
+
     long seed = ResolveSeed();
     _random = new(SeedDerivation.Derive(seed, SaltResolver));
     _propData = ResolvePropData(seed);
@@ -43,7 +43,7 @@ internal sealed class ConfigGenerator
   {
     _propMain = propMain;
     _propMain.Validate();
-    
+
     _random = new(SeedDerivation.Derive(seed, SaltResolver));
     _propData = ResolvePropData(seed);
   }
