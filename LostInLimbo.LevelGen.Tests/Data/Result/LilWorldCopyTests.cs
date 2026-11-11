@@ -48,6 +48,7 @@ public sealed class LilWorldCopyTests
             MaxEdges = NodeMaxEdges,
             Secret = true,
             Pois = [new LilPoi { Id = keyPoiId, Type = EnPoiType.Solution, Name = "Key" }],
+            OpenReach = [startPoiId],
           },
           new LilNode
           {
@@ -145,6 +146,9 @@ public sealed class LilWorldCopyTests
         Assert.True(actual.Reach.ContainsKey(startPoiId));
         Assert.Equal(required, actual.Reach[startPoiId]);
       }
+
+      // Assert: Open reach lists are preserved element-wise.
+      Assert.Equal(expected.OpenReach, actual.OpenReach);
     }
 
     // Assert: Edge contents are preserved element-wise.
@@ -178,6 +182,7 @@ public sealed class LilWorldCopyTests
       Assert.NotSame(source.Graph.Nodes[i], copy.Graph.Nodes[i]);
       Assert.NotSame(source.Graph.Nodes[i].Pois, copy.Graph.Nodes[i].Pois);
       Assert.NotSame(source.Graph.Nodes[i].Reach, copy.Graph.Nodes[i].Reach);
+      Assert.NotSame(source.Graph.Nodes[i].OpenReach, copy.Graph.Nodes[i].OpenReach);
     }
 
     // Assert: Even the inner reach lists are fresh instances.
@@ -247,5 +252,21 @@ public sealed class LilWorldCopyTests
     Assert.Equal(startPoiId, Assert.Single(sourceNode.Reach.Keys));
     Assert.Single(sourceRequired);
     Assert.Equal(2, copyNode.Reach.Count);
+  }
+
+  [Fact]
+  public void Copy_OfWorldWithOpenReach_DetachesOpenReach()
+  {
+    // Arrange: A world whose second node is openly reachable from one start.
+    var source = PopulatedWorld();
+
+    // Act: Copy, then change the copy's open reach list.
+    var copy = LilWorldCopy.Copy(source);
+    Assert.NotNull(copy);
+    copy.Graph.Nodes[1].OpenReach.Add(Guid.NewGuid());
+
+    // Assert: The source kept its single entry; the change is visible only on the copy.
+    Assert.Single(source.Graph.Nodes[1].OpenReach);
+    Assert.Equal(2, copy.Graph.Nodes[1].OpenReach.Count);
   }
 }

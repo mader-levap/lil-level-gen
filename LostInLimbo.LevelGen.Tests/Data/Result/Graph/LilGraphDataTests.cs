@@ -126,6 +126,17 @@ public sealed class LilGraphDataTests
     }
 
     [Fact]
+    public void LilNode_WithRequiredMembersOnly_HasEmptyOpenReach()
+    {
+      // Arrange/Act: Create node with only the required members set.
+      var node = new LilNode { Id = Guid.NewGuid(), RelSize = NodeRelSize, MaxEdges = NodeMaxEdges };
+
+      // Assert: Open reach list is present and empty, never null; the metadata pass fills it later.
+      Assert.NotNull(node.OpenReach);
+      Assert.Empty(node.OpenReach);
+    }
+
+    [Fact]
     public void LilNode_WithMultiplePois_ContainsAllPois()
     {
       // Arrange: Node with red and blue key in the same room.

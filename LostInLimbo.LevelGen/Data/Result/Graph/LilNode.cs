@@ -18,7 +18,7 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// <see cref="Guid.Empty"/>; it is assigned by the generator.
 /// </para>
 /// <para>
-/// <see cref="Pois"/> and <see cref="Reach"/> are mutable collections filled in place by
+/// <see cref="Pois"/>, <see cref="Reach"/> and <see cref="OpenReach"/> are mutable collections filled in place by
 /// generator passes after the node is created: POIs by the graph builders and processors,
 /// reachability metadata by the metadata pass.
 /// </para>
@@ -53,11 +53,13 @@ public sealed record LilNode
   /// Reachability metadata of this node, filled by the metadata pass
   /// (see <c>LostInLimbo.LevelGen.Internal.Generator.Graph.Meta.GraphMetadata</c>).
   /// Key is the identifier of a start POI, value is the list of solution POI identifiers
-  /// that must be collected before this node can be reached from that start - the smallest
-  /// such list over all passages from that start. An empty list means the node is reachable
-  /// from that start without meeting any condition; a start POI with no entry at all means
-  /// this node cannot be reached from that start (and a node unreachable from every start
-  /// keeps an empty dictionary).
+  /// whose conditioned passages every route from that start to this node must use - so the
+  /// player is guaranteed to hold them on arrival. A key that some route can avoid is not
+  /// listed. An empty list means no solution is unavoidable (some route may still use
+  /// conditioned passages, as long as an alternative avoids each of them - see
+  /// <see cref="OpenReach"/> for "reachable without any solution"); a start POI with no
+  /// entry at all means this node cannot be reached from that start (and a node unreachable
+  /// from every start keeps an empty dictionary).
   /// </para>
   /// <para>
   /// The value list is sorted ascending by POI identifier, so the same graph always produces
@@ -65,4 +67,18 @@ public sealed record LilNode
   /// </para>
   /// </summary>
   public Dictionary<Guid, List<Guid>> Reach { get; init; } = new();
+
+  /// <summary>
+  /// <para>
+  /// Identifiers of the start POIs from which this node can be reached using only passages
+  /// without conditions - no solution needed at all. Filled by the metadata pass alongside
+  /// <see cref="Reach"/>.
+  /// </para>
+  /// <para>
+  /// Sorted ascending; empty when every route from every start needs some solution, or when the
+  /// node is unreachable. Every start listed here also has an empty <see cref="Reach"/> list,
+  /// but not the other way round. Never <see langword="null"/>.
+  /// </para>
+  /// </summary>
+  public List<Guid> OpenReach { get; init; } = new();
 }

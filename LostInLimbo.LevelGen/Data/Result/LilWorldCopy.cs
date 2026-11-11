@@ -20,8 +20,9 @@ namespace LostInLimbo.LevelGen.Data.Result;
   /// <see cref="Copy"/> accordingly so the detachment guarantee holds. Leaf records
   /// (<see cref="LilPoi"/>, <see cref="LilCondition"/>, <see cref="LilStyle"/>) are immutable
   /// (init-only) and are shared as list elements; they need no copying.
-  /// Note that <see cref="LilNode.Reach"/> counts as mutable state even though its leaves are
-  /// <see cref="Guid"/> values: the dictionary and its lists must be detached too.
+  /// Note that <see cref="LilNode.Reach"/> and <see cref="LilNode.OpenReach"/> count as mutable
+  /// state even though their leaves are <see cref="Guid"/> values: the dictionary and all lists
+  /// must be detached too.
 /// </para>
 /// Deterministic: the copy preserves all values, identifiers and iteration order of the source.
 /// </remarks>
@@ -54,7 +55,7 @@ public static class LilWorldCopy
   /// <summary>
   /// Copies a graph with fresh node and edge lists. Nodes and edges are recreated via
   /// <c>with</c> so their mutable nested lists (<see cref="LilNode.Pois"/>,
-  /// <see cref="LilEdge.Conditions"/>) and dictionaries (<see cref="LilNode.Reach"/>) are
+  /// <see cref="LilEdge.Conditions"/>, <see cref="LilNode.OpenReach"/>) and dictionaries (<see cref="LilNode.Reach"/>) are
   /// detached as well; immutable leaf records inside them stay shared.
   /// </summary>
   /// <param name="source">Graph to copy. Must not be <see langword="null"/>.</param>
@@ -63,7 +64,7 @@ public static class LilWorldCopy
   {
     var nodes = new List<LilNode>(source.Nodes.Count);
     foreach (var node in source.Nodes)
-      nodes.Add(node with { Pois = [.. node.Pois], Reach = CopyReach(node.Reach) });
+      nodes.Add(node with { Pois = [.. node.Pois], Reach = CopyReach(node.Reach), OpenReach = [.. node.OpenReach] });
 
     var edges = new List<LilEdge>(source.Edges.Count);
     foreach (var edge in source.Edges)

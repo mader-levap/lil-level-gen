@@ -83,7 +83,19 @@ public sealed class GraphMetadataTests
         Assert.True(actualReach.ContainsKey(startId), $"Node {i} misses entry for start {startId}.");
         Assert.Equal(required, actualReach[startId]);
       }
+
+      Assert.Equal(expected.Nodes[i].OpenReach, actual.Nodes[i].OpenReach);
     }
+  }
+
+  /// <summary>
+  /// Asserts that a node's open reach lists exactly the expected start POIs, in ascending order.
+  /// </summary>
+  /// <param name="node">Node whose <see cref="LilNode.OpenReach"/> is checked.</param>
+  /// <param name="startPois">Expected start POI identifiers, ascending.</param>
+  private static void AssertOpenReach(LilNode node, params int[] startPois)
+  {
+    Assert.Equal(startPois.Select(Id).ToList(), node.OpenReach);
   }
 
   /// <summary>Tests the specification semantics: per-start entries, minimality and secrets.</summary>
@@ -139,10 +151,10 @@ public sealed class GraphMetadataTests
     }
 
     [Fact]
-    public void Generate_WithTwoDisjointSingleKeyRoutes_PicksSmallestSolution()
+    public void Generate_WithTwoDisjointSingleKeyRoutes_ListsNeitherSolution()
     {
       // Arrange: Two disjoint routes from the start to the exit, each behind its own single
-      // key (13 and 14); both minimal sets have size one, so the tie must break stably.
+      // key (13 and 14), so neither key is unavoidable.
       var graph = new LilGraph
       {
         Nodes =
@@ -164,8 +176,39 @@ public sealed class GraphMetadataTests
       // Act: Generate the metadata.
       new GraphMetadata(graph).Generate();
 
-      // Assert: Both routes cost exactly one solution; the smaller identifier wins the tie.
-      AssertReach(graph.Nodes[3], (11, [13]));
+      // Assert: Each key can be avoided by taking the other route, so none is required.
+      AssertReach(graph.Nodes[3], (11, []));
+      // Assert: The rooms holding the keys are open from the start.
+      AssertReach(graph.Nodes[1], (11, []));
+      AssertReach(graph.Nodes[2], (11, []));
+    }
+
+    [Fact]
+    public void Generate_WithKeyBehindKey_ListsBothTransitively()
+    {
+      // Arrange: Door A (needs 13) leads to the room with solution 14; door B (needs 14)
+      // leads to the exit. Solution 13 lies in the start room.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(11, EnPoiType.Start), Poi(13, EnPoiType.Solution)),
+          Node(2, Poi(14, EnPoiType.Solution)),
+          Node(3, Poi(15, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(1, 1, 2, conditions: [Condition(13)]),
+          Edge(2, 2, 3, conditions: [Condition(14)]),
+        ],
+      };
+
+      // Act: Generate the metadata.
+      new GraphMetadata(graph).Generate();
+
+      // Assert: The middle room needs door A; the exit needs door B and, transitively, door A.
+      AssertReach(graph.Nodes[1], (11, [13]));
+      AssertReach(graph.Nodes[2], (11, [13, 14]));
     }
 
     [Fact]
@@ -248,6 +291,167 @@ public sealed class GraphMetadataTests
       // the secret flag changes nothing about reach metadata.
       AssertReach(graph.Nodes[1], (11, []));
       AssertReach(graph.Nodes[2], (11, [13]));
+    }
+  }
+
+  /// <summary>Tests <see cref="LilNode.OpenReach"/>: reachability without any solution.</summary>
+  public sealed class OpenReachTests
+  {
+    [Fact]
+    public void Generate_WithSpecExample_ListsStartsReachingOpenly()
+    {
+      // Arrange: The specification example graph.
+      var graph = CreateSpecGraph();
+
+      // Act: Generate the metadata.
+      new GraphMetadata(graph).Generate();
+
+      // Assert: A is behind a one-way passage from start1 only; B and C are open from both
+      // starts; D lies behind the solution door, so no start reaches it openly.
+      AssertOpenReach(graph.Nodes[0], 11);
+      AssertOpenReach(graph.Nodes[1], 11, 12);
+      AssertOpenReach(graph.Nodes[2], 11, 12);
+      AssertOpenReach(graph.Nodes[3]);
+    }
+
+    [Fact]
+    public void Generate_WithTwoDisjointSingleKeyRoutes_ExitIsNotOpenlyReachable()
+    {
+      // Arrange: Two disjoint routes to the exit, behind key 13 or key 14.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(11, EnPoiType.Start)),
+          Node(2, Poi(13, EnPoiType.Solution)),
+          Node(3, Poi(14, EnPoiType.Solution)),
+          Node(4, Poi(15, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(1, 1, 2),
+          Edge(2, 2, 4, conditions: [Condition(13)]),
+          Edge(3, 1, 3),
+          Edge(4, 3, 4, conditions: [Condition(14)]),
+        ],
+      };
+
+      // Act: Generate the metadata.
+      new GraphMetadata(graph).Generate();
+
+      // Assert: No single key is unavoidable, yet some key is always needed for the exit.
+      AssertReach(graph.Nodes[3], (11, []));
+      AssertOpenReach(graph.Nodes[3]);
+      // Assert: The start and the key rooms are open.
+      AssertOpenReach(graph.Nodes[0], 11);
+      AssertOpenReach(graph.Nodes[1], 11);
+      AssertOpenReach(graph.Nodes[2], 11);
+    }
+
+    [Fact]
+    public void Generate_WithParallelOpenAndConditionalPassages_ExitIsOpenlyReachable()
+    {
+      // Arrange: The exit is reachable through an open passage and a parallel locked one.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(11, EnPoiType.Start)),
+          Node(2, Poi(14, EnPoiType.Exit)),
+          Node(3, Poi(13, EnPoiType.Solution)),
+        ],
+        Edges =
+        [
+          Edge(1, 1, 2),
+          Edge(2, 1, 2, conditions: [Condition(13)]),
+          Edge(3, 1, 3),
+        ],
+      };
+
+      // Act: Generate the metadata.
+      new GraphMetadata(graph).Generate();
+
+      // Assert: The open passage makes the exit openly reachable.
+      AssertOpenReach(graph.Nodes[1], 11);
+    }
+
+    [Fact]
+    public void Generate_WithKeyBehindOpenRoom_LockedNodeIsNotOpenlyReachable()
+    {
+      // Arrange: Open room with key 13, then a locked passage requiring it.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(11, EnPoiType.Start)),
+          Node(2, Poi(13, EnPoiType.Solution)),
+          Node(3, Poi(14, EnPoiType.Exit)),
+        ],
+        Edges =
+        [
+          Edge(1, 1, 2),
+          Edge(2, 2, 3, conditions: [Condition(13)]),
+        ],
+      };
+
+      // Act: Generate the metadata.
+      new GraphMetadata(graph).Generate();
+
+      // Assert: The exit is reachable, but only with the key, so it is not openly reachable.
+      AssertReach(graph.Nodes[2], (11, [13]));
+      AssertOpenReach(graph.Nodes[2]);
+      AssertOpenReach(graph.Nodes[1], 11);
+    }
+
+    [Fact]
+    public void Generate_WithUnreachableNode_HasEmptyOpenReachAndNoReach()
+    {
+      // Arrange: A start room and a disconnected room.
+      var graph = new LilGraph
+      {
+        Nodes = [Node(1, Poi(11, EnPoiType.Start)), Node(2)],
+        Edges = [],
+      };
+
+      // Act: Generate the metadata.
+      new GraphMetadata(graph).Generate();
+
+      // Assert: The disconnected room appears in neither output.
+      Assert.Empty(graph.Nodes[1].Reach);
+      AssertOpenReach(graph.Nodes[1]);
+      AssertOpenReach(graph.Nodes[0], 11);
+    }
+
+    [Fact]
+    public void Generate_WithStartsInReverseIdOrder_SortsOpenReachAscending()
+    {
+      // Arrange: Two starts whose node order is the reverse of their POI id order, joined openly.
+      var graph = new LilGraph
+      {
+        Nodes = [Node(1, Poi(22, EnPoiType.Start)), Node(2, Poi(21, EnPoiType.Start))],
+        Edges = [Edge(1, 1, 2)],
+      };
+
+      // Act: Generate the metadata.
+      new GraphMetadata(graph).Generate();
+
+      // Assert: Both nodes list both starts in ascending id order.
+      AssertOpenReach(graph.Nodes[0], 21, 22);
+      AssertOpenReach(graph.Nodes[1], 21, 22);
+    }
+
+    [Fact]
+    public void Generate_Twice_DoesNotDuplicateOpenReach()
+    {
+      // Arrange: The specification example graph, processed once.
+      var graph = CreateSpecGraph();
+      new GraphMetadata(graph).Generate();
+
+      // Act: Process it again.
+      new GraphMetadata(graph).Generate();
+
+      // Assert: Entries are replaced, not accumulated.
+      AssertOpenReach(graph.Nodes[1], 11, 12);
     }
   }
 
@@ -582,6 +786,94 @@ public sealed class GraphMetadataTests
       // second rail, so its minimal requirement stays empty.
       var lastFar = withGoals.Nodes.Single(node => node.Id == Id(LadderRungs + SecondRailOffset));
       AssertReach(lastFar, (1 + PoiOffset, []));
+    }
+
+    /// <summary>Number of chain nodes in the skippable-guard chain.</summary>
+    private const int GuardedChainLength = 40;
+
+    /// <summary>POI id of the start in the skippable-guard chain.</summary>
+    private const int ChainStartPoi = 900;
+
+    /// <summary>Node id of the vault hanging off the last chain node.</summary>
+    private const int VaultNode = 500;
+
+    /// <summary>POI id of the vault key, placed in chain node 2.</summary>
+    private const int VaultKeyPoi = 1500;
+
+    /// <summary>
+    /// Builds the shape that blew up the exact search at difficulty 100: a chain 1..N where
+    /// passage (i, i+1) requires solution <c>PoiOffset + i</c> lying in node i, plus open
+    /// one-way shortcuts (i -> i+2) that skip guarded nodes. A vault behind the last node requires a key
+    /// lying in node 2, which itself is only reachable through the first guarded passage.
+    /// </summary>
+    /// <returns>The chain graph with deterministic identifiers.</returns>
+    private static LilGraph CreateSkippableGuardChain()
+    {
+      var nodes = new List<LilNode>();
+      var edges = new List<LilEdge>();
+      int edgeId = 1;
+
+      for (int i = 1; i <= GuardedChainLength; i++)
+      {
+        var pois = new List<LilPoi>();
+        if (i == 1) pois.Add(Poi(ChainStartPoi, EnPoiType.Start));
+        if (i < GuardedChainLength) pois.Add(Poi(PoiOffset + i, EnPoiType.Solution));
+        if (i == 2) pois.Add(Poi(VaultKeyPoi, EnPoiType.Solution));
+        nodes.Add(Node(i, pois.ToArray()));
+
+        if (i < GuardedChainLength)
+          edges.Add(Edge(edgeId++, i, i + 1, conditions: [Condition(PoiOffset + i)]));
+        if (i + 2 <= GuardedChainLength)
+          edges.Add(Edge(edgeId++, i, i + 2, EnPassageDirection.OneWay));
+      }
+
+      nodes.Add(Node(VaultNode));
+      edges.Add(Edge(edgeId, GuardedChainLength, VaultNode, conditions: [Condition(VaultKeyPoi)]));
+      return new LilGraph { Nodes = nodes, Edges = edges };
+    }
+
+    [Fact]
+    public void Generate_WithManySkippableGuardedNodes_FinishesInTime()
+    {
+      // Arrange: Chain with about forty guarded passages that shortcuts can bypass.
+      var graph = CreateSkippableGuardChain();
+
+      // Act: Run the pass under the time budget.
+      var finished = GenerateWithinBudget(graph);
+
+      // Assert: Many conditions do not blow up the search.
+      Assert.True(finished, $"Metadata pass did not finish within {PassTimeout}.");
+    }
+
+    [Fact]
+    public void Generate_WithManySkippableGuardedNodes_ListsOnlyUnavoidableKeys()
+    {
+      // Arrange: Same chain.
+      var graph = CreateSkippableGuardChain();
+
+      // Act: Run the pass under the time budget.
+      Assert.True(GenerateWithinBudget(graph), $"Metadata pass did not finish within {PassTimeout}.");
+
+      // Assert: Node 2 has no shortcut into it, so its guard is unavoidable. Every later node
+      // can be entered either through its guard or over a shortcut, so it needs nothing.
+      Node2Reach(graph, [PoiOffset + 1]);
+      for (int i = 3; i <= GuardedChainLength; i++)
+      {
+        var node = graph.Nodes.Single(n => n.Id == Id(i));
+        AssertReach(node, (ChainStartPoi, []));
+      }
+
+      // Assert: The vault needs its own key and, transitively, node 2's guard.
+      var vault = graph.Nodes.Single(n => n.Id == Id(VaultNode));
+      AssertReach(vault, (ChainStartPoi, [PoiOffset + 1, VaultKeyPoi]));
+    }
+
+    /// <summary>Asserts the reach entry of chain node 2.</summary>
+    /// <param name="graph">Chain graph.</param>
+    /// <param name="required">Expected required POI ids.</param>
+    private static void Node2Reach(LilGraph graph, int[] required)
+    {
+      AssertReach(graph.Nodes.Single(n => n.Id == Id(2)), (ChainStartPoi, required));
     }
   }
 }

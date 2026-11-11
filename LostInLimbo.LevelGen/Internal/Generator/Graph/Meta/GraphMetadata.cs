@@ -1,44 +1,51 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 
 /// <summary>
-/// Fills <see cref="LilNode.Reach"/> of every node: for each start POI, the smallest list of
-/// solution POI identifiers required to reach that node from that start.
+/// Fills <see cref="LilNode.Reach"/> of every node: for each start POI, the solution POI
+/// identifiers whose conditioned passages every route from that start to the node must use.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Runs one independent label-correcting search per start POI. A search state is
-/// <c>(node, used, held)</c> where <c>used</c> is the union of all conditions crossed on the
-/// way and <c>held</c> holds every condition-required POI of every node visited on the way
-/// (POIs no condition requires can never open a passage, so they are not tracked). A passage can be
-/// crossed when its direction allows leaving the current node and all of its conditions are
-/// held; crossing adds the condition POIs to <c>used</c> and the far node's POIs to
-/// <c>held</c>. Per node the search keeps only non-dominated states (a state is dropped when
-/// another one uses a subset of its conditions and holds a superset of its POIs), so the
-/// fixpoint terminates even on cyclic graphs. The stored entry per node is the state with the
-/// smallest used set (by count, then by ascending identifier), which makes the output
-/// independent of edge processing order. See <see cref="LilNode.Reach"/> for the semantics.
+/// Per start POI, a base key-door flood finds every reachable node: starting at the start node,
+/// it repeatedly crosses every passage whose conditions are all held, where held means the POI
+/// lies in an already reached node, until no new node is reached. Then, for each required POI
+/// the base flood obtains, the flood is repeated with that POI treated as never held. Every node
+/// reached by the base flood but not by the blocked one cannot be reached without that POI, so
+/// the POI is listed for it. Indirect needs follow automatically: blocking a key also makes
+/// every key behind it unobtainable.
 /// </para>
 /// <para>
-/// The pass never verifies the graph - it runs before validation, so a null or empty graph is
-/// a no-op and dangling edge or condition references are skipped rather than thrown.
+/// One more flood per start holds nothing at all, so it crosses only passages without
+/// conditions; every node it reaches lists that start in <see cref="LilNode.OpenReach"/>
+/// (reachable without any solution), sorted ascending once all starts are done.
 /// </para>
-/// <para>Deterministic: the same graph always produces the same metadata.</para>
+/// <para>
+/// Only POIs that some condition requires are tracked; other POIs can never open a passage.
+/// Cost per start is about <c>O(k² × (V + E))</c> for <c>k</c> required POIs - polynomial,
+/// unlike the minimal-route-cost formulation, which is NP-hard.
+/// </para>
+/// <para>
+/// Passage rules mirror the validator: one-way passages lead From -> To only, bidirectional
+/// ones both ways, conditions apply in every direction and secret passages count as ordinary
+/// passages. The pass never verifies the graph - it runs before validation, so a null or empty
+/// graph is a no-op and self-loops or dangling edge references are skipped rather than thrown.
+/// </para>
+/// <para>Deterministic: flood results are sets and lists are filled in ascending POI order.</para>
 /// </remarks>
 internal sealed class GraphMetadata(LilGraph? graph)
 {
-  /// <summary>Graph whose nodes receive reach metadata, or null.</summary>
-  private LilGraph? _graph = graph;
+  /// <summary>
+  /// Shared empty set passed as "required POIs" to the open flood: with nothing worth holding,
+  /// only passages without conditions can be crossed. Never mutated.
+  /// </summary>
+  private static readonly HashSet<Guid> NoPois = new();
 
-  /// <summary>Traversal state of the search for a single start POI.</summary>
-  /// <param name="NodeId">Node the search currently stands in.</param>
-  /// <param name="Used">Conditions crossed so far; the value reported by <see cref="LilNode.Reach"/>.</param>
-  /// <param name="Held">Condition-required POIs of all nodes visited so far, including the current one.</param>
-  private sealed record SearchState(Guid NodeId, HashSet<Guid> Used, HashSet<Guid> Held);
+  /// <summary>Graph whose nodes receive reach metadata, or null.</summary>
+  private readonly LilGraph? _graph = graph;
 
   /// <summary>
   /// Generates reach metadata for all nodes of the graph; a null or empty graph is a no-op.
@@ -53,6 +60,7 @@ internal sealed class GraphMetadata(LilGraph? graph)
     foreach (var node in graph.Nodes)
     {
       node.Reach.Clear();
+      node.OpenReach.Clear();
     }
 
     // Index nodes and build incident adjacency; degenerate and dangling edges are skipped.
@@ -79,7 +87,7 @@ internal sealed class GraphMetadata(LilGraph? graph)
 
     var requiredPois = CollectRequiredPois(graph);
 
-    // One independent search per start POI, in deterministic node then POI order.
+    // One independent analysis per start POI, in deterministic node then POI order.
     foreach (var node in graph.Nodes)
     {
       foreach (var poi in node.Pois)
@@ -90,16 +98,17 @@ internal sealed class GraphMetadata(LilGraph? graph)
         }
       }
     }
+
+    // Starts are visited in node order, not id order; sort so output is order-independent.
+    foreach (var node in graph.Nodes)
+    {
+      node.OpenReach.Sort();
+    }
   }
 
   /// <summary>
   /// Collects every POI identifier that at least one passage condition requires.
   /// </summary>
-  /// <remarks>
-  /// Only these POIs can ever make a passage crossable, so the search tracks only them in
-  /// <see cref="SearchState.Held"/>. Tracking all POIs (goals, exits, ...) would let states that
-  /// differ only in irrelevant POIs escape dominance pruning and grow exponentially.
-  /// </remarks>
   /// <param name="graph">Graph whose passages are scanned.</param>
   /// <returns>Identifiers of all required POIs; empty when no passage has a condition.</returns>
   private static HashSet<Guid> CollectRequiredPois(LilGraph graph)
@@ -117,13 +126,13 @@ internal sealed class GraphMetadata(LilGraph? graph)
   }
 
   /// <summary>
-  /// Runs the label-correcting search for one start POI and writes the best required list of
-  /// every reached node into its reach dictionary.
+  /// Computes the reach entry of every node reachable from one start POI: the base flood
+  /// decides reachability, one blocked flood per obtained required POI decides necessity.
   /// </summary>
   /// <param name="startNode">Node containing the start POI.</param>
   /// <param name="nodeById">Node index by identifier.</param>
   /// <param name="adjacency">Incident passages per traversable node.</param>
-  /// <param name="requiredPois">POIs required by some condition; the only POIs worth holding.</param>
+  /// <param name="requiredPois">POIs required by some condition.</param>
   /// <param name="startPoiId">Identifier of the start POI; the reach dictionary key.</param>
   private static void SolveFromStart(
     LilNode startNode,
@@ -132,100 +141,116 @@ internal sealed class GraphMetadata(LilGraph? graph)
     HashSet<Guid> requiredPois,
     Guid startPoiId)
   {
-    // Non-dominated states per reached node.
-    var fronts = new Dictionary<Guid, List<SearchState>>();
-    var worklist = new Queue<SearchState>();
+    var (reached, held) = Flood(startNode.Id, nodeById, adjacency, requiredPois, blockedPoi: null);
 
-    // The start node is always reachable from itself without meeting any condition.
-    var seed = new SearchState(startNode.Id, [], CollectPois(startNode, requiredPois));
-    fronts[startNode.Id] = [seed];
-    worklist.Enqueue(seed);
-
-    while (worklist.Count > 0)
+    // Unreachable nodes keep no entry; reached ones start with an empty requirement list.
+    var lists = new Dictionary<Guid, List<Guid>>(reached.Count);
+    foreach (var nodeId in reached)
     {
-      var state = worklist.Dequeue();
-      if (!adjacency.TryGetValue(state.NodeId, out var incident)) continue;
+      lists[nodeId] = [];
+    }
 
-      foreach (var edge in incident)
+    // Only obtained keys can matter: an unobtainable key never opened a passage in the base flood.
+    var candidates = new List<Guid>(held);
+    candidates.Sort();
+    foreach (var poiId in candidates)
+    {
+      var (reachedWithout, _) = Flood(startNode.Id, nodeById, adjacency, requiredPois, poiId);
+      foreach (var nodeId in reached)
       {
-        // Incidence direction is pre-filtered, so the other endpoint is always walkable.
-        var nextId = edge.From == state.NodeId ? edge.To : edge.From;
-        if (!HoldsAll(state.Held, edge.Conditions)) continue;
-
-        var nextUsed = new HashSet<Guid>(state.Used);
-        foreach (var condition in edge.Conditions)
-        {
-          nextUsed.Add(condition.RequiresPoi);
-        }
-
-        // The far node's required POIs are collected on arrival, like the validator collects on flood.
-        var nextHeld = new HashSet<Guid>(state.Held);
-        foreach (var poi in nodeById[nextId].Pois)
-        {
-          if (requiredPois.Contains(poi.Id)) nextHeld.Add(poi.Id);
-        }
-
-        var next = new SearchState(nextId, nextUsed, nextHeld);
-        if (TryAdmit(fronts, next)) worklist.Enqueue(next);
+        // Ascending candidate order keeps every list sorted.
+        if (!reachedWithout.Contains(nodeId)) lists[nodeId].Add(poiId);
       }
     }
 
-    // Report the reached nodes; unreachable nodes keep no entry for this start.
-    foreach (var (nodeId, front) in fronts)
+    foreach (var (nodeId, list) in lists)
     {
-      List<Guid>? best = null;
-      foreach (var state in front)
-      {
-        var candidate = state.Used.OrderBy(id => id).ToList();
-        if (best is null || IsBetter(candidate, best)) best = candidate;
-      }
+      nodeById[nodeId].Reach[startPoiId] = list;
+    }
 
-      if (best is not null) nodeById[nodeId].Reach[startPoiId] = best;
+    // Open flood: nothing is ever held, so only passages without conditions are crossed.
+    var (reachedOpenly, _) = Flood(startNode.Id, nodeById, adjacency, NoPois, blockedPoi: null);
+    foreach (var nodeId in reachedOpenly)
+    {
+      nodeById[nodeId].OpenReach.Add(startPoiId);
     }
   }
 
   /// <summary>
-  /// Admits a state into its node's front when no existing state dominates it, dropping the
-  /// states it dominates itself. Rejected states can never yield a better result than an
-  /// already stored one, which both bounds the search and keeps its outcome order-independent.
+  /// Key-door flood from a start node: crosses every passage whose conditions are all held,
+  /// collecting required POIs of reached nodes, until nothing new is reached.
   /// </summary>
-  /// <param name="fronts">Non-dominated states per reached node.</param>
-  /// <param name="state">State to admit.</param>
-  /// <returns>True when the state was added and must be expanded.</returns>
-  private static bool TryAdmit(Dictionary<Guid, List<SearchState>> fronts, SearchState state)
+  /// <param name="startId">Identifier of the start node.</param>
+  /// <param name="nodeById">Node index by identifier.</param>
+  /// <param name="adjacency">Incident passages per traversable node.</param>
+  /// <param name="requiredPois">POIs required by some condition; the only POIs worth holding.</param>
+  /// <param name="blockedPoi">POI treated as never held, or null to block nothing.</param>
+  /// <returns>The reached node identifiers and the held required POIs.</returns>
+  private static (HashSet<Guid> Reached, HashSet<Guid> Held) Flood(
+    Guid startId,
+    Dictionary<Guid, LilNode> nodeById,
+    Dictionary<Guid, List<LilEdge>> adjacency,
+    HashSet<Guid> requiredPois,
+    Guid? blockedPoi)
   {
-    if (!fronts.TryGetValue(state.NodeId, out var front))
+    var reached = new HashSet<Guid> { startId };
+    var held = new HashSet<Guid>();
+    var queue = new Queue<Guid>();
+    // Passages that were blocked by a missing key; retried whenever a new key arrives.
+    var waiting = new List<(LilEdge Edge, Guid NextId)>();
+
+    Arrive(startId);
+    // Key count when waiting passages were last retried (none yet, so zero keys).
+    var keysAtLastRetry = 0;
+    while (true)
     {
-      front = [];
-      fronts[state.NodeId] = front;
+      while (queue.Count > 0)
+      {
+        var nodeId = queue.Dequeue();
+        if (!adjacency.TryGetValue(nodeId, out var incident)) continue;
+
+        foreach (var edge in incident)
+        {
+          // Incidence direction is pre-filtered, so the other endpoint is always walkable.
+          var nextId = edge.From == nodeId ? edge.To : edge.From;
+          if (reached.Contains(nextId)) continue;
+          if (HoldsAll(held, edge.Conditions)) Arrive(nextId);
+          else waiting.Add((edge, nextId));
+        }
+      }
+
+      // Fixpoint: no key gained since the last retry means no waiting passage can open.
+      // Keys only grow, so the loop ends after at most one retry per key.
+      if (held.Count == keysAtLastRetry) break;
+      keysAtLastRetry = held.Count;
+
+      var retry = waiting;
+      waiting = [];
+      foreach (var (edge, nextId) in retry)
+      {
+        if (reached.Contains(nextId)) continue;
+        if (HoldsAll(held, edge.Conditions)) Arrive(nextId);
+        else waiting.Add((edge, nextId));
+      }
     }
 
-    for (var i = front.Count - 1; i >= 0; i--)
+    return (reached, held);
+
+    // Marks a node reached, picks up its required POIs and schedules it for expansion.
+    void Arrive(Guid nodeId)
     {
-      var existing = front[i];
-      if (Dominates(existing, state)) return false;
-      if (Dominates(state, existing)) front.RemoveAt(i);
+      reached.Add(nodeId);
+      foreach (var poi in nodeById[nodeId].Pois)
+      {
+        if (poi.Id != blockedPoi && requiredPois.Contains(poi.Id)) held.Add(poi.Id);
+      }
+
+      queue.Enqueue(nodeId);
     }
-
-    front.Add(state);
-    return true;
-  }
-
-  /// <summary>
-  /// Checks whether state A is at least as good as state B: it uses a subset of B's
-  /// conditions and holds a superset of B's POIs, so every passage B can cross is also
-  /// crossable by A and A's results are never worse.
-  /// </summary>
-  /// <param name="a">Dominating candidate.</param>
-  /// <param name="b">Dominated candidate.</param>
-  /// <returns>True when A dominates B.</returns>
-  private static bool Dominates(SearchState a, SearchState b)
-  {
-    return a.Used.IsSubsetOf(b.Used) && a.Held.IsSupersetOf(b.Held);
   }
 
   /// <summary>Checks whether every condition of a passage is already held.</summary>
-  /// <param name="held">POIs held by the search state.</param>
+  /// <param name="held">POIs held by the flood.</param>
   /// <param name="conditions">Conditions of the passage; an open passage always passes.</param>
   /// <returns>True when all conditions are held.</returns>
   private static bool HoldsAll(HashSet<Guid> held, List<LilCondition> conditions)
@@ -236,41 +261,6 @@ internal sealed class GraphMetadata(LilGraph? graph)
     }
 
     return true;
-  }
-
-  /// <summary>
-  /// Compares two required lists by the reporting order of <see cref="LilNode.Reach"/>: fewer
-  /// solutions first, ties broken by the first differing identifier (ascending).
-  /// </summary>
-  /// <param name="candidate">Challenger list, sorted ascending.</param>
-  /// <param name="best">Current best list, sorted ascending.</param>
-  /// <returns>True when <paramref name="candidate"/> is the smaller list.</returns>
-  private static bool IsBetter(List<Guid> candidate, List<Guid> best)
-  {
-    if (candidate.Count != best.Count) return candidate.Count < best.Count;
-
-    for (var i = 0; i < candidate.Count; i++)
-    {
-      var comparison = candidate[i].CompareTo(best[i]);
-      if (comparison != 0) return comparison < 0;
-    }
-
-    return false;
-  }
-
-  /// <summary>Collects the identifiers of a node's POIs that some condition requires.</summary>
-  /// <param name="node">Node whose POIs are collected.</param>
-  /// <param name="requiredPois">POIs required by some condition.</param>
-  /// <returns>The set of required POI identifiers held by the node; empty when there are none.</returns>
-  private static HashSet<Guid> CollectPois(LilNode node, HashSet<Guid> requiredPois)
-  {
-    var held = new HashSet<Guid>();
-    foreach (var poi in node.Pois)
-    {
-      if (requiredPois.Contains(poi.Id)) held.Add(poi.Id);
-    }
-
-    return held;
   }
 
   /// <summary>Appends an edge to the incident list of a node.</summary>
