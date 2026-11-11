@@ -1,4 +1,5 @@
 using LostInLimbo.LevelGen.Data.Config;
+using LostInLimbo.LevelGen.Data.Result.Stats;
 
 namespace LostInLimbo.LevelGen.Tests.Data.Config;
 
@@ -59,5 +60,32 @@ public sealed class CnfDebugTests
     Assert.False(debug.FailAtStart);
     Assert.False(debug.FailGraphBuild);
     Assert.False(debug.FailGraphValidation);
+    Assert.Null(debug.EndAtPhase);
+  }
+
+  [Fact]
+  public void Validate_WithUndefinedEndAtPhase_ThrowsNamingEndAtPhase()
+  {
+    // Arrange: Debug config stopping after a phase that does not exist.
+    var debug = new CnfDebug { EndAtPhase = (EnPhase)99 };
+
+    // Act/Assert: The undefined value is rejected naming the offending property.
+    var exception = Assert.Throws<ArgumentOutOfRangeException>(() => debug.Validate());
+    Assert.Equal("EndAtPhase", exception.ParamName);
+  }
+
+  [Theory]
+  [InlineData(EnPhase.Prepass)]
+  [InlineData(EnPhase.Graph)]
+  [InlineData(EnPhase.Map)]
+  [InlineData(EnPhase.Finalization)]
+  [InlineData(EnPhase.Completed)]
+  public void Validate_WithDefinedEndAtPhase_DoesNotThrow(EnPhase endAtPhase)
+  {
+    // Arrange: Debug config stopping after a defined phase.
+    var debug = new CnfDebug { EndAtPhase = endAtPhase };
+
+    // Assert: Every defined phase is accepted.
+    debug.Validate();
   }
 }

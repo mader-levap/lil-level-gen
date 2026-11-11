@@ -216,8 +216,9 @@ internal sealed class LevelGenerator
   /// </summary>
   /// <param name="cancellationToken">Token checked at every step boundary.</param>
   /// <returns>
-  /// Generation result: Finished when all steps are done, Paused when the run stopped early,
-  /// or ValidationError when graph validation failed.
+  /// Generation result: Finished when all steps are done, Paused when the run stopped early
+  /// (including the debug stop of <see cref="CnfDebug.EndAtPhase"/>), or ValidationError when
+  /// validation failed.
   /// </returns>
   private EnGenResult RunGeneration(CancellationToken cancellationToken)
   {
@@ -239,6 +240,10 @@ internal sealed class LevelGenerator
   /// <summary>
   /// <para>Main loop.</para>
   /// </summary>
+  /// <remarks>
+  /// Each pass returns false to stop the run early: a pause request, a validation failure, or
+  /// the debug stop of <see cref="CnfDebug.EndAtPhase"/> (see <see cref="CompletePhase"/>).
+  /// </remarks>
   /// <param name="cancellationToken">Token checked at every step boundary.</param>
   private void MainLoop(CancellationToken cancellationToken)
   {
@@ -251,7 +256,10 @@ internal sealed class LevelGenerator
   /// <summary>
   /// <para>Execute the prepass generator. This is considered a single step.</para>
   /// </summary>
-  /// <returns>True if the run should continue, otherwise false.</returns>
+  /// <returns>
+  /// True if the run should continue, otherwise false: a pause was requested before the step
+  /// started, or <see cref="CnfDebug.EndAtPhase"/> stops the run after this phase.
+  /// </returns>
   private bool RunPrepass(CancellationToken cancellationToken)
   {
     // Are we in the correct phase?
@@ -263,8 +271,7 @@ internal sealed class LevelGenerator
 
     PrepassGenerator prepassGenerator = new(_config);
     _prepData = prepassGenerator.Create();
-    _world.Phase = EnPhase.Graph; // move to next phase
-    return true;
+    return CompletePhase(EnPhase.Prepass, EnPhase.Graph);
   }
 
   /// <summary>
@@ -283,9 +290,10 @@ internal sealed class LevelGenerator
   /// </exception>
   /// <returns>
   /// <see langword="true"/> to continue with the next phase; <see langword="false"/> when a
-  /// pause was requested before the step started or when validation failed (the reason is
-  /// kept in <see cref="_validationFailureReason"/>). A failed build throws instead of
-  /// returning <see langword="false"/>.
+  /// pause was requested before the step started, when validation failed (the reason is
+  /// kept in <see cref="_validationFailureReason"/>) or when <see cref="CnfDebug.EndAtPhase"/>
+  /// stops the run after this phase. A failed build throws instead of returning
+  /// <see langword="false"/>.
   /// </returns>
   private bool RunGraph(CancellationToken cancellationToken)
   {
@@ -314,8 +322,7 @@ internal sealed class LevelGenerator
       default:
         throw new InvalidOperationException("Unknown graph outcome: " + result.Outcome + ".");
     }
-    _world.Phase = EnPhase.Map; // move to next phase
-    return true;
+    return CompletePhase(EnPhase.Graph, EnPhase.Map);
   }
 
   /// <summary>
@@ -341,9 +348,10 @@ internal sealed class LevelGenerator
   /// </exception>
   /// <returns>
   /// <see langword="true"/> to continue with the next phase - also when the world is not in
-  /// the map phase, so the run skips this pass; <see langword="false"/> only when a pause was
+  /// the map phase, so the run skips this pass; <see langword="false"/> when a pause was
   /// requested before the next step started (the world stays in
-  /// <see cref="EnPhase.Map"/>). A failed build throws instead of returning
+  /// <see cref="EnPhase.Map"/>) or when the map completed and <see cref="CnfDebug.EndAtPhase"/>
+  /// stops the run after this phase. A failed build throws instead of returning
   /// <see langword="false"/>.
   /// </returns>
   private bool RunMap(CancellationToken cancellationToken)
@@ -381,7 +389,7 @@ internal sealed class LevelGenerator
       stepsRun++;
     }
 
-    if (IsMapGenerationComplete()) _world.Phase = EnPhase.Finalization;
+    if (IsMapGenerationComplete()) return CompletePhase(EnPhase.Map, EnPhase.Finalization);
     return true;
   }
 
@@ -407,6 +415,23 @@ internal sealed class LevelGenerator
   }
 
   // Helpers.
+
+  /// <summary>
+  /// Moves the world from a finished phase to the next one and decides whether the run goes on.
+  /// </summary>
+  /// <remarks>
+  /// When <see cref="CnfDebug.EndAtPhase"/> names the finished phase, the run stops here as if
+  /// paused at the start of next phase. The stop fires only on the transition, so
+  /// a resumed run never finishes that phase again and continues normally.
+  /// </remarks>
+  /// <param name="finished">Phase that just finished.</param>
+  /// <param name="next">Phase the world moves to.</param>
+  /// <returns>True if the run should continue, false if the debug stop ends it.</returns>
+  private bool CompletePhase(EnPhase finished, EnPhase next)
+  {
+    _world.Phase = next;
+    return _config.Debug?.EndAtPhase != finished;
+  }
 
   /// <summary>
   /// Check if level generation as a whole is completed.

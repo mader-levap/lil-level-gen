@@ -1,4 +1,5 @@
 using System;
+using LostInLimbo.LevelGen.Data.Result.Stats;
 
 namespace LostInLimbo.LevelGen.Data.Config;
 
@@ -42,6 +43,23 @@ public sealed record CnfDebug
   public bool FailGraphValidation { get; init; } = false;
 
   /// <summary>
+  /// If not null, end generation after given phase finishes as if it was paused (at beginning of next phase).
+  /// </summary>
+  /// <remarks>
+  /// <para>
+  /// The run reports <see cref="Status.EnGenResult.Paused"/> and publishes its world, whose
+  /// phase is the next one (e.g. <see cref="EnPhase.Map"/> with a complete graph and no map
+  /// steps for <see cref="EnPhase.Graph"/>). Lets tests skip the work of later phases.
+  /// </para>
+  /// <para>
+  /// The stop fires once, when the phase finishes: resuming continues normally. A validation
+  /// failure still wins, as the phase did not finish. <see cref="EnPhase.Finalization"/> and
+  /// <see cref="EnPhase.Completed"/> have no effect - the run finishes as usual.
+  /// </para>
+  /// </remarks>
+  public EnPhase? EndAtPhase { get; init; } = null;
+
+  /// <summary>
   /// How long the placeholder generation pretends to work, in milliseconds.
   /// 0 means it returns immediately. Debug only; real passes will not sleep.
   /// The value is split evenly across <see cref="PlaceholderSteps"/> steps, so the
@@ -61,7 +79,7 @@ public sealed record CnfDebug
   /// <summary>
   /// Checks that this config can be used.
   /// </summary>
-  /// <exception cref="ArgumentOutOfRangeException">A numeric setting is out of range.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">A numeric setting is out of range or <see cref="EndAtPhase"/> is not a defined phase.</exception>
   public void Validate()
   {
     if (PlaceholderSleep < 0)
@@ -69,5 +87,8 @@ public sealed record CnfDebug
 
     if (PlaceholderSteps < 1)
       throw new ArgumentOutOfRangeException(nameof(PlaceholderSteps), PlaceholderSteps, "Placeholder steps must be >= 1.");
+
+    if (EndAtPhase is { } endAtPhase && !Enum.IsDefined(typeof(EnPhase), endAtPhase))
+      throw new ArgumentOutOfRangeException(nameof(EndAtPhase), endAtPhase, "End-at phase must be a defined phase or null.");
   }
 }

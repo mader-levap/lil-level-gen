@@ -93,6 +93,8 @@ After a successful build and before validation, the metadata pass (`GraphMetadat
 
 Validation failure is special: when the built graph is rejected by the validator (when `CnfValidGraphOpt.Enabled`, or via the `CnfDebug.FailGraphValidation` debug hook), the run ends with `EnGenResult.ValidationError` instead of `EnGenResult.Error`. The reason is reported in `GenerationStatus.FailureReason` (no exception), and - unlike an error - the fully built world is published alongside the status, so the editor can show the rejected graph and debug the failing check. The result is terminal: only a fresh `Start` can run again.
 
+Debug early stop: `CnfDebug.EndAtPhase` ends the run right after the named phase finishes, as if paused at the start of the next phase (`EnGenResult.Paused`, world published). With `EnPhase.Graph` the world holds the complete graph in phase `Map` with no map steps, so graph-only tests skip map generation. The stop fires once, so resuming continues normally; a validation failure still wins, and `Finalization`/`Completed` have no effect.
+
 `Simple` and `Linear` finish with the same four finalization processors in the fixed order - secrets, objectives, relative size, grouping - each parameterized by its section of `CnfGraph.ProcOpts`.
 
 ### Map

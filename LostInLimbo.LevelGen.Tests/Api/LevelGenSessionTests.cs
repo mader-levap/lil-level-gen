@@ -30,7 +30,8 @@ public sealed class LevelGenSessionTests
   /// <param name="steps">How many placeholder steps the generation is split into.</param>
   /// <param name="failGraphBuild">If true, the graph build reports failure.</param>
   /// <param name="failGraphValidation">If true, graph validation reports failure after a successful build.</param>
-  private static CnfLevelGeneration Config(int sleep = 1000, bool failAtStart = false, int steps = CnfDebug.DefaultPlaceholderSteps, bool failGraphBuild = false, bool failGraphValidation = false)
+  /// <param name="endAtPhase">If not null, the run stops after this phase finishes.</param>
+  private static CnfLevelGeneration Config(int sleep = 1000, bool failAtStart = false, int steps = CnfDebug.DefaultPlaceholderSteps, bool failGraphBuild = false, bool failGraphValidation = false, EnPhase? endAtPhase = null)
   {
     return CnfLevelGeneration.Default with
     {
@@ -41,6 +42,7 @@ public sealed class LevelGenSessionTests
         FailAtStart = failAtStart,
         FailGraphBuild = failGraphBuild,
         FailGraphValidation = failGraphValidation,
+        EndAtPhase = endAtPhase,
       },
     };
   }
@@ -244,6 +246,25 @@ public sealed class LevelGenSessionTests
       Assert.NotNull(world);
       Assert.Equal(EnPhase.Graph, world.Phase);
       Assert.NotEmpty(world.Graph.Nodes);
+    }
+
+    [Fact]
+    public void Start_WithEndAtPhaseGraph_PublishesPausedWithGraphAtMapPhase()
+    {
+      // Arrange: Fast config that stops once the graph is done.
+      var config = Config(sleep: 0, endAtPhase: EnPhase.Graph);
+
+      // Act: Start a full run and wait for it to stop.
+      Assert.True(_session.Start(EnRunKind.All, config));
+      WaitForTerminal(_session);
+
+      // Assert: The run pauses at the start of the map phase and exposes the built graph.
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
+      var world = _session.World();
+      Assert.NotNull(world);
+      Assert.Equal(EnPhase.Map, world.Phase);
+      Assert.NotEmpty(world.Graph.Nodes);
+      Assert.Equal(0L, world.Stats.Steps);
     }
 
     [Fact]

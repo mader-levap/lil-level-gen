@@ -645,4 +645,162 @@ public sealed class LevelGeneratorTests
       Assert.Equal(3L, PublishedWorld(statusStore).Stats.Steps);
     }
   }
+
+  /// <summary>Tests <see cref="CnfDebug.EndAtPhase"/>: a debug stop after a phase finishes, reported as a pause.</summary>
+  [Collection("LevelGeneratorTests")]
+  public sealed class EndAtPhaseTests
+  {
+    /// <summary>Fast config that stops after the given phase.</summary>
+    /// <param name="endAtPhase">Phase after which the run stops.</param>
+    /// <param name="placeholderSteps">Number of placeholder map steps.</param>
+    /// <param name="failGraphValidation">If true, graph validation reports failure.</param>
+    private static CnfLevelGeneration EndAtConfig(EnPhase endAtPhase, int placeholderSteps = CnfDebug.DefaultPlaceholderSteps, bool failGraphValidation = false)
+    {
+      return CnfLevelGeneration.Default with
+      {
+        Debug = new CnfDebug
+        {
+          PlaceholderSleep = 0,
+          PlaceholderSteps = placeholderSteps,
+          EndAtPhase = endAtPhase,
+          FailGraphValidation = failGraphValidation,
+        },
+      };
+    }
+
+    /// <summary>Claims a run and executes a fresh generator once.</summary>
+    /// <param name="enRunKind">Kind of run.</param>
+    /// <param name="config">Generation config.</param>
+    /// <returns>The store and the generator, for further runs.</returns>
+    private static (GenerationStatusStore Store, LevelGenerator Generator) ExecuteOnce(EnRunKind enRunKind, CnfLevelGeneration config)
+    {
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var generator = new LevelGenerator(enRunKind, config, statusStore);
+      generator.Execute();
+      return (statusStore, generator);
+    }
+
+    [Fact]
+    public void Execute_WithEndAtPhaseGraph_PublishesPausedAtMapWithGraph()
+    {
+      // Arrange/Act: Full run configured to stop once the graph is done.
+      var (statusStore, _) = ExecuteOnce(EnRunKind.All, EndAtConfig(EnPhase.Graph));
+
+      // Assert: Paused at the start of the map phase with a complete graph and no map steps.
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Null(statusStore.Current.Error);
+      var world = PublishedWorld(statusStore);
+      Assert.Equal(EnPhase.Map, world.Phase);
+      Assert.NotEmpty(world.Graph.Nodes);
+      Assert.Equal(0L, world.Stats.Steps);
+    }
+
+    [Fact]
+    public void Execute_WithEndAtPhasePrepass_PublishesPausedAtGraphWithEmptyGraph()
+    {
+      // Arrange/Act: Full run configured to stop once the prepass is done.
+      var (statusStore, _) = ExecuteOnce(EnRunKind.All, EndAtConfig(EnPhase.Prepass));
+
+      // Assert: Paused at the start of the graph phase; no graph was built yet.
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      var world = PublishedWorld(statusStore);
+      Assert.Equal(EnPhase.Graph, world.Phase);
+      Assert.Empty(world.Graph.Nodes);
+      Assert.Equal(0L, world.Stats.Steps);
+    }
+
+    [Fact]
+    public void Execute_WithEndAtPhaseMap_PublishesPausedAtFinalizationWithAllSteps()
+    {
+      // Arrange/Act: Full run over three map steps configured to stop once the map is done.
+      var (statusStore, _) = ExecuteOnce(EnRunKind.All, EndAtConfig(EnPhase.Map, placeholderSteps: 3));
+
+      // Assert: Paused at the start of finalization with every map step done.
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      var world = PublishedWorld(statusStore);
+      Assert.Equal(EnPhase.Finalization, world.Phase);
+      Assert.Equal(3L, world.Stats.Steps);
+    }
+
+    [Fact]
+    public void Execute_WithEndAtPhaseMapAndStepKind_PausesOnlyWhenMapCompletes()
+    {
+      // Arrange: Stepwise run over three map steps configured to stop once the map is done.
+      var statusStore = new GenerationStatusStore();
+      var generator = new LevelGenerator(EnRunKind.Step, EndAtConfig(EnPhase.Map, placeholderSteps: 3), statusStore);
+
+      // Act/Assert: The first two runs pause normally mid-map.
+      for (var step = 1; step <= 2; step++)
+      {
+        Assert.True(statusStore.TryBeginRun());
+        generator.Execute();
+        Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+        Assert.Equal(EnPhase.Map, PublishedWorld(statusStore).Phase);
+        Assert.Equal(step, PublishedWorld(statusStore).Stats.Steps);
+      }
+
+      // Act: The third run makes the last map step.
+      Assert.True(statusStore.TryBeginRun());
+      generator.Execute();
+
+      // Assert: The debug stop fires right after the map completes, before finalization.
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Finalization, PublishedWorld(statusStore).Phase);
+      Assert.Equal(3L, PublishedWorld(statusStore).Stats.Steps);
+    }
+
+    [Theory]
+    [InlineData(EnPhase.Finalization)]
+    [InlineData(EnPhase.Completed)]
+    public void Execute_WithEndAtPhaseFinalizationOrCompleted_PublishesFinished(EnPhase endAtPhase)
+    {
+      // Arrange/Act: Full run configured to stop after a phase that ends the level anyway.
+      var (statusStore, _) = ExecuteOnce(EnRunKind.All, EndAtConfig(endAtPhase));
+
+      // Assert: Nothing is left to pause, so the run finishes normally.
+      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
+    }
+
+    [Fact]
+    public void Execute_AfterEndAtPhaseStop_ResumeRunsToCompletion()
+    {
+      // Arrange: Full run stopped after the graph phase.
+      var (statusStore, generator) = ExecuteOnce(EnRunKind.All, EndAtConfig(EnPhase.Graph, placeholderSteps: 3));
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+
+      // Act: Claim and execute the next run the way Resume does.
+      Assert.True(statusStore.TryBeginRun());
+      generator.Execute();
+
+      // Assert: The stop fires only once, so the resumed run finishes the level.
+      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Completed, PublishedWorld(statusStore).Phase);
+      Assert.Equal(3L, PublishedWorld(statusStore).Stats.Steps);
+    }
+
+    [Fact]
+    public void Execute_WithEndAtPhaseGraphAndFailGraphValidation_PublishesValidationError()
+    {
+      // Arrange/Act: Run stopping after the graph whose validation fails.
+      var (statusStore, _) = ExecuteOnce(EnRunKind.All, EndAtConfig(EnPhase.Graph, failGraphValidation: true));
+
+      // Assert: The graph phase never finished, so validation failure wins over the debug stop.
+      Assert.Equal(EnGenResult.ValidationError, statusStore.Current.Result);
+      Assert.Equal(EnPhase.Graph, PublishedWorld(statusStore).Phase);
+    }
+
+    [Fact]
+    public void Execute_WithEndAtPhaseGraph_GraphMatchesFullRun()
+    {
+      // Arrange/Act: The same config once stopped after the graph and once run to the end.
+      var (stoppedStore, _) = ExecuteOnce(EnRunKind.All, EndAtConfig(EnPhase.Graph));
+      var (fullStore, _) = ExecuteOnce(EnRunKind.All, FastConfig());
+
+      // Assert: Stopping early changes nothing about the generated graph.
+      Assert.Equal(EnGenResult.Finished, fullStore.Current.Result);
+      Graph.GraphTestAssert.AssertEqualGraphs(PublishedWorld(fullStore).Graph, PublishedWorld(stoppedStore).Graph);
+    }
+  }
 }
