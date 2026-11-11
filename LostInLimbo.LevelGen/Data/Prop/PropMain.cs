@@ -10,7 +10,9 @@ namespace LostInLimbo.LevelGen.Data.Prop;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Same properties can and WILL produce different configuration, and so different level.
+/// With a <see cref="TextSeed"/>, the same properties always produce identical configuration,
+/// and so identical level. Without one, the clock is used and every run produces different
+/// configuration (within constraints defined by the properties).
 /// </para>
 /// <para>
 /// This is the root of the JSON configuration file. The shape maps one-to-one to JSON via <see cref="LevelGenerationSerializer"/>.
@@ -35,8 +37,9 @@ public sealed record PropMain
   public int ConfigVersion { get; init; } = CnfLevelGeneration.CurrentConfigVersion;
 
   /// <summary>
-  /// Provided text seed that will be hashed into actual seed. If null, empty or whitespace,
-  /// current time is used as seed.
+  /// Provided text seed that will be hashed into actual seed. Drives both the world seed and every
+  /// random draw of config generation, so the whole level is reproducible from it. Case-sensitive.
+  /// If null, empty or whitespace, current time is used as seed.
   /// </summary>
   public string? TextSeed { get; init; } = null;
 

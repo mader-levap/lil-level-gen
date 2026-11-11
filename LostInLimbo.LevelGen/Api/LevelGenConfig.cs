@@ -13,8 +13,9 @@ public static class LevelGenConfig
   /// Create generation configuration based on given property dataset.
   /// </summary>
   /// <remarks>
-  /// Important: exactly same property dataset can and WILL generate different configuration (within constraints defined in properties).
-  /// It is entire point of config generator.
+  /// Deterministic when <see cref="PropMain.TextSeed"/> is set: the same property dataset always generates
+  /// identical configuration. Without a text seed, the clock is used and every call generates different
+  /// configuration (within constraints defined in properties).
   /// </remarks>
   /// <param name="propMain">Property dataset.</param>
   /// <returns>Generated configuration.</returns>

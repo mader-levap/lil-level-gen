@@ -37,16 +37,28 @@ public sealed class LevelGenConfigTests
   }
 
   [Fact]
-  public void Execute_WithTextSeed_KeepsGeneralSeedStableAcrossRuns()
+  public void Execute_WithTextSeed_ProducesIdenticalConfiguration()
   {
-    // Arrange: Property dataset with a text seed.
-    var propMain = PropMain.Default with { TextSeed = "mordor" };
+    // Arrange: Property dataset with a text seed and a large draw space.
+    var propMain = new PropMain { TextSeed = "mordor", Difficulty = 10 };
 
-    // Act: Generate twice; the resolved general seed comes from the text seed, not the clock.
+    // Act: Generate twice, with the clock ticking between runs so a clock-derived
+    // seed could not accidentally match.
     var first = LevelGenConfig.Execute(propMain);
+    WaitForNextClockTick();
     var second = LevelGenConfig.Execute(propMain);
 
-    // Assert: The text-derived seed is stable across runs.
-    Assert.Equal(first.General.Seed, second.General.Seed);
+    // Assert: The whole configuration is reproducible from the text seed.
+    Assert.Equal(first, second);
+  }
+
+  /// <summary>Spins until the wall clock advances, so two runs cannot share a tick.</summary>
+  private static void WaitForNextClockTick()
+  {
+    var previous = DateTime.UtcNow;
+    while (DateTime.UtcNow == previous)
+    {
+      // Busy-wait: a tick is shorter than any sleep granularity.
+    }
   }
 }

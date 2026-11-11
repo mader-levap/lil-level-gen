@@ -18,7 +18,10 @@ public sealed record PropData
 
   // Fields.
 
-  /// <summary>Internal seed. Independent from seed used in configuration.</summary>
+  /// <summary>
+  /// Internal seed driving config-generation draws. Derived from the text seed with its own salt
+  /// (so it differs from the configuration's world seed), or taken from the clock without one.
+  /// </summary>
   public long Seed { get; init; } = DefaultSeed;
 
   /// <summary>Size of the graph. Should be pre-calculated early as it is needed for a lot of other calculations.</summary>

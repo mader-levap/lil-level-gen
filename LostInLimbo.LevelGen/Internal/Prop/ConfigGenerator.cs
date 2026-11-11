@@ -15,11 +15,16 @@ namespace LostInLimbo.LevelGen.Internal.Prop;
 /// <summary>
 /// Main class handling config generation.
 /// </summary>
-/// <param name="propMain">Property dataset.</param>
 internal sealed class ConfigGenerator
 {
   /// <summary>Salt for the resolver sub-seed; keeps this pass off other passes' streams.</summary>
   private const long SaltResolver = 0x63666767656e6572; // "cfggener"
+
+  /// <summary>
+  /// Salt deriving the internal supporting seed from the text seed; keeps it distinct
+  /// from <see cref="CnfGeneral.Seed"/>, which is the raw text-seed hash.
+  /// </summary>
+  private const long SaltPropSeed = 0x70726F7073656564; // "propseed"
 
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain;
@@ -29,6 +34,15 @@ internal sealed class ConfigGenerator
   /// <summary>Random for sub-seed.</summary>
   private readonly SeededRandom _random;
 
+  /// <summary>
+  /// Creates a generator whose internal seed comes from <see cref="PropMain.TextSeed"/>,
+  /// or from the clock when no text seed is given.
+  /// </summary>
+  /// <remarks>
+  /// With a text seed, the generated configuration is deterministic for the same
+  /// property dataset. Without one, every run produces a different configuration.
+  /// </remarks>
+  /// <param name="propMain">Property dataset. Validated on construction.</param>
   public ConfigGenerator(PropMain propMain)
   {
     _propMain = propMain;
@@ -39,6 +53,16 @@ internal sealed class ConfigGenerator
     _propData = ResolvePropData(seed);
   }
 
+  /// <summary>
+  /// Creates a generator with an explicit internal seed (test seam).
+  /// </summary>
+  /// <remarks>
+  /// The explicit seed overrides <see cref="PropMain.TextSeed"/> for the internal seed;
+  /// the text seed still determines <see cref="CnfGeneral.Seed"/>. Deterministic for
+  /// the same inputs when a text seed is given.
+  /// </remarks>
+  /// <param name="propMain">Property dataset. Validated on construction.</param>
+  /// <param name="seed">Internal supporting seed.</param>
   public ConfigGenerator(PropMain propMain, long seed)
   {
     _propMain = propMain;
@@ -62,12 +86,21 @@ internal sealed class ConfigGenerator
   }
 
   /// <summary>
-  /// Resolve seed.
+  /// Resolve internal supporting seed from the text seed, or from the current time if no
+  /// text seed is given.
   /// </summary>
+  /// <remarks>
+  /// Null, empty and whitespace-only text seeds all count as "no text seed given",
+  /// matching <see cref="GeneralResolver"/>. The clock fallback is intentional
+  /// config-generation behavior; generation itself stays deterministic for the resolved config.
+  /// </remarks>
   /// <returns>Seed.</returns>
   private long ResolveSeed()
   {
-    return DateTime.UtcNow.Ticks - 1000000; // Prevent collision with actual config seed.
+    var textSeed = _propMain.TextSeed;
+    return string.IsNullOrWhiteSpace(textSeed)
+      ? DateTime.UtcNow.Ticks
+      : SeedDerivation.Derive(SeedDerivation.FromText(textSeed), SaltPropSeed);
   }
 
   /// <summary>

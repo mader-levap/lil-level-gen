@@ -175,29 +175,89 @@ public sealed class ConfigGeneratorTests
     }
   }
 
-  /// <summary>Tests clock-seeded behavior of the single-argument constructor.</summary>
-  public sealed class ClockSeedTests
+  /// <summary>
+  /// Tests where the single-argument constructor takes its seeds from: the text seed when
+  /// given (fully reproducible config), otherwise the clock.
+  /// </summary>
+  /// <remarks>
+  /// Degeneration is used as the divergence probe because it is a continuous float draw;
+  /// two different seeds drawing the same value is impossible in practice, unlike the
+  /// small discrete graph draw space at low difficulty.
+  /// </remarks>
+  public sealed class SeedSourceTests
   {
     [Fact]
-    public void Execute_WithTextSeed_KeepsGeneralSeedStableAcrossRuns()
+    public void Execute_WithTextSeed_ProducesIdenticalConfigurationAcrossRuns()
     {
-      // Arrange: Property dataset with a text seed and two clock-seeded generators
-      // whose supporting seeds cannot collide (spin until the clock ticks between
-      // constructions, so sleep granularity can never let them share a tick).
-      var propMain = PropMain.Default with { TextSeed = "mordor" };
+      // Arrange: Property dataset with a text seed and a large draw space.
+      var propMain = new PropMain { TextSeed = "mordor", Difficulty = 10 };
+
+      // Act: Generate twice, with the clock ticking between runs so a clock-derived
+      // seed could not accidentally match.
       var first = new ConfigGenerator(propMain).Execute();
       WaitForNextClockTick();
       var second = new ConfigGenerator(propMain).Execute();
 
-      // Assert: The general seed comes from the text seed, so it is stable, while the
-      // supporting seed comes from the clock, so the resolver's random draws diverge.
-      // Degeneration is used as the divergence probe because at difficulty 0 the graph
-      // draw space is only a handful of combinations (two clock seeds could legitimately
-      // draw the same graph), whereas a continuous float draw colliding is impossible
-      // in practice.
-      Assert.Equal(first.General.Seed, second.General.Seed);
+      // Assert: The whole configuration comes from the text seed, so it is identical.
+      Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void Execute_WithDifferentTextSeeds_ProducesDifferentConfigurations()
+    {
+      // Act: Generate from two different text seeds.
+      var first = new ConfigGenerator(new PropMain { TextSeed = "mordor", Difficulty = 10 }).Execute();
+      var second = new ConfigGenerator(new PropMain { TextSeed = "gondor", Difficulty = 10 }).Execute();
+
+      // Assert: Both the world seed and the config draws diverge.
+      Assert.NotEqual(first.General.Seed, second.General.Seed);
       Assert.NotEqual(first.General.Degeneration, second.General.Degeneration);
     }
+
+    [Fact]
+    public void Execute_WithoutTextSeed_ProducesDifferentConfigurationsAcrossRuns()
+    {
+      // Arrange: Property dataset without a text seed.
+      var propMain = new PropMain { Difficulty = 10 };
+
+      // Act: Generate twice with the clock ticking between runs.
+      var first = new ConfigGenerator(propMain).Execute();
+      WaitForNextClockTick();
+      var second = new ConfigGenerator(propMain).Execute();
+
+      // Assert: The config draws come from the clock, so they diverge.
+      Assert.NotEqual(first.General.Degeneration, second.General.Degeneration);
+    }
+
+    [Fact]
+    public void Execute_WithTextSeed_MatchesPinnedValues()
+    {
+      // Act: Generate from a known text seed through the public-path constructor.
+      var config = new ConfigGenerator(new PropMain { TextSeed = "mordor", Difficulty = 3 }).Execute();
+
+      // Assert: Values match the pinned reference, so a text seed keeps mapping to the
+      // same level across library versions unless this test is deliberately updated.
+      config.Validate();
+      Assert.Equal(PinnedGeneralSeed, config.General.Seed);
+      Assert.Equal(PinnedDegeneration, config.General.Degeneration);
+      Assert.Equal(PinnedGraphSize, config.Graph.Size);
+      Assert.Equal(PinnedConnectivity, config.Graph.Connectivity);
+      Assert.Equal(PinnedComplexity, config.Graph.Complexity);
+      Assert.Equal(PinnedBuilder, config.Graph.GraphBuilder.Builder);
+    }
+
+    /// <summary>Pinned world seed for text seed "mordor" (raw text-seed hash).</summary>
+    private const long PinnedGeneralSeed = -8341167147440548823L;
+    /// <summary>Pinned degeneration for "mordor" at difficulty 3.</summary>
+    private const float PinnedDegeneration = 49.082054f;
+    /// <summary>Pinned graph size for "mordor" at difficulty 3.</summary>
+    private const int PinnedGraphSize = 2;
+    /// <summary>Pinned graph connectivity for "mordor" at difficulty 3.</summary>
+    private const int PinnedConnectivity = 1;
+    /// <summary>Pinned graph complexity for "mordor" at difficulty 3.</summary>
+    private const int PinnedComplexity = 1;
+    /// <summary>Pinned graph builder for "mordor" at difficulty 3.</summary>
+    private const EnGraphBuilder PinnedBuilder = EnGraphBuilder.Linear;
 
     [Fact]
     public void Execute_WithoutTextSeed_UsesClockForGeneralSeed()

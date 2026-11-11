@@ -47,7 +47,8 @@ internal sealed class GeneralResolver(PropMain propMain, PropData propData)
   /// Null, empty and whitespace-only text seeds all count as "no text seed given".
   /// The clock fallback is intentional config-generation behavior (see <see cref="PropMain.TextSeed"/>):
   /// the timestamp is baked into <see cref="CnfGeneral.Seed"/> here, before generation starts,
-  /// so generation itself stays deterministic for the resolved seed.
+  /// so generation itself stays deterministic for the resolved seed. The internal supporting
+  /// seed is derived from the same text seed separately, in <see cref="ConfigGenerator"/>.
   /// </remarks>
   private long ResolveSeed()
   {

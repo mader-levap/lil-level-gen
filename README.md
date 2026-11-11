@@ -13,6 +13,20 @@ Read the entire `README.md`. There is some configuration that needs to be done b
  └─ lil-level-gen/
 ```
 
+## Level generation
+
+### Usage
+
+Use `LevelGenSession` instance.
+
+Very simple example using default props:
+```csharp
+private readonly LevelGenSession _levelGenSession = new();
+PropMain propMain = new();
+CnfLevelGeneration config = LevelGenConfig.Execute(propMain);
+_levelGenSession.Start(EnRunKind.All, config);
+```
+
 ## Releases
 
 ### One-time setup on the LevelGen side
