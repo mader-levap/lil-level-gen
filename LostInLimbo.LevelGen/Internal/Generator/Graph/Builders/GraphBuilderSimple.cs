@@ -13,7 +13,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// Builds the simple level graph: one or more nodes without obstacles. Start and exit may or
 /// may not be in the same node. Skeleton relationships may not exceed
 /// <see cref="CnfGraphBuilderSimple.MaxExtraDegreeStar"/> per node; the extra-relationships phase skips any node whose
-/// total degree has already reached <see cref="CnfGraphBuilderSimple.MaxExtraDegree"/>.
+/// total degree has already reached <see cref="CnfGraphBuilderSimple.MaxExtraDegree"/>. Every node's
+/// <see cref="LilNode.MaxEdges"/> hard cap is therefore the larger of the two values.
 /// </para>
 /// </summary>
 /// <remarks>
@@ -119,7 +120,9 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
       Graph.Nodes.Add(new LilNode {
         Id = id,
         RelSize = NodeRelSize,
-        MaxEdges = _config.MaxExtraDegreeStar
+        // Neither cap alone bounds total degree: the skeleton stays within MaxExtraDegreeStar,
+        // extras fill nodes up to MaxExtraDegree. The hard cap is whichever is larger.
+        MaxEdges = Math.Max(_config.MaxExtraDegreeStar, _config.MaxExtraDegree),
       });
     }
 

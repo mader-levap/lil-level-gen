@@ -213,6 +213,63 @@ public sealed class GraphBuilderSimpleTests
       GraphTestAssert.AssertBeatable(graph);
     }
 
+    /// <summary>
+    /// Builds a dense twenty-node Simple graph without secrets, using the given degree caps.
+    /// </summary>
+    /// <param name="maxExtraDegree">Total-degree threshold of the extras phase.</param>
+    /// <param name="maxExtraDegreeStar">Skeleton-phase degree cap.</param>
+    /// <returns>The built graph.</returns>
+    private static LilGraph BuildDenseWithCaps(int maxExtraDegree, int maxExtraDegreeStar)
+    {
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        CnfSimple = CnfGraphBuilderSimple.Default with
+        {
+          MaxExtraDegree = maxExtraDegree,
+          MaxExtraDegreeStar = maxExtraDegreeStar,
+        },
+      };
+      var (result, graph) = GraphTestSupport.Build(
+        EnGraphBuilder.Simple,
+        new CnfGraph { Size = 20, Connectivity = 1000, ProcOpts = GraphTestSupport.NoSecrets },
+        builderConfig: builderConfig);
+      Assert.True(result.Success);
+      return graph;
+    }
+
+    [Fact]
+    public void Build_WithMaxExtraDegreeAboveStarCap_NoNodeExceedsItsMaxEdges()
+    {
+      // Act: Extras threshold (5) above the skeleton cap (4), with connectivity that fills nodes.
+      var graph = BuildDenseWithCaps(maxExtraDegree: 5, maxExtraDegreeStar: 4);
+
+      // Assert: Every node's hard cap covers its actual relationship count.
+      GraphTestAssert.AssertMaxEdges(graph);
+    }
+
+    [Fact]
+    public void Build_WithMaxExtraDegreeAboveStarCap_ExtrasStillReachMaxExtraDegree()
+    {
+      // Act: Same caps as above.
+      var graph = BuildDenseWithCaps(maxExtraDegree: 5, maxExtraDegreeStar: 4);
+
+      // Assert: The extras threshold is honoured, not silently clamped to the skeleton cap.
+      var degrees = GraphTestSupport.GetDegrees(graph);
+      Assert.Contains(degrees.Values, degree => degree == 5);
+      Assert.All(graph.Nodes, node => Assert.Equal(5, node.MaxEdges));
+    }
+
+    [Fact]
+    public void Build_WithStarCapAboveMaxExtraDegree_MaxEdgesIsStarCap()
+    {
+      // Act: Common case: skeleton cap (7) above the extras threshold (4).
+      var graph = BuildDenseWithCaps(maxExtraDegree: 4, maxExtraDegreeStar: 7);
+
+      // Assert: The node cap is the skeleton cap, and it holds.
+      Assert.All(graph.Nodes, node => Assert.Equal(7, node.MaxEdges));
+      GraphTestAssert.AssertMaxEdges(graph);
+    }
+
     [Fact]
     public void Build_WithExcessiveConnectivityAtLargeSize_SucceedsWithValidStructure()
     {
