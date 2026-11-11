@@ -175,6 +175,36 @@ public sealed class GenerationStatusStoreTests
       Assert.Equal(EnGenResult.Running, store.Current.Result);
     }
 
+    [Fact]
+    public void TryBeginResume_WhenPaused_KeepsPausedCompletion()
+    {
+      // Arrange: Store has a run paused halfway through.
+      var store = new GenerationStatusStore();
+      store.Publish(new GenerationStatus { Result = EnGenResult.Paused, Completion = 0.5f });
+
+      // Act: Claim the resume.
+      Assert.True(store.TryBeginResume());
+
+      // Assert: The resumed run continues from the paused progress instead of dropping to 0.
+      Assert.Equal(EnGenResult.Running, store.Current.Result);
+      Assert.Equal(0.5f, store.Current.Completion);
+    }
+
+    [Fact]
+    public void TryBeginRun_AfterPartialRun_ResetsCompletionToZero()
+    {
+      // Arrange: Store has a run that was cancelled halfway through.
+      var store = new GenerationStatusStore();
+      store.Publish(new GenerationStatus { Result = EnGenResult.Cancelled, Completion = 0.5f });
+
+      // Act: Claim a fresh run.
+      Assert.True(store.TryBeginRun());
+
+      // Assert: A fresh run starts from zero progress.
+      Assert.Equal(EnGenResult.Running, store.Current.Result);
+      Assert.Equal(0.0f, store.Current.Completion);
+    }
+
     [Theory]
     [InlineData(EnGenResult.None)]
     [InlineData(EnGenResult.Running)]

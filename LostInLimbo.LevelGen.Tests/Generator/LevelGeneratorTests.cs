@@ -803,4 +803,152 @@ public sealed class LevelGeneratorTests
       Graph.GraphTestAssert.AssertEqualGraphs(PublishedWorld(fullStore).Graph, PublishedWorld(stoppedStore).Graph);
     }
   }
+
+  /// <summary>
+  /// Tests <see cref="GenerationStatus.Completion"/> reported by <see cref="LevelGenerator"/>: weighted, monotonic progress.
+  /// </summary>
+  [Collection("LevelGeneratorTests")]
+  public sealed class CompletionTests
+  {
+    [Fact]
+    public void Execute_WhenFinished_CompletionIsOne()
+    {
+      // Arrange: Claimed full run.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var generator = new LevelGenerator(EnRunKind.All, FastConfig(), statusStore);
+
+      // Act: Run generation to completion.
+      generator.Execute();
+
+      // Assert: A finished run reports full progress.
+      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(1.0f, statusStore.Current.Completion);
+    }
+
+    [Fact]
+    public void Execute_WithStepRunKind_CompletionIncreasesAcrossRuns()
+    {
+      // Arrange: Stepwise generator over four map steps.
+      const int placeholderSteps = 4;
+      var statusStore = new GenerationStatusStore();
+      var generator = new LevelGenerator(EnRunKind.Step, FastConfig(placeholderSteps), statusStore);
+      var completions = new List<float>();
+
+      // Act: Run one step at a time until the level is finished, recording each terminal progress.
+      for (var run = 0; run < placeholderSteps + 1 && statusStore.Current.Result != EnGenResult.Finished; run++)
+      {
+        Assert.True(statusStore.TryBeginRun());
+        generator.Execute();
+        completions.Add(statusStore.Current.Completion);
+      }
+
+      // Assert: The first pause sits one map step into the map phase.
+      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Equal(GenerationProgress.Compute(EnPhase.Map, 1.0f / placeholderSteps), completions[0], 5);
+
+      // Assert: Progress strictly increases between runs and ends at exactly 1.
+      for (var index = 1; index < completions.Count; index++)
+        Assert.True(completions[index] > completions[index - 1], $"Completion did not increase: {string.Join(", ", completions)}.");
+      Assert.Equal(1.0f, completions[^1]);
+    }
+
+    [Fact]
+    public void Execute_WithEndAtPhaseGraph_CompletionIsStartOfMap()
+    {
+      // Arrange: Full run configured to stop once the graph is done.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var config = CnfLevelGeneration.Default with
+      {
+        Debug = new CnfDebug { PlaceholderSleep = 0, EndAtPhase = EnPhase.Graph },
+      };
+      var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
+
+      // Act: Run generation until the debug stop.
+      generator.Execute();
+
+      // Assert: Progress covers prepass and graph, but nothing of the map.
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.Equal(GenerationProgress.Compute(EnPhase.Map, 0.0f), statusStore.Current.Completion, 5);
+      Assert.Equal(GenerationProgress.PrepassWeight + GenerationProgress.GraphWeight, statusStore.Current.Completion, 5);
+    }
+
+    [Fact]
+    public void Execute_WhenCancelledAfterPause_KeepsLastCompletion()
+    {
+      // Arrange: Stepwise run paused after one map step.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var generator = new LevelGenerator(EnRunKind.Step, FastConfig(), statusStore);
+      generator.Execute();
+      var pausedCompletion = statusStore.Current.Completion;
+      Assert.True(pausedCompletion > 0.0f);
+
+      // Act: Resume with an already cancelled token.
+      Assert.True(statusStore.TryBeginRun());
+      using var cancellationTokenSource = new CancellationTokenSource();
+      cancellationTokenSource.Cancel();
+      generator.Execute(cancellationTokenSource.Token);
+
+      // Assert: The cancelled run reports the progress it had reached, not 0 or 1.
+      Assert.Equal(EnGenResult.Cancelled, statusStore.Current.Result);
+      Assert.Equal(pausedCompletion, statusStore.Current.Completion);
+    }
+
+    [Fact]
+    public void Execute_OnGraphValidationError_KeepsCompletionAtStartOfGraph()
+    {
+      // Arrange: Claimed run whose graph validation fails.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var config = CnfLevelGeneration.Default with
+      {
+        Debug = new CnfDebug { PlaceholderSleep = 0, FailGraphValidation = true },
+      };
+      var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
+
+      // Act: Run generation until validation fails.
+      generator.Execute();
+
+      // Assert: The graph phase never finished, so progress stays at its start.
+      Assert.Equal(EnGenResult.ValidationError, statusStore.Current.Result);
+      Assert.Equal(GenerationProgress.Compute(EnPhase.Graph, 0.0f), statusStore.Current.Completion, 5);
+    }
+
+    [Fact]
+    public void Execute_WhileRunning_PublishesNonDecreasingIntermediateCompletion()
+    {
+      // Arrange: A run of ten 50 ms placeholder steps, observed from the test thread.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var config = CnfLevelGeneration.Default with
+      {
+        Debug = new CnfDebug { PlaceholderSleep = 500, PlaceholderSteps = 10 },
+      };
+      var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
+      var observed = new List<float>();
+
+      // Act: Run on a worker thread and poll the store until the run leaves Running.
+      var worker = new Thread(() => generator.Execute())
+      {
+        IsBackground = true,
+        Name = "LevelGeneratorTests.CompletionProbe",
+      };
+      worker.Start();
+      while (worker.IsAlive)
+      {
+        var status = statusStore.Current;
+        if (status.Result == EnGenResult.Running) observed.Add(status.Completion);
+        Thread.Sleep(5);
+      }
+      Assert.True(worker.Join(TimeSpan.FromSeconds(5)), "Generator did not finish in time.");
+
+      // Assert: Intermediate progress was visible and never went backwards.
+      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.Contains(observed, completion => completion > 0.0f && completion < 1.0f);
+      for (var index = 1; index < observed.Count; index++)
+        Assert.True(observed[index] >= observed[index - 1], $"Completion decreased: {observed[index - 1]} -> {observed[index]}.");
+    }
+  }
 }

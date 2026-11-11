@@ -58,4 +58,23 @@ internal sealed class MapGenerator(CnfLevelGeneration config, PrepData prepData,
     _world.Stats.Steps++;
     return MapRunResult.Succeed();
   }
+
+  /// <summary>
+  /// Estimates how much of the map phase is done, used for overall completion
+  /// (see <see cref="Status.GenerationProgress"/>).
+  /// </summary>
+  /// <remarks>
+  /// <para>Currently PLACEHOLDER: completed steps divided by the configured step count.</para>
+  /// <para>
+  /// The real map generator will not know its step count in advance and will estimate this
+  /// from its own criteria instead (for example areas placed versus areas planned). The
+  /// estimate should never decrease between steps of the same run.
+  /// </para>
+  /// </remarks>
+  /// <returns>Fraction of the map phase that is done, from 0.0 to 1.0.</returns>
+  public float EstimateProgress()
+  {
+    var fraction = (float)_world.Stats.Steps / TotalSteps;
+    return fraction > 1.0f ? 1.0f : fraction;
+  }
 }

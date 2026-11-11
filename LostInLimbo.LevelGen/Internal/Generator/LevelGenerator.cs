@@ -61,6 +61,13 @@ internal sealed class LevelGenerator
   /// </summary>
   private string? _validationFailureReason;
 
+  /// <summary>
+  /// Last overall completion published by this generator (see <see cref="GenerationStatus.Completion"/>).
+  /// Worker-thread only. Survives between runs of the same generator, so a resumed run starts
+  /// from the progress its predecessor reached.
+  /// </summary>
+  private float _completion;
+
   /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
   private int TotalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
@@ -123,6 +130,24 @@ internal sealed class LevelGenerator
   }
 
   /// <summary>
+  /// Publishes a <see cref="EnGenResult.Running"/> status with the overall completion of the
+  /// given position in the run (see <see cref="GenerationProgress"/>).
+  /// </summary>
+  /// <remarks>
+  /// Needs no <see cref="_pauseGate"/>: it is only called from the worker thread while the run
+  /// is executing, so the published result stays <see cref="EnGenResult.Running"/> and
+  /// <see cref="TryRequestPause"/> (which only reads the result) is unaffected. The API layer
+  /// publishes only before the worker starts or after it ends, never concurrently with it.
+  /// </remarks>
+  /// <param name="phase">Phase the run is in.</param>
+  /// <param name="phaseFraction">Progress within <paramref name="phase"/>, from 0.0 to 1.0.</param>
+  private void PublishProgress(EnPhase phase, float phaseFraction)
+  {
+    _completion = GenerationProgress.Compute(phase, phaseFraction);
+    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running, Completion = _completion });
+  }
+
+  /// <summary>
   /// Publishes a terminal status snapshot for a run that is no longer executing, applying
   /// pause precedence and consuming any pending pause request.
   /// </summary>
@@ -134,6 +159,8 @@ internal sealed class LevelGenerator
   /// a frozen deep copy of this generator's world into the store (see <see cref="LilWorldCopy"/>),
   /// so the live instance is never handed out and <c>World</c> reads status and world as one
   /// unit; every other result hides the world by pairing with <see langword="null"/>.
+  /// <para>A finished run reports a completion of exactly 1.0; every other result keeps the
+  /// last completion reached (see <see cref="_completion"/>), so progress stops where the run stopped.</para>
   /// </remarks>
   /// <param name="result">Terminal result to publish.</param>
   /// <param name="error">Exception to attach when publishing <see cref="EnGenResult.Error"/>.</param>
@@ -151,10 +178,12 @@ internal sealed class LevelGenerator
       if (_pauseRequested && result == EnGenResult.Cancelled) result = EnGenResult.Paused;
 
       _pauseRequested = false;
+      if (result == EnGenResult.Finished) _completion = 1.0f;
       var world = result is EnGenResult.Paused or EnGenResult.Finished or EnGenResult.ValidationError
         ? LilWorldCopy.Copy(_world)
         : null;
-      _statusStore.Publish(new GenerationStatus { Result = result, Error = error, FailureReason = failureReason }, world);
+      var status = new GenerationStatus { Result = result, Completion = _completion, Error = error, FailureReason = failureReason };
+      _statusStore.Publish(status, world);
     }
   }
 
@@ -179,6 +208,11 @@ internal sealed class LevelGenerator
   /// <see cref="TryRequestPause"/>) has precedence over cancellation: a run with both pending
   /// reports <see cref="EnGenResult.Paused"/> and keeps its partial world.
   /// </para>
+  /// <para>
+  /// Progress: <see cref="GenerationStatus.Completion"/> is republished at every phase
+  /// transition and after every map step, weighted per phase (see <see cref="GenerationProgress"/>).
+  /// It never decreases within a run and a resumed run starts where the previous one stopped.
+  /// </para>
   /// </remarks>
   /// <param name="cancellationToken">
   /// Token governing this run. Checked before generation starts, at step boundaries and inside
@@ -188,7 +222,8 @@ internal sealed class LevelGenerator
   public void Execute(CancellationToken cancellationToken = default)
   {
     _validationFailureReason = null;
-    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running });
+    // A resumed run continues from the progress the previous run of this generator reached.
+    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running, Completion = _completion });
     try
     {
       // First checkpoint: a token cancelled before the run got going ends it right away.
@@ -388,6 +423,7 @@ internal sealed class LevelGenerator
       }
 
       stepsRun++;
+      PublishProgress(EnPhase.Map, mapGenerator.EstimateProgress());
     }
 
     if (IsMapGenerationComplete()) return CompletePhase(EnPhase.Map, EnPhase.Finalization);
@@ -424,6 +460,7 @@ internal sealed class LevelGenerator
   /// When <see cref="CnfDebug.EndAtPhase"/> names the finished phase, the run stops here as if
   /// paused at the start of next phase. The stop fires only on the transition, so
   /// a resumed run never finishes that phase again and continues normally.
+  /// <para>Publishes the progress of the start of <paramref name="next"/>.</para>
   /// </remarks>
   /// <param name="finished">Phase that just finished.</param>
   /// <param name="next">Phase the world moves to.</param>
@@ -431,6 +468,7 @@ internal sealed class LevelGenerator
   private bool CompletePhase(EnPhase finished, EnPhase next)
   {
     _world.Phase = next;
+    PublishProgress(next, 0.0f);
     return _config.Debug?.EndAtPhase != finished;
   }
 

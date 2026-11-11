@@ -31,7 +31,20 @@ public sealed record GenerationStatus
   /// Completion progress: from 0.0 to 1.0.
   /// </summary>
   /// <remarks>
-  /// For consumers, so they can show progress bar directly using this value. For example, 0.37 would mean generation is 37% complete.
+  /// <para>
+  /// For consumers, so they can show progress bar directly using this value. For example,
+  /// 0.37 would mean generation is 37% complete.
+  /// </para>
+  /// <para>
+  /// Approximate: each generation phase owns a fixed share of the range, roughly matching its
+  /// expected duration, and progress within a phase fills that share. Updated while
+  /// <see cref="EnGenResult.Running"/> at every phase transition and after every map step.
+  /// </para>
+  /// <para>
+  /// Never decreases within a run, and a resumed run continues from the paused value.
+  /// Exactly 1.0 only for <see cref="EnGenResult.Finished"/>; paused, failed, cancelled and
+  /// validation-failed runs keep the value they reached. A fresh run starts at 0.0.
+  /// </para>
   /// </remarks>
   public float Completion { get; init; } = 0.0f;
 

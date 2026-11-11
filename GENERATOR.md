@@ -142,3 +142,11 @@ Runs are cancellable through `LevelGenerationSession.Cancel()` or an optional to
 - A single-step pass whose cost can grow large checks the token inside as well: at its sub-pass boundaries and inside its super-linear loops, never per item of a linear loop. The graph phase does so: `GraphGenerator` between build, metadata and validation; builders between their passes and processors; `GraphMetadata` before every flood; `GraphValidator` between checks, per fixpoint iteration of the traversal check and per one-way passage of the beatability check.
 - A pass cancelled midway must not leave partial data that a resumed run would reuse: `GraphGenerator` resets the graph to an empty one before rethrowing, because a run paused by precedence over cancellation publishes its world and resumes the graph phase.
 - Cancellation must never change the output of a run that is not cancelled: it only truncates it. The cancelled run reports `EnGenResult.Cancelled` and its partial data is discarded.
+
+## Progress
+
+`GenerationStatus.Completion` (0.0-1.0) is computed by `GenerationProgress`: each phase owns a fixed weight (prepass 0.01, graph 0.04, map 0.90, finalization 0.05), and progress within a phase fills its share. Graph generation measured at only a few milliseconds even at maximum difficulty, so it gets a small share; the weights must be re-tuned once the real map generator exists.
+
+- `LevelGenerator` republishes a `Running` status at every phase transition and after every map step. The map fraction comes from `MapGenerator.EstimateProgress()` (placeholder: steps done / configured steps; the real map generator must estimate it without knowing its step count, and the estimate must never decrease).
+- Completion never decreases within a run. A resumed run continues from the paused value (also in `GenerationStatusStore.TryBeginResume`); a fresh run starts at 0.
+- `Finished` reports exactly 1.0; `Paused`, `ValidationError`, `Cancelled` and `Error` keep the value reached.

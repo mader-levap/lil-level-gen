@@ -17,7 +17,7 @@ namespace LostInLimbo.LevelGen.Internal.Status;
 /// </remarks>
 internal sealed class GenerationStatusStore
 {
-  /// <summary>Cached status published when a run begins; reused so CAS compares references.</summary>
+  /// <summary>Cached status published when a fresh run begins (zero completion); reused so CAS compares references.</summary>
   private static readonly GenerationStatus RunningStatus = new() { Result = EnGenResult.Running };
 
   /// <summary>Cached snapshot published when a run begins; a running run never exposes a world.</summary>
@@ -103,6 +103,8 @@ internal sealed class GenerationStatusStore
   /// Stronger than <see cref="TryBeginRun"/>: the claim only succeeds when the current snapshot
   /// is <see cref="EnGenResult.Paused"/>, so a caller that checked for "paused" earlier cannot
   /// claim a state that changed in between.
+  /// <para>Unlike a fresh run, the resumed run keeps the paused
+  /// <see cref="GenerationStatus.Completion"/>, so progress never drops back to zero.</para>
   /// </remarks>
   /// <returns>
   /// <see langword="true"/> if the run was paused and is now marked as running;
@@ -115,8 +117,13 @@ internal sealed class GenerationStatusStore
       var current = Volatile.Read(ref _snapshot);
       if (current.Status.Result != EnGenResult.Paused) return false;
 
+      // Fresh snapshot carrying the paused progress; the CAS below still pins the exact
+      // snapshot that was checked, so the claim stays atomic.
+      var resumed = new GenerationSnapshot(
+        new GenerationStatus { Result = EnGenResult.Running, Completion = current.Status.Completion }, null);
+
       // Succeeds only if nobody else changed the snapshot since we read it.
-      if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, RunningSnapshot, current), current))
+      if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, resumed, current), current))
       {
         Interlocked.Increment(ref _claimId);
         return true;
