@@ -160,6 +160,9 @@ public sealed class ConfigGeneratorTests
     [InlineData(3)]
     [InlineData(7)]
     [InlineData(20)]
+    [InlineData(50)]
+    [InlineData(99)]
+    [InlineData(100)]
     public void Execute_WithDifficulty_OutputValidatesAndGraphStaysInRange(int difficulty)
     {
       // Act: Generate for a difficulty step.
@@ -168,7 +171,7 @@ public sealed class ConfigGeneratorTests
       // Assert: The configuration validates and the graph stays inside the resolver's
       // difficulty-driven ranges with a builder pairing that satisfies validation.
       config.Validate();
-      Assert.InRange(config.Graph.Size, 2, difficulty + 2);
+      Assert.InRange(config.Graph.Size, 2, Math.Min(difficulty + 2, CnfGraph.MaxSize));
       Assert.InRange(config.Graph.Connectivity, 0, difficulty + config.Graph.Size - 1);
       Assert.InRange(config.Graph.Complexity, 0, Math.Min(config.Graph.Size, difficulty / 2 + 1) - 1);
       Assert.NotEqual(EnGraphBuilder.OneNode, config.Graph.GraphBuilder.Builder);

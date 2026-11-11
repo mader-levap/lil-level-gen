@@ -46,6 +46,9 @@ public sealed record PropMain
   /// <summary>
   /// Difficulty. In game these would be descriptive texts like "easy" or "hard", but here we represent it as number. Smallest is 0.
   /// </summary>
+  /// <remarks>
+  /// While allowed max difficulty is 100, actual usage focuses on first few numbers, like 0 being easiest, 1 less easy, 2 harder, 3 even harder etc.
+  /// </remarks>
   public int Difficulty { get; init; } = 0;
 
   /// <summary>If true and possible, map will use different themes.</summary>

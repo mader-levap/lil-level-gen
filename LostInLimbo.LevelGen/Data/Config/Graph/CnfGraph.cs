@@ -27,7 +27,7 @@ public sealed record CnfGraph
   public const int DefaultComplexity = 0;
 
   /// <summary>Maximum allowed size - keeps generation cost bounded.</summary>
-  public const int MaxSize = 100;
+  public const int MaxSize = 110;
 
   // Defaults.
 
@@ -84,7 +84,7 @@ public sealed record CnfGraph
       throw new ArgumentOutOfRangeException(nameof(Connectivity), Connectivity, "Connectivity must be at least 0.");
     if (Complexity < 0)
       throw new ArgumentOutOfRangeException(nameof(Complexity), Complexity, "Complexity must be at least 0.");
-      
+
     if (GraphBuilder is null)
       throw new ArgumentException("GraphBuilder config must not be null.", nameof(GraphBuilder));
     if (ProcOpts is null)
