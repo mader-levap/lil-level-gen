@@ -97,19 +97,24 @@ Before considering work complete:
 ### General coding rules
 
 - Use C# file-scoped namespaces.
-- Write null-aware code and do not silence nullable warnings with `null!` without a documented reason.
-- Use `sealed` for classes that are not intended for inheritance.
+- Write null-aware code and do not silence nullable warnings with `null!` without a documented reason. Exception: filling class fields that are initialized later (not in constructor).
+- Use `sealed` for classes not intended to be inherited.
 - Prefer `record` for immutable data-transfer types.
-- Prefer `IReadOnlyList<T>`, `IReadOnlyCollection<T>`, or arrays in public APIs when callers should not mutate the result.
+- Prefer `IReadOnlyList<T>`/arrays in APIs.
 - Avoid public mutable collections where practical.
 - Observe standard C# conventions about naming of variables, classes etc.
 - Use explicit, descriptive names: `GenerateChunk`, `ChunkData`, `RoomTemplate`, `CorridorSegment`, `SpawnPoint`.
 - Avoid abbreviations except widely understood ones such as `Id`, `X`, `Y`, and `Z`.
-- Keep methods small and focused; extract helper methods when a generation pass becomes complex.
-- Avoid magic numbers; use named constants, options objects, or configuration records.
-- Use `CancellationToken` for potentially expensive or cancellable operations.
+- Avoid magic numbers; use named constants, options objects, configuration records or inspector properties.
 - Do not use `async void`.
-- Do not use `DateTime.Now`, environment-specific paths, or machine-specific behavior in generation logic.
+- Do not use `DateTime.Now`, machine-specific paths or environment-dependent behavior in generation logic.
+- Validate inputs; do not swallow exceptions; return empty collections rather than `null`.
+- Use `#region <very short description>` for longer code files where multiple logically distinct functionalities lives.
+
+### Specific coding rules
+
+- Use `CancellationToken` for potentially expensive or cancellable operations.
+- Keep methods small and focused; extract helper methods when a generation pass becomes complex.
 
 ### Testing requirements
 

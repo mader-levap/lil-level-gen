@@ -28,6 +28,14 @@ public sealed record GenerationStatus
   public EnGenResult Result { get; init; } = EnGenResult.None;
 
   /// <summary>
+  /// Completion progress: from 0.0 to 1.0.
+  /// </summary>
+  /// <remarks>
+  /// For consumers, so they can show progress bar directly using this value. For example, 0.37 would mean generation is 37% complete.
+  /// </remarks>
+  public float Completion { get; init; } = 0.0f;
+
+  /// <summary>
   /// Exception that terminated generation.
   /// Invariant: non-<see langword="null"/> if and only if <see cref="Result"/> is <see cref="EnGenResult.Error"/>.
   /// Stays <see langword="null"/> for <see cref="EnGenResult.Cancelled"/>, which is a requested
