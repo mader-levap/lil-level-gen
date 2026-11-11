@@ -13,7 +13,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 /// <para>
 /// Runs one independent label-correcting search per start POI. A search state is
 /// <c>(node, used, held)</c> where <c>used</c> is the union of all conditions crossed on the
-/// way and <c>held</c> holds every POI of every node visited on the way. A passage can be
+/// way and <c>held</c> holds every condition-required POI of every node visited on the way
+/// (POIs no condition requires can never open a passage, so they are not tracked). A passage can be
 /// crossed when its direction allows leaving the current node and all of its conditions are
 /// held; crossing adds the condition POIs to <c>used</c> and the far node's POIs to
 /// <c>held</c>. Per node the search keeps only non-dominated states (a state is dropped when
@@ -36,7 +37,7 @@ internal sealed class GraphMetadata(LilGraph? graph)
   /// <summary>Traversal state of the search for a single start POI.</summary>
   /// <param name="NodeId">Node the search currently stands in.</param>
   /// <param name="Used">Conditions crossed so far; the value reported by <see cref="LilNode.Reach"/>.</param>
-  /// <param name="Held">POIs of all nodes visited so far, including the current one.</param>
+  /// <param name="Held">Condition-required POIs of all nodes visited so far, including the current one.</param>
   private sealed record SearchState(Guid NodeId, HashSet<Guid> Used, HashSet<Guid> Held);
 
   /// <summary>
@@ -76,6 +77,8 @@ internal sealed class GraphMetadata(LilGraph? graph)
       }
     }
 
+    var requiredPois = CollectRequiredPois(graph);
+
     // One independent search per start POI, in deterministic node then POI order.
     foreach (var node in graph.Nodes)
     {
@@ -83,10 +86,34 @@ internal sealed class GraphMetadata(LilGraph? graph)
       {
         if (poi.Type == EnPoiType.Start)
         {
-          SolveFromStart(node, nodeById, adjacency, poi.Id);
+          SolveFromStart(node, nodeById, adjacency, requiredPois, poi.Id);
         }
       }
     }
+  }
+
+  /// <summary>
+  /// Collects every POI identifier that at least one passage condition requires.
+  /// </summary>
+  /// <remarks>
+  /// Only these POIs can ever make a passage crossable, so the search tracks only them in
+  /// <see cref="SearchState.Held"/>. Tracking all POIs (goals, exits, ...) would let states that
+  /// differ only in irrelevant POIs escape dominance pruning and grow exponentially.
+  /// </remarks>
+  /// <param name="graph">Graph whose passages are scanned.</param>
+  /// <returns>Identifiers of all required POIs; empty when no passage has a condition.</returns>
+  private static HashSet<Guid> CollectRequiredPois(LilGraph graph)
+  {
+    var required = new HashSet<Guid>();
+    foreach (var edge in graph.Edges)
+    {
+      foreach (var condition in edge.Conditions)
+      {
+        required.Add(condition.RequiresPoi);
+      }
+    }
+
+    return required;
   }
 
   /// <summary>
@@ -96,11 +123,13 @@ internal sealed class GraphMetadata(LilGraph? graph)
   /// <param name="startNode">Node containing the start POI.</param>
   /// <param name="nodeById">Node index by identifier.</param>
   /// <param name="adjacency">Incident passages per traversable node.</param>
+  /// <param name="requiredPois">POIs required by some condition; the only POIs worth holding.</param>
   /// <param name="startPoiId">Identifier of the start POI; the reach dictionary key.</param>
   private static void SolveFromStart(
     LilNode startNode,
     Dictionary<Guid, LilNode> nodeById,
     Dictionary<Guid, List<LilEdge>> adjacency,
+    HashSet<Guid> requiredPois,
     Guid startPoiId)
   {
     // Non-dominated states per reached node.
@@ -108,7 +137,7 @@ internal sealed class GraphMetadata(LilGraph? graph)
     var worklist = new Queue<SearchState>();
 
     // The start node is always reachable from itself without meeting any condition.
-    var seed = new SearchState(startNode.Id, [], CollectPois(startNode));
+    var seed = new SearchState(startNode.Id, [], CollectPois(startNode, requiredPois));
     fronts[startNode.Id] = [seed];
     worklist.Enqueue(seed);
 
@@ -129,11 +158,11 @@ internal sealed class GraphMetadata(LilGraph? graph)
           nextUsed.Add(condition.RequiresPoi);
         }
 
-        // The far node's POIs are collected on arrival, like the validator collects on flood.
+        // The far node's required POIs are collected on arrival, like the validator collects on flood.
         var nextHeld = new HashSet<Guid>(state.Held);
         foreach (var poi in nodeById[nextId].Pois)
         {
-          nextHeld.Add(poi.Id);
+          if (requiredPois.Contains(poi.Id)) nextHeld.Add(poi.Id);
         }
 
         var next = new SearchState(nextId, nextUsed, nextHeld);
@@ -229,15 +258,16 @@ internal sealed class GraphMetadata(LilGraph? graph)
     return false;
   }
 
-  /// <summary>Collects the identifiers of all POIs of a node.</summary>
+  /// <summary>Collects the identifiers of a node's POIs that some condition requires.</summary>
   /// <param name="node">Node whose POIs are collected.</param>
-  /// <returns>The set of POI identifiers; empty when the node has no POIs.</returns>
-  private static HashSet<Guid> CollectPois(LilNode node)
+  /// <param name="requiredPois">POIs required by some condition.</param>
+  /// <returns>The set of required POI identifiers held by the node; empty when there are none.</returns>
+  private static HashSet<Guid> CollectPois(LilNode node, HashSet<Guid> requiredPois)
   {
     var held = new HashSet<Guid>();
     foreach (var poi in node.Pois)
     {
-      held.Add(poi.Id);
+      if (requiredPois.Contains(poi.Id)) held.Add(poi.Id);
     }
 
     return held;

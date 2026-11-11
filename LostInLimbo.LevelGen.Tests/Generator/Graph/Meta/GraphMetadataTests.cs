@@ -467,4 +467,121 @@ public sealed class GraphMetadataTests
       AssertReachSame(normal, reversed);
     }
   }
+
+  /// <summary>
+  /// Tests that the search scales with POIs that conditions reference, not with all POIs:
+  /// goal-like POIs that no passage requires must neither slow the pass down nor change its output.
+  /// </summary>
+  public sealed class ScalingTests
+  {
+    /// <summary>Time budget for one metadata pass on the ladder graphs below.</summary>
+    private static readonly TimeSpan PassTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>Number of rungs of the ladder graph; two nodes per rung.</summary>
+    private const int LadderRungs = 16;
+
+    /// <summary>Node id offset for the second rail of the ladder.</summary>
+    private const int SecondRailOffset = 100;
+
+    /// <summary>POI id offset; POI ids are node id plus this offset.</summary>
+    private const int PoiOffset = 1000;
+
+    /// <summary>
+    /// Builds a 2 x <see cref="LadderRungs"/> ladder: two rails of open passages joined by a
+    /// rung at every step, so most nodes are reachable along many different paths. Node 1
+    /// holds the start POI; with <paramref name="withGoals"/> every other node holds an
+    /// optional goal POI that no passage requires. With <paramref name="withConditions"/>
+    /// node 2 holds a solution and the last rung requires it.
+    /// </summary>
+    /// <param name="withGoals">Whether every non-start node gets an unrequired optional goal POI.</param>
+    /// <param name="withConditions">Whether one solution POI and one conditional passage are added.</param>
+    /// <returns>The ladder graph with deterministic identifiers.</returns>
+    private static LilGraph CreateLadderGraph(bool withGoals, bool withConditions)
+    {
+      var nodes = new List<LilNode>();
+      var edges = new List<LilEdge>();
+      int edgeId = 1;
+
+      for (int rung = 1; rung <= LadderRungs; rung++)
+      {
+        foreach (int nodeId in new[] { rung, rung + SecondRailOffset })
+        {
+          var pois = new List<LilPoi>();
+          if (nodeId == 1) pois.Add(Poi(nodeId + PoiOffset, EnPoiType.Start));
+          else if (withConditions && nodeId == 2) pois.Add(Poi(nodeId + PoiOffset, EnPoiType.Solution));
+          else if (withGoals) pois.Add(Poi(nodeId + PoiOffset, EnPoiType.OptionalGoal));
+          nodes.Add(Node(nodeId, pois.ToArray()));
+        }
+
+        // Rung between the rails; the last one is conditional when requested.
+        bool lastRung = rung == LadderRungs;
+        edges.Add(withConditions && lastRung
+          ? Edge(edgeId++, rung, rung + SecondRailOffset, conditions: [Condition(2 + PoiOffset)])
+          : Edge(edgeId++, rung, rung + SecondRailOffset));
+
+        // Rails to the next rung.
+        if (!lastRung)
+        {
+          edges.Add(Edge(edgeId++, rung, rung + 1));
+          edges.Add(Edge(edgeId++, rung + SecondRailOffset, rung + 1 + SecondRailOffset));
+        }
+      }
+
+      return new LilGraph { Nodes = nodes, Edges = edges };
+    }
+
+    /// <summary>Runs the metadata pass on a worker task and reports whether it finished in time.</summary>
+    /// <param name="graph">Graph to process in place.</param>
+    /// <returns>True when the pass finished within <see cref="PassTimeout"/>.</returns>
+    private static bool GenerateWithinBudget(LilGraph graph)
+    {
+      return Task.Run(() => new GraphMetadata(graph).Generate()).Wait(PassTimeout);
+    }
+
+    [Fact]
+    public void Generate_WithManyUnrequiredPoisOnMultiPathGraph_FinishesInTime()
+    {
+      // Arrange: Ladder with an unrequired optional goal on nearly every node and no conditions.
+      var graph = CreateLadderGraph(withGoals: true, withConditions: false);
+
+      // Act: Run the pass under the time budget.
+      var finished = GenerateWithinBudget(graph);
+
+      // Assert: Unrequired POIs do not blow up the search.
+      Assert.True(finished, $"Metadata pass did not finish within {PassTimeout}.");
+    }
+
+    [Fact]
+    public void Generate_WithManyUnrequiredPoisAndConditions_FinishesInTime()
+    {
+      // Arrange: Same ladder plus one solution and one conditional passage.
+      var graph = CreateLadderGraph(withGoals: true, withConditions: true);
+
+      // Act: Run the pass under the time budget.
+      var finished = GenerateWithinBudget(graph);
+
+      // Assert: The search stays fast when some POIs do matter.
+      Assert.True(finished, $"Metadata pass did not finish within {PassTimeout}.");
+    }
+
+    [Fact]
+    public void Generate_WithUnrequiredPois_ProducesSameReachAsWithout()
+    {
+      // Arrange: The conditional ladder with and without unrequired goal POIs.
+      var withGoals = CreateLadderGraph(withGoals: true, withConditions: true);
+      var withoutGoals = CreateLadderGraph(withGoals: false, withConditions: true);
+
+      // Act: Run the pass on both.
+      Assert.True(GenerateWithinBudget(withGoals), $"Metadata pass did not finish within {PassTimeout}.");
+      Assert.True(GenerateWithinBudget(withoutGoals), $"Metadata pass did not finish within {PassTimeout}.");
+
+      // Assert: POIs no passage requires cannot change what is required to reach a node.
+      AssertReachSame(withoutGoals, withGoals);
+
+      // Assert: The far end of the conditional last rung is also reachable along the
+      // second rail, so its minimal requirement stays empty.
+      var lastFar = withGoals.Nodes.Single(node => node.Id == Id(LadderRungs + SecondRailOffset));
+      AssertReach(lastFar, (1 + PoiOffset, []));
+    }
+  }
 }

@@ -15,7 +15,7 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 public sealed record CnfProcRelSecretsOpt
 {
   /// <summary>Maximum allowed amount - keeps generation cost bounded.</summary>
-  public const int MaxAmount = 100;
+  public const int MaxAmount = 110;
 
   //
 

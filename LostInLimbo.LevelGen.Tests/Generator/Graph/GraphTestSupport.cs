@@ -128,6 +128,42 @@ internal static class GraphTestSupport
   }
 
   /// <summary>
+  /// Collects the ids of every node connected to <paramref name="startId"/>, treating edges
+  /// as undirected (connectivity only, not solvability).
+  /// </summary>
+  /// <param name="graph">Graph to search.</param>
+  /// <param name="startId">Id of the node to start from.</param>
+  /// <returns>Ids of all connected nodes, including <paramref name="startId"/>.</returns>
+  public static HashSet<Guid> GetReachableNodeIds(LilGraph graph, Guid startId)
+  {
+    // Adjacency lists over both edge directions.
+    var neighbors = new Dictionary<Guid, List<Guid>>();
+    foreach (var edge in graph.Edges)
+    {
+      if (!neighbors.TryGetValue(edge.From, out var fromList)) neighbors[edge.From] = fromList = new List<Guid>();
+      if (!neighbors.TryGetValue(edge.To, out var toList)) neighbors[edge.To] = toList = new List<Guid>();
+      fromList.Add(edge.To);
+      toList.Add(edge.From);
+    }
+
+    // Breadth-first search.
+    var reached = new HashSet<Guid> { startId };
+    var queue = new Queue<Guid>();
+    queue.Enqueue(startId);
+    while (queue.Count > 0)
+    {
+      var current = queue.Dequeue();
+      if (!neighbors.TryGetValue(current, out var next)) continue;
+      foreach (var id in next)
+      {
+        if (reached.Add(id)) queue.Enqueue(id);
+      }
+    }
+
+    return reached;
+  }
+
+  /// <summary>
   /// Reads the current size assignment of a graph in a stable order.
   /// </summary>
   /// <param name="graph">Graph to read.</param>
