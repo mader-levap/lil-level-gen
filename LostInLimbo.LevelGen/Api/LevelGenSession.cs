@@ -209,8 +209,15 @@ public sealed class LevelGenSession
   /// Best-effort: a run that reaches a terminal state concurrently may still report
   /// <see cref="EnGenResult.Finished"/> or <see cref="EnGenResult.Paused"/>. An explicit
   /// <see cref="Pause"/> request that is already pending takes precedence over cancellation.
-  /// Calling this when no run is in flight is a no-op. Cancellation of a paused run must go
-  /// through a fresh <see cref="Start"/> call instead.
+  /// Calling this when no run is in flight is a no-op.
+  /// <para>
+  /// A paused session is not in flight, so it cannot be cancelled: this method returns
+  /// <see langword="false"/>, the status stays <see cref="EnGenResult.Paused"/> and
+  /// <see cref="World"/> still returns the partial world. An external token given to
+  /// <see cref="Start"/> or <see cref="Resume"/> is likewise not observed while paused. To
+  /// discard a paused session, call <see cref="Clear"/> (back to <see cref="EnGenResult.None"/>,
+  /// never blocks in this state).
+  /// </para>
   /// </remarks>
   /// <returns>
   /// <see langword="true"/> if a running generation was asked to cancel;
@@ -251,6 +258,10 @@ public sealed class LevelGenSession
   /// <see langword="true"/>. A paused run never reports
   /// <see cref="EnGenResult.Cancelled"/>: pause takes precedence over cancellation.
   /// </para>
+  /// <para>
+  /// Once paused, the run can no longer be cancelled (see <see cref="Cancel"/>); discard it
+  /// with <see cref="Clear"/> or continue generation with a <see cref="Start"/>.
+  /// </para>
   /// </remarks>
   /// <returns>
   /// <see langword="true"/> if a running generation was asked to pause;
@@ -270,7 +281,8 @@ public sealed class LevelGenSession
   /// <summary>
   /// Restores the pristine never-ran state: status back to <see cref="EnGenResult.None"/> with
   /// no error, no generator, and no live cancellation source, so <see cref="World"/> returns
-  /// <see langword="null"/>. A subsequent <see cref="Start"/> begins from scratch.
+  /// <see langword="null"/>. A subsequent <see cref="Start"/> begins from scratch. This is the
+  /// intended way to discard a paused (or otherwise terminal) session without starting a new run.
   /// </summary>
   /// <remarks>
   /// Unlike the other commands, this one may block. When a run is in flight, the call first
