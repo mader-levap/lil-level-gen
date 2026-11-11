@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
@@ -61,14 +62,16 @@ internal abstract class AGraphBuilder
   /// <param name="config">Full generation configuration.</param>
   /// <param name="prepData">Preparatory data based on config.</param>
   /// <param name="graph">Target graph. Empty on entry; <see cref="Build"/> appends nodes and edges in place.</param>
+  /// <param name="cancellationToken">Token checked between build passes.</param>
   /// <returns>True if graph generation was successful, otherwise false.</returns>
   /// <exception cref="ArgumentNullException">A parameter is <see langword="null"/>.</exception>
-  public LilResult Run(CnfLevelGeneration config, PrepData prepData, LilGraph graph)
+  /// <exception cref="OperationCanceledException">The token was cancelled; the graph may be partially filled.</exception>
+  public LilResult Run(CnfLevelGeneration config, PrepData prepData, LilGraph graph, CancellationToken cancellationToken = default)
   {
     Setup(config, prepData, graph);
     // Debug-only deliberate failure, mirroring CnfDebug.FailAtStart at the run level.
     if (Config.Debug?.FailGraphBuild == true) return LilResult.Fail("Deliberate failure at the very start.");
-    return Build();
+    return Build(cancellationToken);
   }
 
   /// <summary>
@@ -92,9 +95,11 @@ internal abstract class AGraphBuilder
 
   /// <summary>Fills the target graph with the complete abstract level description.</summary>
   /// <remarks>You must run <see cref="Setup"/> before calling <see cref="Build"/>.</remarks>
+  /// <param name="cancellationToken">Token to check between build passes.</param>
   /// <returns>
   /// A result whose <see cref="LilResult.Success"/> is <see langword="true"/> when
   /// the graph is successfully generated; otherwise a failed result with the reason of the failure.
   /// </returns>
-  protected abstract LilResult Build();
+  /// <exception cref="OperationCanceledException">The token was cancelled; the graph may be partially filled.</exception>
+  protected abstract LilResult Build(CancellationToken cancellationToken);
 }

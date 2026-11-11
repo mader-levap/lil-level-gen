@@ -139,4 +139,6 @@ Runs are cancellable through `LevelGenerationSession.Cancel()` or an optional to
 
 - Every pass takes a `CancellationToken` parameter (never a stored field) and calls `ThrowIfCancellationRequested()` at pass boundaries.
 - Inside a pass, cancellation happens at a step boundary. Note some passes are fast enough that they are considered a single step.
+- A single-step pass whose cost can grow large checks the token inside as well: at its sub-pass boundaries and inside its super-linear loops, never per item of a linear loop. The graph phase does so: `GraphGenerator` between build, metadata and validation; builders between their passes and processors; `GraphMetadata` before every flood; `GraphValidator` between checks, per fixpoint iteration of the traversal check and per one-way passage of the beatability check.
+- A pass cancelled midway must not leave partial data that a resumed run would reuse: `GraphGenerator` resets the graph to an empty one before rethrowing, because a run paused by precedence over cancellation publishes its world and resumes the graph phase.
 - Cancellation must never change the output of a run that is not cancelled: it only truncates it. The cancelled run reports `EnGenResult.Cancelled` and its partial data is discarded.

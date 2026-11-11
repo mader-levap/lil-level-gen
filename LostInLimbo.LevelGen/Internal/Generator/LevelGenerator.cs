@@ -181,8 +181,9 @@ internal sealed class LevelGenerator
   /// </para>
   /// </remarks>
   /// <param name="cancellationToken">
-  /// Token governing this run. Checked before generation starts and then only at step
-  /// boundaries - the sleep of a running placeholder step is never interrupted.
+  /// Token governing this run. Checked before generation starts, at step boundaries and inside
+  /// the graph phase (between and within its passes, see <see cref="GraphGenerator.Execute"/>)
+  /// - the sleep of a running placeholder step is never interrupted.
   /// </param>
   public void Execute(CancellationToken cancellationToken = default)
   {
@@ -305,7 +306,7 @@ internal sealed class LevelGenerator
     cancellationToken.ThrowIfCancellationRequested();
 
     GraphGenerator graphGenerator = new(_config, GetPrepData(), _world);
-    GraphRunResult result = graphGenerator.Execute();
+    GraphRunResult result = graphGenerator.Execute(cancellationToken);
     switch (result.Outcome)
     {
       case EnGenerationOutcome.Success:

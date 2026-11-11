@@ -1,3 +1,4 @@
+using System.Threading;
 using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
@@ -28,7 +29,7 @@ internal sealed class GraphBuilderOneNode : AGraphBuilder
   private const long SaltExitPoi = 0x65786974; // "exit"
 
   /// <inheritdoc/>
-  protected override LilResult Build()
+  protected override LilResult Build(CancellationToken cancellationToken)
   {
     // Identifiers are derived from the graph sub-seed; deterministic, no RNG.
     var nodeId = IdDerivation.Derive(PrepData.SeedGraph, SaltNode);

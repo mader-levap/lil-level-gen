@@ -1,7 +1,10 @@
+using System;
+using System.Threading;
 using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result;
+using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
@@ -37,6 +40,12 @@ internal sealed class GraphGenerator(CnfLevelGeneration config, PrepData prepDat
   private LilWorld _world = world;
 
   /// <summary>
+  /// Test-only hook invoked after a successful build, before the metadata pass. Lets tests
+  /// act (e.g. cancel the token) while the graph is already filled. Null in production.
+  /// </summary>
+  internal Action? AfterBuildHook { get; init; }
+
+  /// <summary>
   /// Creates the whole graph and optionally validates it. It is treated as a single step.
   /// </summary>
   /// <remarks>
@@ -44,27 +53,57 @@ internal sealed class GraphGenerator(CnfLevelGeneration config, PrepData prepDat
   /// instead of running the real validator, and independently of whether validation is enabled
   /// (see <see cref="CnfValidGraphOpt.Enabled"/>).
   /// </remarks>
+  /// <param name="cancellationToken">
+  /// Token checked between build, metadata and validation and inside each of them.
+  /// </param>
   /// <returns>
   /// The outcome of the run: <see cref="EnGenerationOutcome.Success"/>,
   /// <see cref="EnGenerationOutcome.BuildFailed"/> (graph may be partially mutated) or
   /// <see cref="EnGenerationOutcome.ValidationFailed"/> (built graph is intact), each failed outcome
   /// carrying its reason.
   /// </returns>
-  public GraphRunResult Execute()
+  /// <exception cref="OperationCanceledException">
+  /// The token was cancelled. The world's graph is reset to an empty one first, so no
+  /// partial graph is ever kept.
+  /// </exception>
+  public GraphRunResult Execute(CancellationToken cancellationToken = default)
   {
+    try
+    {
+      return ExecuteStages(cancellationToken);
+    }
+    catch (OperationCanceledException)
+    {
+      // Builders require an empty graph, so a half-built one must never survive: a run paused
+      // by precedence over cancellation publishes its world and later re-runs this phase.
+      _world.Graph = new LilGraph();
+      throw;
+    }
+  }
+
+  /// <summary>Runs build, metadata and validation, checking the token between them.</summary>
+  /// <param name="cancellationToken">Token of the run.</param>
+  /// <returns>The outcome of the run; see <see cref="Execute"/>.</returns>
+  private GraphRunResult ExecuteStages(CancellationToken cancellationToken)
+  {
+    cancellationToken.ThrowIfCancellationRequested();
     AGraphBuilder builder = GraphBuilderFactory.Create(_config.Graph.GraphBuilder);
-    LilResult graphGenResult = builder.Run(_config, _prepData, _world.Graph);
+    LilResult graphGenResult = builder.Run(_config, _prepData, _world.Graph, cancellationToken);
     if (!graphGenResult.Success)
       return GraphRunResult.FailBuild(graphGenResult.FailureReason!);
 
+    AfterBuildHook?.Invoke();
+
+    cancellationToken.ThrowIfCancellationRequested();
     GraphMetadata graphMetadata = new(_world.Graph);
-    graphMetadata.Generate();
+    graphMetadata.Generate(cancellationToken);
 
     if (_config.Debug?.FailGraphValidation == true)
       return GraphRunResult.FailValidation("Deliberate validation failure.");
 
+    cancellationToken.ThrowIfCancellationRequested();
     GraphValidator graphValidator = new(_world.Graph, _config.Graph.ValidatorOpts);
-    LilResult graphValidationResult = graphValidator.Validate();
+    LilResult graphValidationResult = graphValidator.Validate(cancellationToken);
     return graphValidationResult.Success
       ? GraphRunResult.Succeed()
       : GraphRunResult.FailValidation(graphValidationResult.FailureReason!);

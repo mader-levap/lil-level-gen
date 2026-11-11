@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
@@ -37,6 +38,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 /// references are skipped rather than thrown.
 /// </para>
 /// <para>Deterministic: flood results are sets and lists are filled in ascending POI order.</para>
+/// <para>Costly: may take noticeable amount of time for large graphs in certain circumstances.</para>
 /// </remarks>
 internal sealed class GraphMetadata(LilGraph? graph)
 {
@@ -50,7 +52,9 @@ internal sealed class GraphMetadata(LilGraph? graph)
   /// Generates reach metadata for all nodes of the graph; a null or empty graph is a no-op.
   /// Existing entries are replaced, so calling the pass twice yields the same result.
   /// </summary>
-  public void Generate()
+  /// <param name="cancellationToken">Token checked before every flood.</param>
+  /// <exception cref="OperationCanceledException">The token was cancelled; metadata may be partial.</exception>
+  public void Generate(CancellationToken cancellationToken = default)
   {
     var graph = _graph;
     if (graph is null || graph.Nodes.Count == 0) return;
@@ -72,7 +76,7 @@ internal sealed class GraphMetadata(LilGraph? graph)
       {
         if (poi.Type == EnPoiType.Start)
         {
-          SolveFromStart(flood, node, requiredPois, poi.Id);
+          SolveFromStart(flood, node, requiredPois, poi.Id, cancellationToken);
         }
       }
     }
@@ -112,12 +116,15 @@ internal sealed class GraphMetadata(LilGraph? graph)
   /// <param name="startNode">Node containing the start POI.</param>
   /// <param name="requiredPois">POIs required by some condition; the only POIs worth picking up.</param>
   /// <param name="startPoiId">Identifier of the start POI; the reach dictionary key.</param>
+  /// <param name="cancellationToken">Token checked before every flood.</param>
   private static void SolveFromStart(
     GraphFlood flood,
     LilNode startNode,
     HashSet<Guid> requiredPois,
-    Guid startPoiId)
+    Guid startPoiId,
+    CancellationToken cancellationToken)
   {
+    cancellationToken.ThrowIfCancellationRequested();
     var (reached, held) = flood.Run(startNode.Id, NoPois, requiredPois, blockedPoi: null);
 
     // Unreachable nodes keep no entry; reached ones start with an empty requirement list.
@@ -132,10 +139,11 @@ internal sealed class GraphMetadata(LilGraph? graph)
     candidates.Sort();
     foreach (var poiId in candidates)
     {
+      // k floods per start: the costly part of the pass, so each one is a checkpoint.
+      cancellationToken.ThrowIfCancellationRequested();
       var (reachedWithout, _) = flood.Run(startNode.Id, NoPois, requiredPois, poiId);
       foreach (var nodeId in reached)
-      {
-        // Ascending candidate order keeps every list sorted.
+      { // Ascending candidate order keeps every list sorted.
         if (!reachedWithout.Contains(nodeId)) lists[nodeId].Add(poiId);
       }
     }

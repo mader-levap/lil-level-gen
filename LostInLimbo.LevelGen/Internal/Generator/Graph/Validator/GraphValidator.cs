@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result.Graph;
@@ -89,27 +90,26 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
   /// A result whose <see cref="LilResult.Success"/> is <see langword="true"/> when the graph is valid
   /// (beatable) or validation is skipped; otherwise a failed result with the reason of the first failed check.
   /// </returns>
-  public LilResult Validate()
+  /// <param name="cancellationToken">Token checked between checks and inside the quadratic ones.</param>
+  /// <exception cref="OperationCanceledException">The token was cancelled.</exception>
+  public LilResult Validate(CancellationToken cancellationToken = default)
   {
     if (!_options.Enabled) return LilResult.Succeed(); // Validation skipped.
 
-    LilResult? result = CheckFundamental();
-    if (result != null) return result;
-
-    result = Setup();
-    if (result != null) return result;
-    result = CheckGoalSecrets();
-    if (result != null) return result;
-    result = CheckEdges();
-    if (result != null) return result;
-    result = CheckMaxEdges();
-    if (result != null) return result;
-    result = CheckTraversals();
-    if (result != null) return result;
-    result = CheckGoalBeatability();
-    if (result != null) return result;
-    result = CheckExits();
-    if (result != null) return result;
+    // Each check is a checkpoint; the two quadratic ones also check inside their loops.
+    Func<LilResult?>[] checks =
+    [
+      CheckFundamental, Setup, CheckGoalSecrets, CheckEdges, CheckMaxEdges,
+      () => CheckTraversals(cancellationToken),
+      () => CheckGoalBeatability(cancellationToken),
+      CheckExits,
+    ];
+    foreach (var check in checks)
+    {
+      cancellationToken.ThrowIfCancellationRequested();
+      LilResult? result = check();
+      if (result != null) return result;
+    }
 
     return LilResult.Succeed(); // Success: All checks passed.
   }
@@ -263,8 +263,9 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
   /// Traversal pass: flood from every start node until no new node becomes reachable, then
   /// report the first conditioned passage the player can reach but can never satisfy.
   /// </summary>
+  /// <param name="cancellationToken">Token checked on every fixpoint iteration.</param>
   /// <returns>Null if success, otherwise failure.</returns>
-  private LilResult? CheckTraversals()
+  private LilResult? CheckTraversals(CancellationToken cancellationToken)
   {
     var collectedPois = new HashSet<Guid>();
 
@@ -274,6 +275,8 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     var changed = true;
     while (changed)
     {
+      // Up to one iteration per node, each scanning all edges.
+      cancellationToken.ThrowIfCancellationRequested();
       changed = false;
       foreach (var edge in _graph!.Edges)
       {
@@ -337,8 +340,9 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
   /// the first reported problem is deterministic. The cost is linear in the number of
   /// reachable one-way passages, so bulk seed loops stay cheap.
   /// </remarks>
+  /// <param name="cancellationToken">Token checked for every reachable one-way passage.</param>
   /// <returns>Null if success, otherwise failure.</returns>
-  private LilResult? CheckGoalBeatability()
+  private LilResult? CheckGoalBeatability(CancellationToken cancellationToken)
   {
     // Without a reachable exit every reason below is moot: CheckExits' unreachable-exit
     // report is the root cause and must own it. This also keeps the reasons of this check
@@ -359,6 +363,8 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
       if (edge.Direction != EnPassageDirection.OneWay) continue;
       if (!_flooded.Contains(edge.From)) continue;
 
+      // Two floods per reachable one-way passage.
+      cancellationToken.ThrowIfCancellationRequested();
       referencedSolutions ??= BuildReferencedSolutions();
 
       // Flood the far side structurally to see what a player crossing the point of no

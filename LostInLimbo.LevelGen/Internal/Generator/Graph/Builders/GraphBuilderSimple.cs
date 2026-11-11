@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Result.Graph;
@@ -75,7 +76,7 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
   }
 
   /// <inheritdoc/>
-  protected override LilResult Build()
+  protected override LilResult Build(CancellationToken cancellationToken)
   {
     var size = Config.Graph.Size;
     var connectivity = Config.Graph.Connectivity;
@@ -83,15 +84,22 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
     var adjacency = new bool[size, size];
 
     var nodeIds = CreateNodes(size);
+    cancellationToken.ThrowIfCancellationRequested();
     CreateSkeleton(size, nodeIds, degrees, adjacency);
+    cancellationToken.ThrowIfCancellationRequested();
     PlacePois();
+    cancellationToken.ThrowIfCancellationRequested();
     AddExtraRelationships(connectivity, degrees, adjacency, nodeIds);
 
     // Finalization.
     var procOpts = Config.Graph.ProcOpts;
+    cancellationToken.ThrowIfCancellationRequested();
     new ProcRelSecrets(Graph, procOpts.RelSecrets, PrepData.SeedGraph).Execute();
+    cancellationToken.ThrowIfCancellationRequested();
     new ProcNodeObjectives(Graph, procOpts.NodeObjectives, PrepData.SeedGraph).Execute();
+    cancellationToken.ThrowIfCancellationRequested();
     new ProcNodeRelSize(Graph, procOpts.NodeRelSize, PrepData.SeedGraph).Execute();
+    cancellationToken.ThrowIfCancellationRequested();
     new ProcNodeStyle(Graph, procOpts.NodeStyle, PrepData.SeedGraph).Execute();
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
