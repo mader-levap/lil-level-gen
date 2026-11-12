@@ -191,6 +191,50 @@ public sealed class GenerationStatusStoreTests
     }
 
     [Fact]
+    public void TryBeginRun_WithSeed_PublishesRunningStatusWithSeed()
+    {
+      // Arrange: Fresh store and the seed of the run about to be claimed.
+      var store = new GenerationStatusStore();
+      const long seed = 1234L;
+
+      // Act: Claim a fresh run with the seed.
+      Assert.True(store.TryBeginRun(seed));
+
+      // Assert: The Running status already reports the seed of the claimed run.
+      Assert.Equal(EnGenResult.Running, store.Current.Result);
+      Assert.Equal(seed, store.Current.Seed);
+    }
+
+    [Fact]
+    public void TryBeginRun_AfterRunWithOtherSeed_ReportsNewSeed()
+    {
+      // Arrange: Store has a finished run with one seed.
+      var store = new GenerationStatusStore();
+      store.Publish(new GenerationStatus { Result = EnGenResult.Finished, Seed = 1L });
+
+      // Act: Claim a fresh run with a different seed.
+      Assert.True(store.TryBeginRun(2L));
+
+      // Assert: The new run reports its own seed, not the previous one.
+      Assert.Equal(2L, store.Current.Seed);
+    }
+
+    [Fact]
+    public void TryBeginResume_KeepsSeedOfPausedRun()
+    {
+      // Arrange: Store has a paused run with a known seed.
+      var store = new GenerationStatusStore();
+      store.Publish(new GenerationStatus { Result = EnGenResult.Paused, Seed = -42L });
+
+      // Act: Claim the resume.
+      Assert.True(store.TryBeginResume());
+
+      // Assert: The resumed run continues with the paused run's seed.
+      Assert.Equal(EnGenResult.Running, store.Current.Result);
+      Assert.Equal(-42L, store.Current.Seed);
+    }
+
+    [Fact]
     public void TryBeginRun_AfterPartialRun_ResetsCompletionToZero()
     {
       // Arrange: Store has a run that was cancelled halfway through.
@@ -332,6 +376,21 @@ public sealed class GenerationStatusStoreTests
       // Assert: The reset succeeds because the observed run still holds the claim.
       Assert.True(published);
       Assert.Equal(EnGenResult.None, store.Current.Result);
+    }
+
+    [Fact]
+    public void TryPublishIdle_ResetsSeedToZero()
+    {
+      // Arrange: A claimed run with a seed reached a terminal state.
+      var store = new GenerationStatusStore();
+      Assert.True(store.TryBeginRun(1234L));
+      store.Publish(new GenerationStatus { Result = EnGenResult.Finished, Seed = 1234L });
+
+      // Act: Reset to idle.
+      Assert.True(store.TryPublishIdle(store.ClaimId));
+
+      // Assert: The never-ran state carries no seed.
+      Assert.Equal(0L, store.Current.Seed);
     }
 
     [Fact]

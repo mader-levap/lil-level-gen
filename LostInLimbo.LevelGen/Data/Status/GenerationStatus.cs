@@ -28,6 +28,23 @@ public sealed record GenerationStatus
   public EnGenResult Result { get; init; } = EnGenResult.None;
 
   /// <summary>
+  /// Seed used for this generation.
+  /// </summary>
+  /// <remarks>
+  /// <para>
+  /// Equals <see cref="Config.CnfGeneral.Seed"/> of the run's configuration. That includes a clock
+  /// seed baked into the configuration when it was created from properties without a text seed
+  /// (see <see cref="Prop.PropMain.TextSeed"/>), so the reported value always reproduces the run.
+  /// </para>
+  /// <para>
+  /// Reported from the moment a run is claimed, in every result including errors and
+  /// cancellation, and kept across pause and resume. 0 for <see cref="EnGenResult.None"/>
+  /// (never ran, or cleared); 0 is also a valid seed, so check <see cref="Result"/> to tell them apart.
+  /// </para>
+  /// </remarks>
+  public long Seed { get; init; } = 0;
+
+  /// <summary>
   /// Completion progress: from 0.0 to 1.0.
   /// </summary>
   /// <remarks>

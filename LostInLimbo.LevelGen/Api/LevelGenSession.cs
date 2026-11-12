@@ -125,7 +125,9 @@ public sealed class LevelGenSession
       CancellationTokenSource source;
       lock (_runGate)
       {
-        if (!_statusStore.TryBeginRun()) return false;
+        // The seed is final at this point (any clock fallback was baked in when the config
+        // was created), so the Running status reports it from the claim onwards.
+        if (!_statusStore.TryBeginRun(config.General.Seed)) return false;
 
         AfterClaimTestHook?.Invoke();
         generator = new LevelGenerator(enRunKind, config, _statusStore);
@@ -141,7 +143,7 @@ public sealed class LevelGenSession
     {
       // Defensive: a failure after the claim (e.g. source creation on a disposed token)
       // must not leave the status stuck at "running".
-      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Error = exception });
+      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Seed = config.General.Seed, Error = exception });
       return false;
     }
   }
@@ -195,7 +197,8 @@ public sealed class LevelGenSession
     catch (Exception exception)
     {
       // Defensive: a failure after the claim must not leave the status stuck at "running".
-      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Error = exception });
+      // The resume claim carried the paused run's seed over, so the current status still has it.
+      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Seed = _statusStore.Current.Seed, Error = exception });
       return false;
     }
   }
@@ -535,7 +538,7 @@ public sealed class LevelGenSession
     }
     catch (Exception exception)
     {
-      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Error = exception });
+      _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Error, Seed = generator.Seed, Error = exception });
       return false;
     }
   }

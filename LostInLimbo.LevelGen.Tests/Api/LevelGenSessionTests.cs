@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config;
+using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Data.Result.Stats;
 using LostInLimbo.LevelGen.Data.Status;
 
@@ -800,6 +801,166 @@ public sealed class LevelGenSessionTests
       WaitForTerminal(_session);
       Assert.Equal(EnGenResult.Finished, _session.Status().Result);
       Assert.NotNull(_session.World());
+    }
+  }
+
+  /// <summary>
+  /// Tests <see cref="GenerationStatus.Seed"/>: every status of a run reports the seed of its
+  /// configuration, from the claim until <see cref="LevelGenSession.Clear"/>.
+  /// </summary>
+  public sealed class SeedTests
+  {
+    private const long TestSeed = 1234L;
+
+    private readonly LevelGenSession _session = new();
+
+    /// <summary>Returns the given config with its world seed replaced.</summary>
+    private static CnfLevelGeneration WithSeed(CnfLevelGeneration config, long seed = TestSeed)
+    {
+      return config with { General = config.General with { Seed = seed } };
+    }
+
+    [Fact]
+    public void Start_WhenFinished_StatusSeedEqualsConfigSeed()
+    {
+      // Arrange: Config with a known seed.
+      var config = WithSeed(Config(sleep: 0));
+
+      // Act: Run the whole level.
+      Assert.True(_session.Start(EnRunKind.All, config));
+      WaitForTerminal(_session);
+
+      // Assert: The finished status reports the config seed.
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.Equal(TestSeed, _session.Status().Seed);
+    }
+
+    [Fact]
+    public void Start_WhileRunning_StatusSeedEqualsConfigSeed()
+    {
+      // Arrange: Config with a known seed for a run that stays in flight.
+      var config = WithSeed(InFlightConfig());
+
+      // Act: Start the run.
+      Assert.True(_session.Start(EnRunKind.All, config));
+
+      // Assert: The Running status reports the seed right after the claim.
+      Assert.Equal(EnGenResult.Running, _session.Status().Result);
+      Assert.Equal(TestSeed, _session.Status().Seed);
+
+      // Cleanup: Stop the run.
+      _session.Cancel();
+      WaitForTerminal(_session);
+    }
+
+    [Fact]
+    public void Resume_AfterPause_KeepsSeed()
+    {
+      // Arrange: A stepwise run paused after its first step.
+      Assert.True(_session.Start(EnRunKind.Step, WithSeed(Config(sleep: 0))));
+      WaitForTerminal(_session);
+      Assert.Equal(EnGenResult.Paused, _session.Status().Result);
+      Assert.Equal(TestSeed, _session.Status().Seed);
+
+      // Act: Resume until the level is finished.
+      Assert.True(_session.Resume(EnRunKind.All));
+      WaitForTerminal(_session);
+
+      // Assert: The resumed run still reports the original seed.
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.Equal(TestSeed, _session.Status().Seed);
+    }
+
+    [Fact]
+    public void Start_WhenFailing_StatusSeedEqualsConfigSeed()
+    {
+      // Arrange: Config with a known seed that fails at start.
+      var config = WithSeed(Config(failAtStart: true));
+
+      // Act: Start the failing run.
+      Assert.True(_session.Start(EnRunKind.All, config));
+      WaitForTerminal(_session);
+
+      // Assert: The error status still reports the seed.
+      Assert.Equal(EnGenResult.Error, _session.Status().Result);
+      Assert.Equal(TestSeed, _session.Status().Seed);
+    }
+
+    [Fact]
+    public void Start_WhenCancelled_StatusSeedEqualsConfigSeed()
+    {
+      // Arrange: A run with a known seed that stays in flight.
+      Assert.True(_session.Start(EnRunKind.All, WithSeed(InFlightConfig())));
+
+      // Act: Cancel the run.
+      Assert.True(_session.Cancel());
+      WaitForTerminal(_session);
+
+      // Assert: The cancelled status still reports the seed.
+      Assert.Equal(EnGenResult.Cancelled, _session.Status().Result);
+      Assert.Equal(TestSeed, _session.Status().Seed);
+    }
+
+    [Fact]
+    public void Start_WithValidationFailure_StatusSeedEqualsConfigSeed()
+    {
+      // Arrange: Config with a known seed whose graph validation fails.
+      var config = WithSeed(Config(sleep: 0, failGraphValidation: true));
+
+      // Act: Run the whole level.
+      Assert.True(_session.Start(EnRunKind.All, config));
+      WaitForTerminal(_session);
+
+      // Assert: The validation-failed status still reports the seed.
+      Assert.Equal(EnGenResult.ValidationError, _session.Status().Result);
+      Assert.Equal(TestSeed, _session.Status().Seed);
+    }
+
+    [Fact]
+    public void Clear_ResetsSeedToZero()
+    {
+      // Arrange: A finished run with a known seed.
+      Assert.True(_session.Start(EnRunKind.All, WithSeed(Config(sleep: 0))));
+      WaitForTerminal(_session);
+
+      // Act: Clear the session.
+      Assert.True(_session.Clear());
+
+      // Assert: The never-ran state carries no seed.
+      Assert.Equal(EnGenResult.None, _session.Status().Result);
+      Assert.Equal(0L, _session.Status().Seed);
+    }
+
+    [Fact]
+    public void Start_WithConfigFromPropsWithoutTextSeed_StatusSeedEqualsBakedSeed()
+    {
+      // Arrange: Config generated from properties without a text seed, so the clock seed is baked in.
+      var config = LevelGenConfig.Execute(new PropMain());
+
+      // Act: Run the whole level.
+      Assert.True(_session.Start(EnRunKind.All, config));
+      WaitForTerminal(_session);
+
+      // Assert: The status reports exactly the seed baked into the config.
+      Assert.Equal(config.General.Seed, _session.Status().Seed);
+    }
+
+    [Theory]
+    [InlineData(long.MinValue)]
+    [InlineData(-1L)]
+    [InlineData(long.MaxValue)]
+    public void Start_WithExtremeSeed_StatusSeedEqualsConfigSeed(long seed)
+    {
+      // Arrange: Config with an extreme seed.
+      var config = WithSeed(Config(sleep: 0), seed);
+
+      // Act: Run the whole level.
+      Assert.True(_session.Start(EnRunKind.All, config));
+      WaitForTerminal(_session);
+
+      // Assert: The status reports the seed unchanged.
+      Assert.Equal(EnGenResult.Finished, _session.Status().Result);
+      Assert.Equal(seed, _session.Status().Seed);
     }
   }
 

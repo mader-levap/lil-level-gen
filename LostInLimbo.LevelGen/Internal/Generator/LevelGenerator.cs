@@ -72,6 +72,12 @@ internal sealed class LevelGenerator
   private int TotalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
 
   /// <summary>
+  /// World seed of this generator's run, reported in every status it publishes
+  /// (see <see cref="GenerationStatus.Seed"/>).
+  /// </summary>
+  internal long Seed => _config.General.Seed;
+
+  /// <summary>
   /// Prepares the level generator. Assumes the config was already validated by the API layer
   /// (see <see cref="CnfLevelGeneration.Validate"/>) before the run was claimed.
   /// </summary>
@@ -144,7 +150,7 @@ internal sealed class LevelGenerator
   private void PublishProgress(EnPhase phase, float phaseFraction)
   {
     _completion = GenerationProgress.Compute(phase, phaseFraction);
-    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running, Completion = _completion });
+    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running, Seed = Seed, Completion = _completion });
   }
 
   /// <summary>
@@ -182,7 +188,7 @@ internal sealed class LevelGenerator
       var world = result is EnGenResult.Paused or EnGenResult.Finished or EnGenResult.ValidationError
         ? LilWorldCopy.Copy(_world)
         : null;
-      var status = new GenerationStatus { Result = result, Completion = _completion, Error = error, FailureReason = failureReason };
+      var status = new GenerationStatus { Result = result, Seed = Seed, Completion = _completion, Error = error, FailureReason = failureReason };
       _statusStore.Publish(status, world);
     }
   }
@@ -223,7 +229,7 @@ internal sealed class LevelGenerator
   {
     _validationFailureReason = null;
     // A resumed run continues from the progress the previous run of this generator reached.
-    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running, Completion = _completion });
+    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running, Seed = Seed, Completion = _completion });
     try
     {
       // First checkpoint: a token cancelled before the run got going ends it right away.
