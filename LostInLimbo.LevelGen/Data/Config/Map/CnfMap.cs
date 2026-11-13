@@ -34,9 +34,12 @@ public sealed record CnfMap
   /// <summary>
   /// Checks that this map generation config can be used for map generation.
   /// </summary>
+  /// <exception cref="ArgumentException">ValidatorOpts is null.</exception>
   public void Validate()
   {
     if (ValidatorOpts is null)
       throw new ArgumentException("ValidatorOpts config must not be null.", nameof(ValidatorOpts));
+
+    ValidatorOpts.Validate();
   }
 }

@@ -4,6 +4,7 @@ using LostInLimbo.LevelGen.Data.Config.Style;
 using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop;
 using LostInLimbo.LevelGen.Internal.Prop.Data;
+using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Tests.Prop;
 
@@ -70,11 +71,19 @@ public sealed class ConfigGeneratorTests
     }
 
     [Fact]
-    public void Ctor_WithNullPropMain_ThrowsNullReferenceException()
+    public void Ctor_WithNullPropMain_ThrowsArgumentNullException()
     {
-      // Act/Assert: Null datasets currently surface as NullReferenceException from
-      // Validate; pinned so any future ArgumentNullException is an intentional change.
-      Assert.Throws<NullReferenceException>(() => new ConfigGenerator(null!, PropData.DefaultSeed));
+      // Act/Assert: The seam constructor rejects a missing dataset naming the parameter.
+      var exception = Assert.Throws<ArgumentNullException>(() => new ConfigGenerator(null!, PropData.DefaultSeed));
+      Assert.Equal("propMain", exception.ParamName);
+    }
+
+    [Fact]
+    public void PublicCtor_WithNullPropMain_ThrowsArgumentNullException()
+    {
+      // Act/Assert: The public-path constructor rejects a missing dataset naming the parameter.
+      var exception = Assert.Throws<ArgumentNullException>(() => new ConfigGenerator(null!));
+      Assert.Equal("propMain", exception.ParamName);
     }
   }
 
@@ -218,6 +227,44 @@ public sealed class ConfigGeneratorTests
     }
 
     [Fact]
+    public void Execute_WithTextSeed_UsesTextHashAsGeneralSeed()
+    {
+      // Act: Generate from a known text seed.
+      var config = new ConfigGenerator(new PropMain { TextSeed = "mordor" }).Execute();
+
+      // Assert: The world seed is the raw FromText hash.
+      Assert.Equal(SeedDerivation.FromText("mordor"), config.General.Seed);
+    }
+
+    [Fact]
+    public void Execute_WithTextSeedDifferingByCase_ProducesDifferentGeneralSeeds()
+    {
+      // Act: Generate from text seeds that differ only in case.
+      var lower = new ConfigGenerator(new PropMain { TextSeed = "mordor" }).Execute();
+      var upper = new ConfigGenerator(new PropMain { TextSeed = "Mordor" }).Execute();
+
+      // Assert: Text seeding is case-sensitive.
+      Assert.NotEqual(lower.General.Seed, upper.General.Seed);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Execute_WithBlankTextSeed_UsesClockForGeneralSeed(string textSeed)
+    {
+      // Arrange: Empty and whitespace-only text seeds count as "no text seed given".
+      var propMain = new PropMain { TextSeed = textSeed };
+
+      // Act: Capture the clock window around generation.
+      var before = DateTime.UtcNow.Ticks;
+      var config = new ConfigGenerator(propMain).Execute();
+      var after = DateTime.UtcNow.Ticks;
+
+      // Assert: The general seed is a timestamp taken between the two clock reads.
+      Assert.InRange(config.General.Seed, before, after);
+    }
+
+    [Fact]
     public void Execute_WithoutTextSeed_ProducesDifferentConfigurationsAcrossRuns()
     {
       // Arrange: Property dataset without a text seed.
@@ -273,6 +320,25 @@ public sealed class ConfigGeneratorTests
 
       // Assert: The general seed is a timestamp taken between the two clock reads.
       Assert.InRange(config.General.Seed, before, after);
+    }
+
+    [Fact]
+    public void Execute_WithoutTextSeed_ReportedSeedReproducesConfigDraws()
+    {
+      // Arrange: Property dataset without a text seed and a large draw space.
+      var propMain = new PropMain { Difficulty = 10 };
+
+      // Act: Generate from the clock, then replay the config draws from the internal seed
+      // derived from the reported world seed.
+      var config = new ConfigGenerator(propMain).Execute();
+      var internalSeed = SeedDerivation.Derive(config.General.Seed, ConfigGenerator.SaltPropSeed);
+      var replay = new ConfigGenerator(propMain, internalSeed).Execute();
+
+      // Assert: The clock is read once, so the reported world seed alone reproduces every
+      // config draw.
+      Assert.Equal(config.General.Degeneration, replay.General.Degeneration);
+      Assert.Equal(config.Graph, replay.Graph);
+      Assert.Equal(config.Map, replay.Map);
     }
 
     /// <summary>Spins until the wall clock advances, so two clock-seeded constructions cannot share a tick.</summary>

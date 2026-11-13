@@ -21,10 +21,10 @@ internal sealed class ConfigGenerator
   private const long SaltResolver = 0x63666767656e6572; // "cfggener"
 
   /// <summary>
-  /// Salt deriving the internal supporting seed from the text seed; keeps it distinct
-  /// from <see cref="CnfGeneral.Seed"/>, which is the raw text-seed hash.
+  /// Salt deriving the internal supporting seed from the world seed; keeps it distinct
+  /// from <see cref="CnfGeneral.Seed"/>, so config draws and generation draws never share a stream.
   /// </summary>
-  private const long SaltPropSeed = 0x70726F7073656564; // "propseed"
+  internal const long SaltPropSeed = 0x70726F7073656564; // "propseed"
 
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain;
@@ -35,72 +35,80 @@ internal sealed class ConfigGenerator
   private readonly SeededRandom _random;
 
   /// <summary>
-  /// Creates a generator whose internal seed comes from <see cref="PropMain.TextSeed"/>,
-  /// or from the clock when no text seed is given.
+  /// Creates a generator whose world seed comes from <see cref="PropMain.TextSeed"/>, or from
+  /// the clock when no text seed is given. The internal supporting seed is always derived from
+  /// that world seed.
   /// </summary>
   /// <remarks>
-  /// With a text seed, the generated configuration is deterministic for the same
-  /// property dataset. Without one, every run produces a different configuration.
+  /// With a text seed, the generated configuration is deterministic for the same property
+  /// dataset. Without one, the clock is read exactly once, so the reported
+  /// <see cref="CnfGeneral.Seed"/> still determines every config draw.
   /// </remarks>
   /// <param name="propMain">Property dataset. Validated on construction.</param>
+  /// <exception cref="ArgumentNullException"><paramref name="propMain"/> is <see langword="null"/>.</exception>
   public ConfigGenerator(PropMain propMain)
   {
-    _propMain = propMain;
+    _propMain = propMain ?? throw new ArgumentNullException(nameof(propMain));
     _propMain.Validate();
 
-    long seed = ResolveSeed();
+    var worldSeed = ResolveWorldSeed();
+    var seed = SeedDerivation.Derive(worldSeed, SaltPropSeed);
     _random = new(SeedDerivation.Derive(seed, SaltResolver));
-    _propData = ResolvePropData(seed);
+    _propData = ResolvePropData(seed, worldSeed);
   }
 
   /// <summary>
   /// Creates a generator with an explicit internal seed (test seam).
   /// </summary>
   /// <remarks>
-  /// The explicit seed overrides <see cref="PropMain.TextSeed"/> for the internal seed;
-  /// the text seed still determines <see cref="CnfGeneral.Seed"/>. Deterministic for
-  /// the same inputs when a text seed is given.
+  /// The explicit seed replaces the internal seed derived from the world seed; the world seed
+  /// (<see cref="CnfGeneral.Seed"/>) is still resolved from <see cref="PropMain.TextSeed"/> or
+  /// the clock. Deterministic for the same inputs when a text seed is given.
   /// </remarks>
   /// <param name="propMain">Property dataset. Validated on construction.</param>
   /// <param name="seed">Internal supporting seed.</param>
+  /// <exception cref="ArgumentNullException"><paramref name="propMain"/> is <see langword="null"/>.</exception>
   public ConfigGenerator(PropMain propMain, long seed)
   {
-    _propMain = propMain;
+    _propMain = propMain ?? throw new ArgumentNullException(nameof(propMain));
     _propMain.Validate();
 
     _random = new(SeedDerivation.Derive(seed, SaltResolver));
-    _propData = ResolvePropData(seed);
+    _propData = ResolvePropData(seed, ResolveWorldSeed());
   }
 
   /// <summary>
   /// Resolve supporting data.
   /// </summary>
+  /// <param name="seed">Internal supporting seed.</param>
+  /// <param name="worldSeed">World seed reported as <see cref="CnfGeneral.Seed"/>.</param>
   /// <returns>Supporting data.</returns>
-  private PropData ResolvePropData(long seed)
+  private PropData ResolvePropData(long seed, long worldSeed)
   {
     return new PropData
     {
       Seed = seed,
+      WorldSeed = worldSeed,
       Size = ResolveSize(),
     };
   }
 
   /// <summary>
-  /// Resolve internal supporting seed from the text seed, or from the current time if no
-  /// text seed is given.
+  /// Resolve the world seed from the text seed, or from the current time if no text seed is given.
   /// </summary>
   /// <remarks>
-  /// Null, empty and whitespace-only text seeds all count as "no text seed given",
-  /// matching <see cref="GeneralResolver"/>. The clock fallback is intentional
-  /// config-generation behavior; generation itself stays deterministic for the resolved config.
+  /// Null, empty and whitespace-only text seeds all count as "no text seed given". This is the
+  /// only clock read of config generation; the clock fallback is intentional config-generation
+  /// behavior (see <see cref="PropMain.TextSeed"/>), and generation itself stays deterministic
+  /// for the resolved config.
   /// </remarks>
-  /// <returns>Seed.</returns>
-  private long ResolveSeed()
+  /// <returns>World seed.</returns>
+  private long ResolveWorldSeed()
   {
     var textSeed = _propMain.TextSeed;
     return string.IsNullOrWhiteSpace(textSeed)
       ? DateTime.UtcNow.Ticks
-      : SeedDerivation.Derive(SeedDerivation.FromText(textSeed), SaltPropSeed);
+      : SeedDerivation.FromText(textSeed);
   }
 
   /// <summary>

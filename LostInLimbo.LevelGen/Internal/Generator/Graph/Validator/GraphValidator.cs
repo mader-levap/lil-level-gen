@@ -45,9 +45,9 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// cannot stand at it - so it falls through to the unreachable-region reasons.
 /// </para>
 /// <para>
-/// Instances hold per-call state, so create a new instance per validation
-/// (or use <see cref="LevelGraphValidation"/>); one instance must not be shared across
-/// concurrent calls. Safe to call in bulk seed loops.
+/// Instances hold per-call state that is reset at the start of every validation, so one
+/// instance may validate repeatedly, but must not be shared across concurrent calls.
+/// Safe to call in bulk seed loops.
 /// </para>
 /// <para>
 /// Optimizations will be done later. Main issues:
@@ -126,13 +126,15 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
   }
 
   /// <summary>
-  /// Sets up internal data: builds the node and POI indexes, rejecting empty or duplicate
-  /// node/POI identifiers, records which nodes carry a mandatory Goal POI, and requires at
-  /// least one Start and one Exit POI.
+  /// Sets up internal data: resets the state of any previous call, builds the node and POI
+  /// indexes, rejecting empty or duplicate node/POI identifiers, records which nodes carry a
+  /// mandatory Goal POI, and requires at least one Start and one Exit POI.
   /// </summary>
   /// <returns>Null if success, otherwise failure.</returns>
   private LilResult? Setup()
   {
+    ResetState();
+
     _nodesById = new Dictionary<Guid, LilNode>(_graph!.Nodes.Count);
     foreach (var node in _graph.Nodes)
     {
@@ -449,6 +451,21 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
 
   // ///////////////////////////////////////////////////////////////////////////
   // Helper functions.
+
+  /// <summary>
+  /// Clears all per-call state, so a repeated <see cref="Validate"/> on the same instance
+  /// starts from scratch instead of seeing indexes and flood results of the previous call.
+  /// </summary>
+  private void ResetState()
+  {
+    _nodesById = null;
+    _adjacency = null;
+    _startNodeIds.Clear();
+    _exitNodeIds.Clear();
+    _goalNodeIds.Clear();
+    _poiTypes.Clear();
+    _flooded.Clear();
+  }
 
   /// <summary>Floods a node and everything structurally reachable from it: bidirectional
   /// passages both ways, one-way passages forward only, conditions ignored and no POIs

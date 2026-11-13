@@ -19,4 +19,14 @@ public sealed record CnfValidMapOpt
   /// If true, perform map validation when map generation is finished.
   /// </summary>
   public bool Enabled { get; init; } = false;
+
+  // Helpers.
+
+  /// <summary>
+  /// Checks that these options can be used for validation. Every value of the current flag is
+  /// valid; the method exists so the parent config validates every section the same way.
+  /// </summary>
+  public void Validate()
+  {
+  }
 }

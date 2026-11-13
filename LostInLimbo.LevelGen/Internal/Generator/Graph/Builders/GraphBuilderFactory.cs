@@ -20,9 +20,12 @@ internal static class GraphBuilderFactory
   /// </summary>
   /// <param name="cnfGraphBuilder">Configuration for builders.</param>
   /// <returns>Fresh builder instance.</returns>
+  /// <exception cref="ArgumentNullException"><paramref name="cnfGraphBuilder"/> is <see langword="null"/>.</exception>
   /// <exception cref="ArgumentOutOfRangeException">The value names no known builder.</exception>
   public static AGraphBuilder Create(CnfGraphBuilder cnfGraphBuilder)
   {
+    if (cnfGraphBuilder is null) throw new ArgumentNullException(nameof(cnfGraphBuilder));
+
     return cnfGraphBuilder.Builder switch
     {
       EnGraphBuilder.OneNode => new GraphBuilderOneNode(),

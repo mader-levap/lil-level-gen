@@ -140,6 +140,49 @@ public sealed class GraphValidatorTests
     }
 
     [Fact]
+    public void Validate_CalledTwiceOnSameInstanceWithValidGraph_SucceedsBothTimes()
+    {
+      // Arrange: Minimal beatable graph and one validator instance.
+      var graph = new LilGraph
+      {
+        Nodes = [Node(1, Poi(10, EnPoiType.Start), Poi(11, EnPoiType.Exit))],
+      };
+      var validator = new GraphValidator(graph, CnfValidGraphOpt.DefEnabled);
+
+      // Act: Validate twice on the same instance.
+      var first = validator.Validate();
+      var second = validator.Validate();
+
+      // Assert: Per-call state does not leak between calls, so both succeed.
+      Assert.True(first.Success, first.FailureReason);
+      Assert.True(second.Success, second.FailureReason);
+    }
+
+    [Fact]
+    public void Validate_CalledTwiceOnSameInstanceWithUnreachableNode_ReportsSameReason()
+    {
+      // Arrange: Beatable start/exit node plus one orphan node, and one validator instance.
+      var graph = new LilGraph
+      {
+        Nodes =
+        [
+          Node(1, Poi(10, EnPoiType.Start), Poi(11, EnPoiType.Exit)),
+          Node(2),
+        ],
+      };
+      var validator = new GraphValidator(graph, CnfValidGraphOpt.DefEnabled);
+
+      // Act: Validate twice on the same instance.
+      var first = validator.Validate();
+      var second = validator.Validate();
+
+      // Assert: Both calls report the same unreachable-node failure.
+      Assert.False(first.Success);
+      Assert.Equal("1 node(s) unreachable from start POI.", first.FailureReason);
+      Assert.Equal(first.FailureReason, second.FailureReason);
+    }
+
+    [Fact]
     public void Validate_DuplicatePoiId_Fails()
     {
       // Arrange: Two nodes each holding a POI with the same identifier.

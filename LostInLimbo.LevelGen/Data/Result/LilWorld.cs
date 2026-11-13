@@ -8,7 +8,7 @@ namespace LostInLimbo.LevelGen.Data.Result;
 /// Result of generation.
 /// </summary>
 /// <remarks>
-/// Pure data.
+/// Pure data. Must be serializable.
 /// </remarks>
 public sealed record LilWorld
 {

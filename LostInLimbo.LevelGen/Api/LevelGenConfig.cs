@@ -1,3 +1,4 @@
+using System;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop;
@@ -19,8 +20,12 @@ public static class LevelGenConfig
   /// </remarks>
   /// <param name="propMain">Property dataset.</param>
   /// <returns>Generated configuration.</returns>
+  /// <exception cref="ArgumentNullException"><paramref name="propMain"/> is <see langword="null"/>.</exception>
+  /// <exception cref="ArgumentOutOfRangeException">A property is out of range; see <see cref="PropMain.Validate"/>.</exception>
   public static CnfLevelGeneration Execute(PropMain propMain)
   {
+    if (propMain is null) throw new ArgumentNullException(nameof(propMain));
+
     ConfigGenerator configGenerator = new(propMain);
     return configGenerator.Execute();
   }

@@ -33,8 +33,11 @@ internal sealed class GraphFlood
   /// Indexes the nodes and passages of <paramref name="graph"/>.
   /// </summary>
   /// <param name="graph">Graph to flood; read only.</param>
+  /// <exception cref="ArgumentNullException"><paramref name="graph"/> is <see langword="null"/>.</exception>
   public GraphFlood(LilGraph graph)
   {
+    if (graph is null) throw new ArgumentNullException(nameof(graph));
+
     _nodeById = new Dictionary<Guid, LilNode>(graph.Nodes.Count);
     foreach (var node in graph.Nodes)
     {

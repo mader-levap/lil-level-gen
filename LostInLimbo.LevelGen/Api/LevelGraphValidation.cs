@@ -28,12 +28,13 @@ public static class LevelGraphValidation
   /// A result whose <see cref="LilResult.Success"/> is <see langword="true"/> when
   /// the graph is beatable; otherwise a failed result with the reason of the first failed check.
   /// </returns>
-  /// <exception cref="ArgumentNullException"><paramref name="world"/> is <see langword="null"/>.</exception>
+  /// <exception cref="ArgumentNullException"><paramref name="world"/> or <paramref name="validatorOpt"/> is <see langword="null"/>.</exception>
   public static LilResult Validate(LilWorld world, CnfValidGraphOpt validatorOpt)
   {
     if (world is null) throw new ArgumentNullException(nameof(world));
+    if (validatorOpt is null) throw new ArgumentNullException(nameof(validatorOpt));
 
-    // Fresh validator per call: instances hold per-call state and must not be shared.
+    // Fresh validator per call: instances must not be shared across concurrent calls.
     return new GraphValidator(world.Graph, validatorOpt).Validate();
   }
 }

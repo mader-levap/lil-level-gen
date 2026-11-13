@@ -23,6 +23,14 @@ public sealed class GraphBuilderFactoryTests
   }
 
   [Fact]
+  public void Create_WithNullConfig_ThrowsArgumentNullException()
+  {
+    // Act/Assert: A missing builder config is rejected naming the parameter.
+    var exception = Assert.Throws<ArgumentNullException>(() => GraphBuilderFactory.Create(null!));
+    Assert.Equal("cnfGraphBuilder", exception.ParamName);
+  }
+
+  [Fact]
   public void Create_WithUndefinedBuilder_ThrowsArgumentOutOfRangeException()
   {
     // Act/Assert: A value no member defines is rejected naming the parameter.

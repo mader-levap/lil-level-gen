@@ -31,6 +31,20 @@ public sealed class LevelGraphValidationTests
   }
 
   [Fact]
+  public void Validate_NullValidatorOpt_ThrowsArgumentNullException()
+  {
+    // Arrange: Fresh world but no validator options.
+    var world = new LilWorld();
+
+    // Act: Try to validate without options.
+    var act = () => LevelGraphValidation.Validate(world, null!);
+
+    // Assert: The argument is rejected up front.
+    var exception = Assert.Throws<ArgumentNullException>(act);
+    Assert.Equal("validatorOpt", exception.ParamName);
+  }
+
+  [Fact]
   public void Validate_WorldWithEmptyGraph_Fails()
   {
     // Arrange: Fresh world whose graph generation never ran.

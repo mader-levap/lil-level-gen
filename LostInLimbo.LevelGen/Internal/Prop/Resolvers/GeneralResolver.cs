@@ -40,22 +40,14 @@ internal sealed class GeneralResolver(PropMain propMain, PropData propData)
   // Field resolvers.
 
   /// <summary>
-  /// Resolve seed from the text seed, or from the current time if no text seed is given.
+  /// Resolve the world seed. It is resolved once by <see cref="ConfigGenerator"/> (text-seed hash
+  /// or clock, see <see cref="PropMain.TextSeed"/>) and passed in through
+  /// <see cref="PropData.WorldSeed"/>; this resolver never reads the clock itself.
   /// </summary>
   /// <returns>Seed.</returns>
-  /// <remarks>
-  /// Null, empty and whitespace-only text seeds all count as "no text seed given".
-  /// The clock fallback is intentional config-generation behavior (see <see cref="PropMain.TextSeed"/>):
-  /// the timestamp is baked into <see cref="CnfGeneral.Seed"/> here, before generation starts,
-  /// so generation itself stays deterministic for the resolved seed. The internal supporting
-  /// seed is derived from the same text seed separately, in <see cref="ConfigGenerator"/>.
-  /// </remarks>
   private long ResolveSeed()
   {
-    var textSeed = _propMain.TextSeed;
-    return string.IsNullOrWhiteSpace(textSeed)
-      ? DateTime.UtcNow.Ticks
-      : SeedDerivation.FromText(textSeed);
+    return _propData.WorldSeed;
   }
 
   /// <summary>

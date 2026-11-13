@@ -11,63 +11,41 @@ namespace LostInLimbo.LevelGen.Tests.Prop.Resolvers;
 /// </summary>
 public sealed class GeneralResolverTests
 {
-  /// <summary>Creates a resolver over a property dataset carrying the given text seed.</summary>
-  private static GeneralResolver CreateResolver(string? textSeed)
-  {
-    return new GeneralResolver(new PropMain { TextSeed = textSeed }, PropData.Default);
-  }
-
-  /// <summary>Tests text seeds and no-text-seed fallback.</summary>
+  /// <summary>
+  /// Tests that the world seed is taken from <see cref="PropData.WorldSeed"/>. Resolving it from
+  /// the text seed or the clock is <c>ConfigGenerator</c>'s job (see <c>ConfigGeneratorTests</c>).
+  /// </summary>
   public sealed class SeedTests
   {
-    [Fact]
-    public void Execute_WithTextSeed_HashesIntoSeed()
-    {
-      // Act: Resolve general configuration with a known text seed.
-      var config = CreateResolver("mordor").Execute();
-
-      // Assert: The seed is the FromText hash, pinned here so text seeds keep
-      // reproducing previously generated levels.
-      Assert.Equal(SeedDerivation.FromText("mordor"), config.Seed);
-      Assert.Equal(-8341167147440548823L, config.Seed);
-    }
-
-    [Fact]
-    public void Execute_WithTextSeedDifferingByCase_ProducesDifferentSeeds()
-    {
-      // Act: Resolve configurations whose text seeds differ only in case.
-      var lower = CreateResolver("mordor").Execute();
-      var upper = CreateResolver("Mordor").Execute();
-
-      // Assert: Text seeding is case-sensitive.
-      Assert.NotEqual(lower.Seed, upper.Seed);
-    }
-
-    [Fact]
-    public void Execute_WithSameTextSeed_IsDeterministic()
-    {
-      // Act: Resolve twice from the same text seed; the clock must not leak in.
-      var first = CreateResolver("mordor").Execute();
-      var second = CreateResolver("mordor").Execute();
-
-      // Assert: Text-seeded runs ignore the clock and stay identical.
-      Assert.Equal(first.Seed, second.Seed);
-    }
-
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    [InlineData("   ")]
-    public void Execute_WithoutTextSeed_FallsBackToTime(string? textSeed)
+    [InlineData("mordor")]
+    public void Execute_CopiesWorldSeedFromPropData(string? textSeed)
     {
-      // Act: Capture the clock window around resolution; null, empty and
-      // whitespace-only text seeds all count as "no text seed given".
-      var before = DateTime.UtcNow.Ticks;
-      var seed = CreateResolver(textSeed).Execute().Seed;
-      var after = DateTime.UtcNow.Ticks;
+      // Arrange: Supporting data carrying a known world seed; the text seed must not matter.
+      var propData = PropData.Default with { WorldSeed = 123456789L };
+      var resolver = new GeneralResolver(new PropMain { TextSeed = textSeed }, propData);
 
-      // Assert: The seed is a timestamp taken between the two clock reads.
-      Assert.InRange(seed, before, after);
+      // Act: Resolve general configuration.
+      var config = resolver.Execute();
+
+      // Assert: The world seed is copied unchanged, without reading the text seed or the clock.
+      Assert.Equal(123456789L, config.Seed);
+    }
+
+    [Fact]
+    public void Execute_WithSamePropData_IsDeterministic()
+    {
+      // Arrange: Clock-less inputs (no text seed, fixed world seed).
+      var propData = PropData.Default with { WorldSeed = 7L };
+
+      // Act: Resolve twice from the same inputs.
+      var first = new GeneralResolver(PropMain.Default, propData).Execute();
+      var second = new GeneralResolver(PropMain.Default, propData).Execute();
+
+      // Assert: Identical output; the clock cannot leak in.
+      Assert.Equal(first, second);
     }
   }
 

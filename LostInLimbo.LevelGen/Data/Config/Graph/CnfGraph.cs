@@ -94,5 +94,6 @@ public sealed record CnfGraph
 
     GraphBuilder.Validate();
     ProcOpts.Validate();
+    ValidatorOpts.Validate();
   }
 }

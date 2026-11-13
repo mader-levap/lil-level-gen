@@ -19,10 +19,16 @@ public sealed record PropData
   // Fields.
 
   /// <summary>
-  /// Internal seed driving config-generation draws. Derived from the text seed with its own salt
-  /// (so it differs from the configuration's world seed), or taken from the clock without one.
+  /// Internal seed driving config-generation draws. Derived from <see cref="WorldSeed"/> with its
+  /// own salt, so it differs from the configuration's world seed.
   /// </summary>
   public long Seed { get; init; } = DefaultSeed;
+
+  /// <summary>
+  /// World seed reported as <c>CnfGeneral.Seed</c>: the text-seed hash, or the clock when no text
+  /// seed is given. Resolved once by <c>ConfigGenerator</c>, so every resolver sees the same value.
+  /// </summary>
+  public long WorldSeed { get; init; } = DefaultSeed;
 
   /// <summary>Size of the graph. Should be pre-calculated early as it is needed for a lot of other calculations.</summary>
   public int Size { get; init; } = DefaultSize;

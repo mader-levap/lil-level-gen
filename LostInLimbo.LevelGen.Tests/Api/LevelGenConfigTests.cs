@@ -26,6 +26,14 @@ public sealed class LevelGenConfigTests
   }
 
   [Fact]
+  public void Execute_WithNullPropMain_ThrowsArgumentNullException()
+  {
+    // Act/Assert: A missing property dataset is rejected naming the parameter.
+    var exception = Assert.Throws<ArgumentNullException>(() => LevelGenConfig.Execute(null!));
+    Assert.Equal("propMain", exception.ParamName);
+  }
+
+  [Fact]
   public void Execute_WithNegativeDifficulty_ThrowsArgumentOutOfRangeExceptionNamingDifficulty()
   {
     // Arrange: Property dataset with negative difficulty.

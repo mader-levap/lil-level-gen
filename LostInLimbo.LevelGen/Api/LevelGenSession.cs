@@ -263,7 +263,7 @@ public sealed class LevelGenSession
   /// </para>
   /// <para>
   /// Once paused, the run can no longer be cancelled (see <see cref="Cancel"/>); discard it
-  /// with <see cref="Clear"/> or continue generation with a <see cref="Start"/>.
+  /// with <see cref="Clear"/> or continue generation with <see cref="Resume"/>.
   /// </para>
   /// </remarks>
   /// <returns>

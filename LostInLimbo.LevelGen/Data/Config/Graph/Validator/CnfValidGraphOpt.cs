@@ -27,4 +27,14 @@ public sealed record CnfValidGraphOpt
   /// Defaults to <see langword="true"/> to preserve existing validation behavior.
   /// </summary>
   public bool AllowOneWayDeadEnds { get; init; } = true;
+
+  // Helpers.
+
+  /// <summary>
+  /// Checks that these options can be used for validation. Every combination of the current
+  /// flags is valid; the method exists so the parent config validates every section the same way.
+  /// </summary>
+  public void Validate()
+  {
+  }
 }
