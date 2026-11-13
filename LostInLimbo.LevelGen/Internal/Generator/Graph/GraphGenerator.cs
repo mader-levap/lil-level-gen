@@ -37,7 +37,7 @@ internal sealed class GraphGenerator(CnfLevelGeneration config, PrepData prepDat
   private readonly PrepData _prepData = prepData;
 
   /// <summary>World: partial or complete result of generation.</summary>
-  private LilWorld _world = world;
+  private readonly LilWorld _world = world;
 
   /// <summary>
   /// Test-only hook invoked after a successful build, before the metadata pass. Lets tests

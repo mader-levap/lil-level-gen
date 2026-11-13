@@ -15,9 +15,9 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Map.Validator;
 internal sealed class MapValidator(LilMap? map, CnfValidMapOpt options)
 {
   /// <summary>Map to verify.</summary>
-  private LilMap? _map = map;
+  private readonly LilMap? _map = map;
   /// <summary>Validator options.</summary>
-  private CnfValidMapOpt _options = options;
+  private readonly CnfValidMapOpt _options = options;
 
   /// <summary>
   /// Validates the given level map.

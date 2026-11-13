@@ -80,4 +80,22 @@ public sealed class PrepassGeneratorTests
     // Assert: Graph and Map sub-seeds never collapse onto the same value.
     Assert.NotEqual(prepData.SeedGraph, prepData.SeedMap);
   }
+
+  [Fact]
+  public void Create_CalledTwiceOnSameGenerator_ReturnsEqualButSeparateInstances()
+  {
+    // Arrange: One generator over a known world seed.
+    var generator = new PrepassGenerator(CnfLevelGeneration.Default with
+    {
+      General = new CnfGeneral { Seed = 42 },
+    });
+
+    // Act: Create the prepass data twice.
+    var first = generator.Create();
+    var second = generator.Create();
+
+    // Assert: Each call builds its own data instead of handing out shared state.
+    Assert.Equal(first, second);
+    Assert.NotSame(first, second);
+  }
 }

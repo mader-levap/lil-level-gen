@@ -25,7 +25,7 @@ internal sealed class MapGenerator(CnfLevelGeneration config, PrepData prepData,
   private readonly PrepData _prepData = prepData;
 
   /// <summary>World: partial or complete result of generation.</summary>
-  private LilWorld _world = world;
+  private readonly LilWorld _world = world;
 
   /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
   private int TotalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;

@@ -63,6 +63,13 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <summary>Denominator of the share of the graph size used as the largest group count.</summary>
   private const int ManyThemesGroupShareDenominator = 3;
 
+  /// <summary>
+  /// Builders the resolver picks from, with equal chance. <see cref="EnGraphBuilder.OneNode"/> is
+  /// excluded (a trivial single-node level). A new builder joins the pick only when added
+  /// here; keep the order stable, as the index of the draw selects the builder.
+  /// </summary>
+  private static readonly EnGraphBuilder[] EligibleBuilders = [EnGraphBuilder.Simple, EnGraphBuilder.Linear];
+
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain = propMain;
   /// <summary>Supporting data.</summary>
@@ -126,20 +133,19 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     return new CnfGraphBuilder {
       Builder = enGraphBuilder,
       CnfSimple = enGraphBuilder == EnGraphBuilder.Simple ?
-        new BuilderSimpleResolver(_propMain, _propData, _random).Execute() : null,
+        new BuilderSimpleResolver(_propMain, _propData).Execute() : null,
       CnfLinear = enGraphBuilder == EnGraphBuilder.Linear ?
-        new BuilderLinearResolver(_propMain, _propData, _random).Execute() : null,
+        new BuilderLinearResolver(_propMain, _propData).Execute() : null,
     };
   }
 
   /// <summary>
-  /// Pick random graph builder from available graph builders, except <c>EnGraphBuilder.OneNode</c>.
+  /// Pick a random graph builder with equal chance from <see cref="EligibleBuilders"/>.
   /// </summary>
   /// <returns>Graph builder.</returns>
   private EnGraphBuilder PickGraphBuilder()
   {
-    int count = Enum.GetValues(typeof(EnGraphBuilder)).Length;
-    return (EnGraphBuilder)_random.NextInt(1, count); // we exclude first member
+    return EligibleBuilders[_random.NextInt(EligibleBuilders.Length)];
   }
 
   // Processor options.

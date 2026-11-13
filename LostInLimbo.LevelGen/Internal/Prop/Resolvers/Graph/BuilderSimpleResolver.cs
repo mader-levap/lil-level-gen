@@ -10,9 +10,11 @@ namespace LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
 /// </summary>
 /// <param name="propMain">Property dataset.</param>
 /// <param name="propData">Internal data supporting config generation.</param>
-/// <param name="random">Random for sub-seed.</param>
-internal sealed class BuilderSimpleResolver(PropMain propMain, PropData propData, SeededRandom random)
+internal sealed class BuilderSimpleResolver(PropMain propMain, PropData propData)
 {
+  /// <summary>Salt for the simple builder resolver sub-seed; keeps its draws off the graph resolver's stream.</summary>
+  private const long SaltBuilderSimpleResolver = 0x6366676273696D70; // "cfgbsimp"
+
   // Draw ranges: each pair is [Min, MaxExclusive).
 
   /// <summary>Smallest drawn <see cref="CnfGraphBuilderSimple.ChokepointChance"/> (inclusive).</summary>
@@ -35,7 +37,7 @@ internal sealed class BuilderSimpleResolver(PropMain propMain, PropData propData
   /// <summary>Supporting data.</summary>
   private readonly PropData _propData = propData;
   /// <summary>Random for sub-seed.</summary>
-  private readonly SeededRandom _random = random;
+  private readonly SeededRandom _random = new(SeedDerivation.Derive(propData.Seed, SaltBuilderSimpleResolver));
 
   /// <summary>
   /// Resolve simple builder configuration.

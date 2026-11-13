@@ -1,12 +1,12 @@
 namespace LostInLimbo.LevelGen.Internal.Generator.Prepass;
 
 /// <summary>
-/// Holds data derived from config before actual generation.
+/// Holds data derived from config before actual generation. Immutable once created.
 /// </summary>
 internal sealed record PrepData
 {
   /// <summary>Sub-seed for graph generation.</summary>
-  public long SeedGraph { get; set; } = 0;
+  public long SeedGraph { get; init; }
   /// <summary>Sub-seed for map generation.</summary>
-  public long SeedMap { get; set; } = 0;
+  public long SeedMap { get; init; }
 }

@@ -137,12 +137,12 @@ Rules for every phase (from AGENTS.md):
 **Done when:** the build has no doc/cref warnings, the public API no longer contains `PropData`, and generated output is unchanged.
 
 ### Phase 3: Robustness (C1–C6)
-- [ ] C1: give each sub-resolver its own salted sub-seed. **This changes the generated config for the same text seed**, so review the seed-snapshot test diffs explicitly.
-- [ ] C2: pick from explicit lists of eligible graph builders (`GraphResolver.PickGraphBuilder`) and skeleton scenarios (`GraphBuilderSimple.PickScenario`, which drops `ScenarioCount`).
-- [ ] C3: clean up `EvalWeights` (validation, exception types, generic `Pick<T>`).
-- [ ] C4: make `PrepData` immutable.
-- [ ] C5: add the missing `readonly` modifiers.
-- [ ] C6: remove the unused members.
+- [x] C1: give each sub-resolver its own salted sub-seed. **This changes the generated config for the same text seed**, so review the seed-snapshot test diffs explicitly.
+- [x] C2: pick from explicit lists of eligible graph builders (`GraphResolver.PickGraphBuilder`) and skeleton scenarios (`GraphBuilderSimple.PickScenario`, which drops `ScenarioCount`).
+- [x] C3: clean up `EvalWeights`: generic `Pick<T>` over arrays, constant-time input checks only (hot path; the caller guarantees valid weights, as documented), no `IndexOutOfRangeException`.
+- [x] C4: make `PrepData` immutable.
+- [x] C5: add the missing `readonly` modifiers.
+- [ ] C6: remove the unused members. **Deferred by the user; not part of this pass.**
 
 **Done when:** the suite is green and the only output change is the intended one from C1.
 

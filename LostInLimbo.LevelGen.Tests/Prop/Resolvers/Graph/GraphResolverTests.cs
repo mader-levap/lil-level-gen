@@ -149,6 +149,43 @@ public sealed class GraphResolverTests
     }
 
     [Fact]
+    public void Execute_SeedSweep_BuilderSubConfigMatchesStandaloneBuilderResolver()
+    {
+      // Arrange: Flags tracking which builders the sweep observed.
+      var seenSimple = false;
+      var seenLinear = false;
+
+      // Act: Resolve across a seed sweep wide enough to hit both builders.
+      for (long seed = 0; seed < 64 && (!seenSimple || !seenLinear); seed++)
+      {
+        var propMain = new PropMain { TextSeed = "mordor", Difficulty = 5 };
+        var propData = PropData.Default with { Seed = seed, Size = 2 };
+        var builder = new GraphResolver(propMain, propData).Execute().GraphBuilder;
+
+        // Assert: The builder sub-config equals a standalone resolve from the same data,
+        // so builder options run on their own sub-seed, independent of how many draws the
+        // graph resolver made before them (and its later draws are independent of them).
+        switch (builder.Builder)
+        {
+          case EnGraphBuilder.Simple:
+            Assert.Equal(new BuilderSimpleResolver(propMain, propData).Execute(), builder.CnfSimple);
+            seenSimple = true;
+            break;
+          case EnGraphBuilder.Linear:
+            Assert.Equal(new BuilderLinearResolver(propMain, propData).Execute(), builder.CnfLinear);
+            seenLinear = true;
+            break;
+          default:
+            throw new InvalidOperationException($"Unexpected builder {builder.Builder}.");
+        }
+      }
+
+      // Assert: The sweep observed both builders, so both branches are covered.
+      Assert.True(seenSimple, "Seed sweep never picked the Simple builder.");
+      Assert.True(seenLinear, "Seed sweep never picked the Linear builder.");
+    }
+
+    [Fact]
     public void Execute_AlwaysEnablesValidatorDisallowingOneWayDeadEnds()
     {
       // Act: Resolve graph configuration.

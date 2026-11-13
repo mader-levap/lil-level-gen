@@ -63,22 +63,22 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
   #region State
 
   /// <summary>Graph to verify.</summary>
-  private LilGraph? _graph = graph;
+  private readonly LilGraph? _graph = graph;
   /// <summary>Validator options.</summary>
-  private CnfValidGraphOpt _options = options;
+  private readonly CnfValidGraphOpt _options = options;
   
   /// <summary>All nodes mapped by id.</summary>
   private Dictionary<Guid, LilNode>? _nodesById;
   /// <summary>All start nodes.</summary>
-  private HashSet<Guid> _startNodeIds = [];
+  private readonly HashSet<Guid> _startNodeIds = [];
   /// <summary>All end nodes.</summary>
-  private HashSet<Guid> _exitNodeIds = [];
+  private readonly HashSet<Guid> _exitNodeIds = [];
   /// <summary>All nodes holding a mandatory <see cref="EnPoiType.Goal"/> POI.</summary>
-  private HashSet<Guid> _goalNodeIds = [];
+  private readonly HashSet<Guid> _goalNodeIds = [];
   /// <summary>All POI types mapped by POI id.</summary>
-  private Dictionary<Guid, EnPoiType> _poiTypes = [];
+  private readonly Dictionary<Guid, EnPoiType> _poiTypes = [];
   /// <summary>Flooded nodes.</summary>
-  private HashSet<Guid> _flooded = [];
+  private readonly HashSet<Guid> _flooded = [];
 
   /// <summary>Structural neighbors of each node, built once from the edge list so
   /// <see cref="FloodStructural"/> is O(V+E) instead of O(V·E) per call.</summary>

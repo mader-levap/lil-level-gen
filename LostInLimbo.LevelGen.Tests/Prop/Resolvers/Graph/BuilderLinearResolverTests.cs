@@ -1,7 +1,6 @@
 using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
-using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Tests.Prop.Resolvers.Graph;
 
@@ -11,10 +10,10 @@ namespace LostInLimbo.LevelGen.Tests.Prop.Resolvers.Graph;
 /// </summary>
 public sealed class BuilderLinearResolverTests
 {
-  /// <summary>Creates a resolver over a property dataset and a fixed random stream.</summary>
+  /// <summary>Creates a resolver over a property dataset with the given internal seed.</summary>
   private static BuilderLinearResolver CreateResolver(long propSeed)
   {
-    return new BuilderLinearResolver(PropMain.Default, PropData.Default with { Seed = propSeed }, new SeededRandom(propSeed));
+    return new BuilderLinearResolver(PropMain.Default, PropData.Default with { Seed = propSeed });
   }
 
   [Fact]
@@ -25,15 +24,15 @@ public sealed class BuilderLinearResolverTests
 
     // Assert: Values match the pinned draws, so the resolver salt and stream order
     // cannot silently change, and each stays inside its planned randomization range.
-    Assert.Equal(4, config.MaxEdges);
+    Assert.Equal(5, config.MaxEdges);
     Assert.InRange(config.MaxEdges, 3, 6);
-    Assert.Equal(4, config.MaxExtraDegree);
+    Assert.Equal(2, config.MaxExtraDegree);
     Assert.InRange(config.MaxExtraDegree, 2, 4);
-    Assert.Equal(3, config.MaxConditionPerRel);
+    Assert.Equal(2, config.MaxConditionPerRel);
     Assert.InRange(config.MaxConditionPerRel, 1, 4);
-    Assert.Equal(3, config.MaxConditionDistance);
+    Assert.Equal(2, config.MaxConditionDistance);
     Assert.InRange(config.MaxConditionDistance, 2, 4);
-    Assert.Equal(2, config.MaxSkipDistance);
+    Assert.Equal(1, config.MaxSkipDistance);
     Assert.InRange(config.MaxSkipDistance, 1, 3);
   }
 

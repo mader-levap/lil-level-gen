@@ -43,8 +43,13 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
 
   /// <summary>Minimum size where scenarios differ.</summary>
   private const int ScenarioSize = 3;
-  /// <summary>Number of <see cref="EnSkeletonScenario"/> members; each is rolled with an equal chance.</summary>
-  private const int ScenarioCount = 3;
+  /// <summary>
+  /// Scenarios rolled with an equal chance once the size reaches <see cref="ScenarioSize"/>. A new
+  /// scenario joins the roll only when added here; keep the order stable, as the index of the draw
+  /// selects the scenario.
+  /// </summary>
+  private static readonly EnSkeletonScenario[] Scenarios =
+    [EnSkeletonScenario.Linear, EnSkeletonScenario.Star, EnSkeletonScenario.Mixed];
   /// <summary>Smallest linear prefix of the Mixed scenario (inclusive): at least one chain link.</summary>
   private const int MinMixedLinearCount = 2;
   /// <summary>
@@ -191,8 +196,7 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
   private EnSkeletonScenario PickScenario(int size)
   {
     if (size < ScenarioSize) return EnSkeletonScenario.Linear;
-    var roll = Random.NextInt(ScenarioCount);
-    return (EnSkeletonScenario)roll;
+    return Scenarios[Random.NextInt(Scenarios.Length)];
   }
 
   /// <summary>
