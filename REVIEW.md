@@ -60,6 +60,8 @@ The findings below are grouped by kind and given IDs (A = bugs, B = AGENTS.md ad
   - `LilNode.Pois/Reach/OpenReach` and `LilEdge.Conditions` are mutable.
   - Consequences: the docs say "immutable once created", which is not true; record equality is reference-based for these members; `with` aliases the collections (`LilWorldCopy` has to work around this).
   - AGENTS.md prefers `IReadOnlyList<T>`. This is a broad public-API change, so it gets its own phase.
+  - **Resolution: not needed.** Consumers never share state with the generator: `LevelGenerator.PublishTerminal` stores a deep copy and `LevelGenSession.World()` hands out another deep copy on every call (`LilWorldCopy`). Read-only types would add only compile-time protection, would make the types harder to build and edit for the editor and for the world-accepting APIs (`LevelGraphValidation`, `LevelGraphReach`), and would not fix record equality either. Fixed instead: the false "immutable once created" claims on `LilNode`, `LilEdge` and `LilGraph`, plus notes on `LilWorld` and the graph types about copy-on-read and `with` sharing collections.
+  - **Revisit if:** large maps make the per-call copy in `World()` measurably expensive. Immutable snapshots could then be shared instead of copied.
 
 ### C. Robustness / design
 
@@ -153,8 +155,7 @@ Rules for every phase (from AGENTS.md):
 
 **Done when:** the determinism tests show identical generated graphs before and after, and the suite is green.
 
-### Phase 5: Read-only data contracts (B6)
-- [ ] Design proposal first: public result types expose `IReadOnlyList` / `IReadOnlyDictionary`; builders work on internal mutable state and freeze it into the result.
-- [ ] Implement after the design is approved, updating `LilWorldCopy`, the processors, the metadata pass, the validator, `LevelGraphReach` and the tests.
+### Phase 5: Read-only data contracts (B6) - dropped
+- [x] Not needed: copy-on-read already isolates consumers (see B6). Replaced by a docs fix of the result types' mutability claims.
 
-**Done when:** no public result type exposes a mutable collection, serialization still round-trips, and the suite is green.
+**Done when:** the docs match the actual mutability. Done.

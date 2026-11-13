@@ -17,7 +17,9 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// blue keys. See <see cref="LilCondition"/> for how conditions reference POIs.
 /// </para>
 /// <para>
-/// Immutable once created and added to <see cref="LilGraph.Edges"/>. Invariants (enforced by
+/// Scalar properties are init-only; <see cref="Conditions"/> is a mutable list that a
+/// <c>with</c> copy shares with the original (copy the owning world with
+/// <see cref="LilWorldCopy.Copy"/> for a detached copy). Invariants (enforced by
 /// <see cref="LostInLimbo.LevelGen.Api.LevelGraphValidation"/>): <see cref="Id"/> must not be
 /// <see cref="Guid.Empty"/> and must be unique; <see cref="From"/>
 /// and <see cref="To"/> must reference existing nodes and must differ from each other.

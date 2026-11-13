@@ -28,10 +28,13 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// the key (<c>solution</c>) is always before the door that requires it (<c>condition</c>). No softlock.
 /// </para>
 /// <para>
-/// Mutable containers: generator builds the graph in place by appending nodes and edges.
-/// Nodes and edges themselves are immutable once created (see <see cref="LilNode"/>,
-/// <see cref="LilEdge"/>). Iteration order of these lists is not significant; consumers
-/// must sort explicitly before using order in generation logic.
+/// Mutable plain data: the generator builds the graph in place by appending nodes and edges and by
+/// filling the collections of nodes and edges. Consumers receive a private deep copy (see
+/// <see cref="Api.LevelGenSession.World"/>), so their changes never reach the generator or other
+/// consumers. To detach a graph built or edited by a consumer, copy its owning world with
+/// <see cref="LilWorldCopy.Copy"/>.
+/// Iteration order of these lists is not significant; consumers must sort explicitly before using
+/// order in generation logic.
 /// </para>
 /// </remarks>
 public sealed record LilGraph

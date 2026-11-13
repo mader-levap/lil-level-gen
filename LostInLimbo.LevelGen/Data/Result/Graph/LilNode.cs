@@ -13,14 +13,15 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// the map. The player has access to everything within a given place.
 /// </para>
 /// <para>
-/// Immutable once created and added to <see cref="LilGraph.Nodes"/>. Invariant (enforced by
+/// Scalar properties are init-only. Invariant (enforced by
 /// <see cref="LostInLimbo.LevelGen.Api.LevelGraphValidation"/>): <see cref="Id"/> must not be
 /// <see cref="Guid.Empty"/>; it is assigned by the generator.
 /// </para>
 /// <para>
 /// <see cref="Pois"/>, <see cref="Reach"/> and <see cref="OpenReach"/> are mutable collections filled in place by
 /// generator passes after the node is created: POIs by the graph builders and processors,
-/// reachability metadata by the metadata pass.
+/// reachability metadata by the metadata pass. A <c>with</c> copy shares these collections with
+/// the original; copy the owning world with <see cref="LilWorldCopy.Copy"/> for a detached copy.
 /// </para>
 /// </remarks>
 public sealed record LilNode

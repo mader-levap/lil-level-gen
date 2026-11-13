@@ -9,20 +9,22 @@ namespace LostInLimbo.LevelGen.Data.Result;
 /// Creates deep copies of <see cref="LilWorld"/> data.
 /// </summary>
 /// <remarks>
+/// <para>
 /// <see cref="LilWorld"/> is a mutable record: a plain <c>with</c> expression would only copy
 /// the top-level references and leave the copy sharing the source's graph containers, stats
 /// and nested lists with the source. This helper detaches every mutable part instead, so the
 /// copy can be handed to consumers (e.g. <see cref="Api.LevelGenSession.World"/>) or
 /// stored without either side being able to affect the other through shared state.
+/// </para>
 /// <para>
-  /// Maintenance rule: when mutable state is added to <see cref="LilWorld"/>, <see cref="LilGraph"/>,
-  /// <see cref="LilNode"/>, <see cref="LilEdge"/> or <see cref="LilStats"/>, extend
-  /// <see cref="Copy"/> accordingly so the detachment guarantee holds. Leaf records
-  /// (<see cref="LilPoi"/>, <see cref="LilCondition"/>, <see cref="LilStyle"/>) are immutable
-  /// (init-only) and are shared as list elements; they need no copying.
-  /// Note that <see cref="LilNode.Reach"/> and <see cref="LilNode.OpenReach"/> count as mutable
-  /// state even though their leaves are <see cref="Guid"/> values: the dictionary and all lists
-  /// must be detached too.
+/// Maintenance rule: when mutable state is added to <see cref="LilWorld"/>, <see cref="LilGraph"/>,
+/// <see cref="LilNode"/>, <see cref="LilEdge"/> or <see cref="LilStats"/>, extend
+/// <see cref="Copy"/> accordingly so the detachment guarantee holds. Leaf records
+/// (<see cref="LilPoi"/>, <see cref="LilCondition"/>, <see cref="LilStyle"/>) are immutable
+/// (init-only) and are shared as list elements; they need no copying.
+/// Note that <see cref="LilNode.Reach"/> and <see cref="LilNode.OpenReach"/> count as mutable
+/// state even though their leaves are <see cref="Guid"/> values: the dictionary and all lists
+/// must be detached too.
 /// </para>
 /// Deterministic: the copy preserves all values, identifiers and iteration order of the source.
 /// </remarks>

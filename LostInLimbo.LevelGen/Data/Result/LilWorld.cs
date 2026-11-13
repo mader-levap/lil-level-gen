@@ -8,7 +8,13 @@ namespace LostInLimbo.LevelGen.Data.Result;
 /// Result of generation.
 /// </summary>
 /// <remarks>
-/// Pure data. Must be serializable.
+/// Pure, mutable data. Must be serializable.
+/// <para>
+/// <see cref="Api.LevelGenSession.World"/> returns a private deep copy on every call, so a
+/// consumer may modify it freely without affecting the generator or other callers. A
+/// <c>with</c> expression copies only top-level references; use <see cref="LilWorldCopy.Copy"/>
+/// for a fully detached copy.
+/// </para>
 /// </remarks>
 public sealed record LilWorld
 {
