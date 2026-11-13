@@ -13,6 +13,23 @@ namespace LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
 /// <param name="random">Random for sub-seed.</param>
 internal sealed class BuilderSimpleResolver(PropMain propMain, PropData propData, SeededRandom random)
 {
+  // Draw ranges: each pair is [Min, MaxExclusive).
+
+  /// <summary>Smallest drawn <see cref="CnfGraphBuilderSimple.ChokepointChance"/> (inclusive).</summary>
+  private const float ChokepointChanceMin = 0.2f;
+  /// <summary>Upper bound of the drawn <see cref="CnfGraphBuilderSimple.ChokepointChance"/> (exclusive).</summary>
+  private const float ChokepointChanceMaxExclusive = 0.95f;
+
+  /// <summary>Smallest drawn <see cref="CnfGraphBuilderSimple.MaxExtraDegree"/> (inclusive).</summary>
+  private const int MaxExtraDegreeMin = 2;
+  /// <summary>Upper bound of the drawn <see cref="CnfGraphBuilderSimple.MaxExtraDegree"/> (exclusive).</summary>
+  private const int MaxExtraDegreeMaxExclusive = 6;
+
+  /// <summary>Smallest drawn <see cref="CnfGraphBuilderSimple.MaxExtraDegreeStar"/> (inclusive).</summary>
+  private const int MaxExtraDegreeStarMin = 4;
+  /// <summary>Upper bound of the drawn <see cref="CnfGraphBuilderSimple.MaxExtraDegreeStar"/> (exclusive).</summary>
+  private const int MaxExtraDegreeStarMaxExclusive = 9;
+
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain = propMain;
   /// <summary>Supporting data.</summary>
@@ -28,9 +45,9 @@ internal sealed class BuilderSimpleResolver(PropMain propMain, PropData propData
   {
     return CnfGraphBuilderSimple.Default with
     {
-      ChokepointChance = _random.NextFloat(0.2f, 0.95f),
-      MaxExtraDegree = _random.NextInt(2, 6),
-      MaxExtraDegreeStar = _random.NextInt(4, 9),
+      ChokepointChance = _random.NextFloat(ChokepointChanceMin, ChokepointChanceMaxExclusive),
+      MaxExtraDegree = _random.NextInt(MaxExtraDegreeMin, MaxExtraDegreeMaxExclusive),
+      MaxExtraDegreeStar = _random.NextInt(MaxExtraDegreeStarMin, MaxExtraDegreeStarMaxExclusive),
     };
   }
 }

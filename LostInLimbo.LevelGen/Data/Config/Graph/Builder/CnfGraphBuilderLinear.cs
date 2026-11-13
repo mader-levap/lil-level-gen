@@ -4,7 +4,7 @@ using LostInLimbo.LevelGen.Data.Result.Graph;
 namespace LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 
 /// <summary>
-/// <para>Configuration of <see cref="Internal.Generator.Graph.Builders.GraphBuilderLinear"/>: degree caps,
+/// <para>Configuration of the Linear graph builder (<see cref="EnGraphBuilder.Linear"/>): degree caps,
 /// condition limits and skip distance.</para>
 /// </summary>
 public sealed record CnfGraphBuilderLinear

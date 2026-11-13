@@ -16,6 +16,15 @@ internal sealed class GeneralResolver(PropMain propMain, PropData propData)
   /// <summary>Salt for the general resolver sub-seed; keeps this pass off other passes' streams.</summary>
   private const long SaltGeneralResolver = 0x63666767656E; // "cfggen"
 
+  /// <summary>Center of the degeneration range per difficulty step.</summary>
+  private const float DegenerationPerDifficulty = 10.0f;
+
+  /// <summary>Half-width of the degeneration range around its center.</summary>
+  private const float DegenerationSpread = 20.0f;
+
+  /// <summary>Lowest allowed degeneration; the range is clamped to it.</summary>
+  private const float MinDegeneration = 0.0f;
+
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain = propMain;
   /// <summary>Supporting data.</summary>
@@ -60,9 +69,9 @@ internal sealed class GeneralResolver(PropMain propMain, PropData propData)
   /// <returns>Degeneration level.</returns>
   private float ResolveDegeneration()
   {
-    float baseValue = _propMain.Difficulty * 10.0f;
-    float from = Math.Max(0.0f, baseValue - 20.0f);
-    float to = baseValue + 20.0f;
+    float baseValue = _propMain.Difficulty * DegenerationPerDifficulty;
+    float from = Math.Max(MinDegeneration, baseValue - DegenerationSpread);
+    float to = baseValue + DegenerationSpread;
     return _random.NextFloat(from, to);
   }
 }

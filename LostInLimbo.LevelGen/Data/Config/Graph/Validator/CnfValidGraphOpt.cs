@@ -1,7 +1,8 @@
 namespace LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 
 /// <summary>
-/// Options controlling <see cref="GraphValidator"/>.
+/// Options controlling graph validation: the validation step at the end of graph generation and
+/// <see cref="Api.LevelGraphValidation"/>.
 /// </summary>
 public sealed record CnfValidGraphOpt
 {

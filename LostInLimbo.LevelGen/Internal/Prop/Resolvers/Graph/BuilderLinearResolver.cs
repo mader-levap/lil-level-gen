@@ -13,6 +13,33 @@ namespace LostInLimbo.LevelGen.Internal.Prop.Resolvers.Graph;
 /// <param name="random">Random for sub-seed.</param>
 internal sealed class BuilderLinearResolver(PropMain propMain, PropData propData, SeededRandom random)
 {
+  // Draw ranges: each pair is [Min, MaxExclusive).
+
+  /// <summary>Smallest drawn <see cref="CnfGraphBuilderLinear.MaxEdges"/> (inclusive).</summary>
+  private const int MaxEdgesMin = 3;
+  /// <summary>Upper bound of the drawn <see cref="CnfGraphBuilderLinear.MaxEdges"/> (exclusive).</summary>
+  private const int MaxEdgesMaxExclusive = 7;
+
+  /// <summary>Smallest drawn <see cref="CnfGraphBuilderLinear.MaxExtraDegree"/> (inclusive).</summary>
+  private const int MaxExtraDegreeMin = 2;
+  /// <summary>Upper bound of the drawn <see cref="CnfGraphBuilderLinear.MaxExtraDegree"/> (exclusive).</summary>
+  private const int MaxExtraDegreeMaxExclusive = 5;
+
+  /// <summary>Smallest drawn <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/> (inclusive).</summary>
+  private const int MaxConditionPerRelMin = 1;
+  /// <summary>Upper bound of the drawn <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/> (exclusive).</summary>
+  private const int MaxConditionPerRelMaxExclusive = 5;
+
+  /// <summary>Smallest drawn <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/> (inclusive).</summary>
+  private const int MaxConditionDistanceMin = 2;
+  /// <summary>Upper bound of the drawn <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/> (exclusive).</summary>
+  private const int MaxConditionDistanceMaxExclusive = 5;
+
+  /// <summary>Smallest drawn <see cref="CnfGraphBuilderLinear.MaxSkipDistance"/> (inclusive).</summary>
+  private const int MaxSkipDistanceMin = 1;
+  /// <summary>Upper bound of the drawn <see cref="CnfGraphBuilderLinear.MaxSkipDistance"/> (exclusive).</summary>
+  private const int MaxSkipDistanceMaxExclusive = 4;
+
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain = propMain;
   /// <summary>Supporting data.</summary>
@@ -28,11 +55,11 @@ internal sealed class BuilderLinearResolver(PropMain propMain, PropData propData
   {
     return CnfGraphBuilderLinear.Default with
     {
-      MaxEdges = _random.NextInt(3, 7),
-      MaxExtraDegree = _random.NextInt(2, 5),
-      MaxConditionPerRel = _random.NextInt(1, 5),
-      MaxConditionDistance = _random.NextInt(2, 5),
-      MaxSkipDistance = _random.NextInt(1, 4),
+      MaxEdges = _random.NextInt(MaxEdgesMin, MaxEdgesMaxExclusive),
+      MaxExtraDegree = _random.NextInt(MaxExtraDegreeMin, MaxExtraDegreeMaxExclusive),
+      MaxConditionPerRel = _random.NextInt(MaxConditionPerRelMin, MaxConditionPerRelMaxExclusive),
+      MaxConditionDistance = _random.NextInt(MaxConditionDistanceMin, MaxConditionDistanceMaxExclusive),
+      MaxSkipDistance = _random.NextInt(MaxSkipDistanceMin, MaxSkipDistanceMaxExclusive),
     };
   }
 }

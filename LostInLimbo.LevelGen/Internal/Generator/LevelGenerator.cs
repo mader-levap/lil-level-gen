@@ -28,6 +28,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator;
 /// </remarks>
 internal sealed class LevelGenerator
 {
+  #region State
+
   /// <summary>Kind of run. Mutated only between runs via <see cref="SetRunKind"/>.</summary>
   private EnRunKind _enRunKind;
   /// <summary>Configuration data for level generation.</summary>
@@ -76,6 +78,10 @@ internal sealed class LevelGenerator
   /// (see <see cref="GenerationStatus.Seed"/>).
   /// </summary>
   internal long Seed => _config.General.Seed;
+
+  #endregion
+
+  #region Lifecycle and run control
 
   /// <summary>
   /// Prepares the level generator. Assumes the config was already validated by the API layer
@@ -135,6 +141,10 @@ internal sealed class LevelGenerator
     }
   }
 
+  #endregion
+
+  #region Status publishing
+
   /// <summary>
   /// Publishes a <see cref="EnGenResult.Running"/> status with the overall completion of the
   /// given position in the run (see <see cref="GenerationProgress"/>).
@@ -192,6 +202,10 @@ internal sealed class LevelGenerator
       _statusStore.Publish(status, world);
     }
   }
+
+  #endregion
+
+  #region Execution
 
   /// <summary>
   /// Starts or resumes generation.
@@ -277,8 +291,6 @@ internal sealed class LevelGenerator
     return IsGenerationComplete() ? EnGenResult.Finished : EnGenResult.Paused;
   }
 
-  //
-
   /// <summary>
   /// <para>Main loop.</para>
   /// </summary>
@@ -294,6 +306,10 @@ internal sealed class LevelGenerator
     if (!RunMap(cancellationToken)) return;
     RunFinalization(cancellationToken);
   }
+
+  #endregion
+
+  #region Phases
 
   /// <summary>
   /// <para>Execute the prepass generator. This is considered a single step.</para>
@@ -457,7 +473,9 @@ internal sealed class LevelGenerator
     _world.Phase = EnPhase.Completed;
   }
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Moves the world from a finished phase to the next one and decides whether the run goes on.
@@ -507,4 +525,6 @@ internal sealed class LevelGenerator
     return _prepData ?? throw new InvalidOperationException(
       $"Phase {_world.Phase} requires prepass data, but the prepass has not run on this generator.");
   }
+
+  #endregion
 }

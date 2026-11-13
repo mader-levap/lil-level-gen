@@ -19,6 +19,50 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <summary>Salt for the graph resolver sub-seed; keeps this pass off other passes' streams.</summary>
   private const long SaltGraphResolver = 0x6366676772617068; // "cfggraph"
 
+  // Draw ranges below are [from, to); a "+ 1" turns an inclusive maximum into an exclusive bound.
+
+  /// <summary>Smallest drawn connectivity (inclusive): no extra relationships.</summary>
+  private const int MinConnectivity = 0;
+
+  /// <summary>Smallest drawn complexity (inclusive): no conditional passages; objectives still add challenge.</summary>
+  private const int MinComplexity = 0;
+
+  /// <summary>Difficulty levels per additional allowed conditional passage.</summary>
+  private const int ComplexityDifficultyDivisor = 2;
+
+  /// <summary>Smallest drawn amount of secret nodes (inclusive).</summary>
+  private const int MinSecretAmount = 0;
+
+  /// <summary>Divisor applied to <c>Difficulty + Size</c> to get the largest drawn amount of secret nodes.</summary>
+  private const int SecretAmountDivisor = 2;
+
+  /// <summary>Chance that a secret nests behind an earlier secret.</summary>
+  private const float ChanceSecretInSecret = 0.1f;
+
+  /// <summary>Chance that a secret gets separate entry passage and exit passage.</summary>
+  private const float ChanceTwoPassages = 0.05f;
+
+  /// <summary>Smallest drawn amount of mandatory goals (inclusive).</summary>
+  private const int MinGoalAmount = 1;
+
+  /// <summary>Difficulty levels per additional allowed mandatory goal.</summary>
+  private const int GoalAmountDifficultyDivisor = 2;
+
+  /// <summary>Smallest drawn amount of optional goals (inclusive).</summary>
+  private const int MinOptGoalAmount = 0;
+
+  /// <summary>Group count when <see cref="PropMain.ManyThemes"/> is off: a single theme.</summary>
+  private const int SingleThemeGroupCount = 1;
+
+  /// <summary>Smallest group count when <see cref="PropMain.ManyThemes"/> is on.</summary>
+  private const int MinManyThemesGroupCount = 2;
+
+  /// <summary>Numerator of the share of the graph size used as the largest group count.</summary>
+  private const int ManyThemesGroupShareNumerator = 2;
+
+  /// <summary>Denominator of the share of the graph size used as the largest group count.</summary>
+  private const int ManyThemesGroupShareDenominator = 3;
+
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain = propMain;
   /// <summary>Supporting data.</summary>
@@ -53,7 +97,7 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   private int ResolveConnectivity()
   {
     // Need to calc amount of extra relationships depending on difficulty and size.
-    int from = 0;
+    int from = MinConnectivity;
     int to = _propMain.Difficulty + _propData.Size;
     return _random.NextInt(from, to);
   }
@@ -65,8 +109,8 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   private int ResolveComplexity()
   {
     // Need to calc amount of conditional passages depending on difficulty and constrained by size.
-    int from = 0; // it is ok, we have other obstacles like objectives 
-    int to = Math.Min(_propData.Size, _propMain.Difficulty/2+1);
+    int from = MinComplexity;
+    int to = Math.Min(_propData.Size, _propMain.Difficulty / ComplexityDifficultyDivisor + 1);
     return _random.NextInt(from, to);
   }
 
@@ -122,14 +166,14 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <returns>Secrets options.</returns>
   private CnfProcRelSecretsOpt ResolveSecrets()
   {
-    int amountFrom = 0;
-    int amountTo = (_propMain.Difficulty+_propData.Size)/2 + 1;
+    int amountFrom = MinSecretAmount;
+    int amountTo = (_propMain.Difficulty + _propData.Size) / SecretAmountDivisor + 1;
 
     return CnfProcRelSecretsOpt.Default with
     {
       Amount = _random.NextInt(amountFrom, amountTo),
-      ChanceSecretInSecret = 0.1f,
-      ChanceTwoPassages = 0.05f,
+      ChanceSecretInSecret = ChanceSecretInSecret,
+      ChanceTwoPassages = ChanceTwoPassages,
     };
   }
 
@@ -139,13 +183,13 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <returns>Objectives options.</returns>
   private CnfProcNodeObjectivesOpt ResolveObjectives()
   {
-    int from = 1;
-    int to = _propMain.Difficulty/2+1;
+    int from = MinGoalAmount;
+    int to = _propMain.Difficulty / GoalAmountDifficultyDivisor + 1;
 
     return CnfProcNodeObjectivesOpt.Default with
     {
       GoalAmount = _random.NextInt(from, to),
-      OptGoalAmount = _random.NextInt(0, _propData.Size),
+      OptGoalAmount = _random.NextInt(MinOptGoalAmount, _propData.Size),
     };
   }
 
@@ -167,10 +211,13 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <returns>Style options.</returns>
   private CnfProcNodeStyleOpt ResolveStyle()
   {
-    int groupCount = 1;
-    if (_propMain.ManyThemes) {
-      int groupCountMax = Math.Max(2, _propData.Size*2/3+1);
-      groupCount = _random.NextInt(2, groupCountMax);
+    int groupCount = SingleThemeGroupCount;
+    if (_propMain.ManyThemes)
+    {
+      int groupCountMax = Math.Max(
+        MinManyThemesGroupCount,
+        _propData.Size * ManyThemesGroupShareNumerator / ManyThemesGroupShareDenominator + 1);
+      groupCount = _random.NextInt(MinManyThemesGroupCount, groupCountMax);
     }
 
     return CnfProcNodeStyleOpt.Default with

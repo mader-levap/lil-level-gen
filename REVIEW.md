@@ -64,7 +64,7 @@ The findings below are grouped by kind and given IDs (A = bugs, B = AGENTS.md ad
 ### C. Robustness / design
 
 - **C1. A shared RNG stream across sub-resolvers.** `GraphResolver` hands its `_random` to `BuilderSimpleResolver` / `BuilderLinearResolver`. One extra draw in a builder resolver shifts every later draw (proc opts) and silently changes generated levels. Use one salted sub-seed per resolver, as the generator passes already do.
-- **C2. `GraphResolver.PickGraphBuilder` depends on enum order** ("exclude first member"). Any new `EnGraphBuilder` member is picked automatically. Use an explicit array of eligible builders.
+- **C2. `GraphResolver.PickGraphBuilder` depends on enum order** ("exclude first member"). Any new `EnGraphBuilder` member is picked automatically. Use an explicit array of eligible builders. The same applies to `GraphBuilderSimple.PickScenario`, which casts `NextInt(ScenarioCount)` to `EnSkeletonScenario`: pick from an explicit `Scenarios` array instead (same draw, so output stays the same if the array keeps the enum order).
 - **C3. `EvalWeights`:**
   - It throws `IndexOutOfRangeException`, which is reserved for the runtime.
   - It does no null checks and does not validate that weights are positive. Zero or negative weights crash in `NextInt`, and `Sum()` can overflow.
@@ -128,17 +128,17 @@ Rules for every phase (from AGENTS.md):
 **Done when:** the new tests fail before the fixes and pass after them, and the whole suite is green.
 
 ### Phase 2: AGENTS.md adherence (B1–B5)
-- [ ] B1: make `PropData` `internal`.
-- [ ] B2: enable `<GenerateDocumentationFile>`, then fix all cref warnings and the public docs that point at internal types.
-- [ ] B3: replace the magic numbers with named constants.
-- [ ] B4: add `#region`s to the four long files.
-- [ ] B5: remove the `Api` dependency from `GraphValidator`.
+- [x] B1: make `PropData` `internal`.
+- [x] B2: enable `<GenerateDocumentationFile>`, then fix all cref warnings and the public docs that point at internal types.
+- [x] B3: replace the magic numbers with named constants.
+- [x] B4: add `#region`s to the four long files.
+- [x] B5: remove the `Api` dependency from `GraphValidator`.
 
 **Done when:** the build has no doc/cref warnings, the public API no longer contains `PropData`, and generated output is unchanged.
 
 ### Phase 3: Robustness (C1–C6)
 - [ ] C1: give each sub-resolver its own salted sub-seed. **This changes the generated config for the same text seed**, so review the seed-snapshot test diffs explicitly.
-- [ ] C2: pick from an explicit list of eligible graph builders.
+- [ ] C2: pick from explicit lists of eligible graph builders (`GraphResolver.PickGraphBuilder`) and skeleton scenarios (`GraphBuilderSimple.PickScenario`, which drops `ScenarioCount`).
 - [ ] C3: clean up `EvalWeights` (validation, exception types, generic `Pick<T>`).
 - [ ] C4: make `PrepData` immutable.
 - [ ] C5: add the missing `readonly` modifiers.

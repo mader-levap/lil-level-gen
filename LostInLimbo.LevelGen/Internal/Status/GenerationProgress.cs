@@ -1,11 +1,12 @@
 using System;
 using LostInLimbo.LevelGen.Data.Result.Stats;
+using LostInLimbo.LevelGen.Data.Status;
 
 namespace LostInLimbo.LevelGen.Internal.Status;
 
 /// <summary>
 /// Converts the position of a run (current phase + progress within that phase) into overall
-/// completion from 0.0 to 1.0, see <see cref="Data.Status.GenerationStatus.Completion"/>.
+/// completion from 0.0 to 1.0, see <see cref="GenerationStatus.Completion"/>.
 /// </summary>
 /// <remarks>
 /// <para>

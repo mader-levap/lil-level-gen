@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Data.Status;
@@ -61,6 +60,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 /// <param name="options">Validator options.</param>
 internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
 {
+  #region State
+
   /// <summary>Graph to verify.</summary>
   private LilGraph? _graph = graph;
   /// <summary>Validator options.</summary>
@@ -82,6 +83,10 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
   /// <summary>Structural neighbors of each node, built once from the edge list so
   /// <see cref="FloodStructural"/> is O(V+E) instead of O(V·E) per call.</summary>
   private Dictionary<Guid, List<Guid>>? _adjacency;
+
+  #endregion
+
+  #region Entry point
 
   /// <summary>
   /// Validates the given level graph for beatability.
@@ -113,6 +118,10 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
 
     return LilResult.Succeed(); // Success: All checks passed.
   }
+
+  #endregion
+
+  #region Checks
 
   /// <summary>
   /// Checks fundamentals.
@@ -449,8 +458,9 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     return null; // Success: every start reaches an exit and every exit is reachable.
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Helper functions.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Clears all per-call state, so a repeated <see cref="Validate"/> on the same instance
@@ -738,4 +748,6 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     }
     return true;
   }
+
+  #endregion
 }

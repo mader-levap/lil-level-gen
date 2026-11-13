@@ -39,8 +39,8 @@ internal sealed class MapGenerator(CnfLevelGeneration config, PrepData prepData,
   /// Each step sleeps for <c>PlaceholderSleep / PlaceholderSteps</c> milliseconds as an
   /// imitation of the work done in a single step. The sleep itself is a plain, uninterruptible
   /// <see cref="Thread.Sleep(int)"/>.
-  /// Completed steps are counted in <see cref="LilStats.Steps"/> of <see cref="_world"/>,
-  /// which survives pausing and resuming because the API keeps this generator instance alive.
+  /// Completed steps are counted in <see cref="Data.Result.Stats.LilStats.Steps"/> of <see cref="_world"/>,
+  /// which survives pausing and resuming because the owning <c>LevelGenerator</c> keeps its world alive.
   /// </para>
   /// </remarks>
   /// <returns>

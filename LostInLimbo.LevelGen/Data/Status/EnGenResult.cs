@@ -13,7 +13,7 @@ namespace LostInLimbo.LevelGen.Data.Status;
 /// </para>
 /// <para>
 /// Unlike <see cref="Error"/>, <see cref="ValidationError"/> exposes the world built up to the
-/// failing check (see <c>LevelGenerationSession.World</c>), so a consumer can inspect the graph
+/// failing check (see <see cref="Api.LevelGenSession.World"/>), so a consumer can inspect the graph
 /// and debug the issue; the reason itself is reported through <see cref="GenerationStatus.FailureReason"/>.
 /// </para>
 /// </remarks>

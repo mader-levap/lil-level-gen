@@ -1,7 +1,7 @@
 namespace LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 
 /// <summary>
-/// Options controlling <see cref="MapValidator"/>. Currently PLACEHOLDER.
+/// Options controlling map validation in the finalization phase. Currently PLACEHOLDER.
 /// </summary>
 public sealed record CnfValidMapOpt
 {

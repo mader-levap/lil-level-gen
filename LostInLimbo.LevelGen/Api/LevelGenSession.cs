@@ -25,6 +25,8 @@ namespace LostInLimbo.LevelGen.Api;
 /// </summary>
 public sealed class LevelGenSession
 {
+  #region State
+
   /// <summary>
   /// Single source of truth for generation status of this session. Owned here; generators
   /// receive it and publish their transitions from the worker thread.
@@ -59,8 +61,9 @@ public sealed class LevelGenSession
   /// <summary>Poll interval used while waiting for an in-flight run to reach a terminal state.</summary>
   private static readonly TimeSpan TerminalPollInterval = TimeSpan.FromMilliseconds(10);
 
-  // TEST SEAMS
-  //
+  #endregion
+
+  #region Test seams
   // Hooks used by tests to hold open otherwise unreachable interleaving windows. They are never
   // set in production (always <see langword="null"/>); tests set them before and clear them
   // after the act they synchronize, and their bodies must not call back into commands that take
@@ -88,7 +91,9 @@ public sealed class LevelGenSession
   /// </summary>
   internal volatile Action? WorldSampleTestHook;
 
-  // COMMANDS
+  #endregion
+
+  #region Commands
 
   /// <summary>
   /// Begin level generation based on the given config. Will discard all and any partial data,
@@ -398,7 +403,9 @@ public sealed class LevelGenSession
     }
   }
 
-  // DATA
+  #endregion
+
+  #region Data
 
   /// <summary>
   /// Get the status of generation.
@@ -449,7 +456,9 @@ public sealed class LevelGenSession
       : null;
   }
 
-  // OTHER
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Validates a generation config before its run is claimed, so a bad config cannot leave
@@ -542,4 +551,6 @@ public sealed class LevelGenSession
       return false;
     }
   }
+
+  #endregion
 }

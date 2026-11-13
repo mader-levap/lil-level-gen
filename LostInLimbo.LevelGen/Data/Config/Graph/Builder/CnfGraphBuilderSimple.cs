@@ -3,7 +3,7 @@ using System;
 namespace LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 
 /// <summary>
-/// <para>Configuration of <see cref="Internal.Generator.Graph.Builders.GraphBuilderSimple"/>: passage chokepoint chance and degree caps.</para>
+/// <para>Configuration of the Simple graph builder (<see cref="EnGraphBuilder.Simple"/>): passage chokepoint chance and degree caps.</para>
 /// </summary>
 public sealed record CnfGraphBuilderSimple
 {

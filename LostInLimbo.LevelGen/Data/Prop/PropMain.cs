@@ -15,7 +15,7 @@ namespace LostInLimbo.LevelGen.Data.Prop;
 /// configuration (within constraints defined by the properties).
 /// </para>
 /// <para>
-/// This is the root of the JSON configuration file. The shape maps one-to-one to JSON via <see cref="LevelGenerationSerializer"/>.
+/// This is the root of the JSON configuration file. The shape maps one-to-one to JSON via <see cref="Api.LevelGenSerializer"/>.
 /// </para>
 /// </remarks>
 public sealed record PropMain

@@ -26,6 +26,15 @@ internal sealed class ConfigGenerator
   /// </summary>
   internal const long SaltPropSeed = 0x70726F7073656564; // "propseed"
 
+  /// <summary>Smallest graph size config generation draws (inclusive).</summary>
+  private const int MinGraphSize = 2;
+
+  /// <summary>
+  /// Offset added to <see cref="PropMain.Difficulty"/> to get the exclusive upper bound of the
+  /// graph size draw: size is drawn from <c>[MinGraphSize, Difficulty + offset)</c>.
+  /// </summary>
+  private const int GraphSizeDifficultyOffset = 3;
+
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain;
   /// <summary>Supporting data.</summary>
@@ -117,8 +126,8 @@ internal sealed class ConfigGenerator
   /// <returns>Size of the graph.</returns>
   private int ResolveSize()
   {
-    int from = 2;
-    int to = _propMain.Difficulty + 3;
+    int from = MinGraphSize;
+    int to = _propMain.Difficulty + GraphSizeDifficultyOffset;
     return _random.NextInt(from, to);
   }
 

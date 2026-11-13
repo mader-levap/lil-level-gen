@@ -4,7 +4,7 @@ using LostInLimbo.LevelGen.Internal.Generator.Graph;
 namespace LostInLimbo.LevelGen.Internal.Generator.Map;
 
 /// <summary>
-/// Result of <see cref="MapGenerator.Execute"/>: the outcome of the run plus the reason of
+/// Result of <see cref="MapGenerator.ExecuteStep"/>: the outcome of the run plus the reason of
 /// a failed outcome.
 /// </summary>
 /// <param name="Outcome">What happened during the run; see <see cref="EnGenerationOutcome"/>.</param>

@@ -3,7 +3,7 @@ namespace LostInLimbo.LevelGen.Internal.Prop.Data;
 /// <summary>
 /// Internal data supporting config generation.
 /// </summary>
-public sealed record PropData
+internal sealed record PropData
 {
   /// <summary>Default seed.</summary>
   public const long DefaultSeed = 0L;

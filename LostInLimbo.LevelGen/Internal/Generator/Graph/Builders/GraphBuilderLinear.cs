@@ -48,6 +48,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <param name="cnfGraphBuilder">Configuration for graph builders.</param>
 internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGraphBuilder
 {
+  #region Configuration and constants
+
   /// <summary>Builder configuration; defaults to <see cref="CnfGraphBuilderLinear.Default"/>.</summary>
   private readonly CnfGraphBuilderLinear _config = cnfGraphBuilder.CnfLinear ?? CnfGraphBuilderLinear.Default;
 
@@ -72,6 +74,10 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   private const long SaltExitPoi = 0x65786974; // "exit"
   /// <summary>Salt for solution POI identifiers; one sub-channel per obstacle.</summary>
   private const long SaltSolutionPoi = 0x736F6C7574696F6E; // "solution"
+
+  #endregion
+
+  #region Build
 
   /// <inheritdoc/>
   protected override LilResult Build(CancellationToken cancellationToken)
@@ -109,9 +115,9 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
     return LilResult.Succeed();
   }
 
-  //
-  // Skeleton pass.
-  //
+  #endregion
+
+  #region Skeleton pass
 
   /// <summary>
   /// Creates all nodes in chain order with deterministic identifiers.
@@ -151,9 +157,9 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
       AddEdge(i, i + 1, nodeIds, degrees, SkeletonPassage);
   }
 
-  //
-  // POI pass.
-  //
+  #endregion
+
+  #region POI pass
 
   /// <summary>
   /// Places the start POI into the first node and the exit POI into the last node; both land
@@ -174,9 +180,9 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
     });
   }
 
-  //
-  // Extra relationship pass.
-  //
+  #endregion
+
+  #region Extra relationship pass
 
   /// <summary>
   /// Adds extra relationships on top of the skeleton until connectivity is spent or no
@@ -356,9 +362,9 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
     return IdDerivation.Derive(subSeed, SaltEdge);
   }
 
-  //
-  // Obstacle pass.
-  //
+  #endregion
+
+  #region Obstacle pass
 
   /// <summary>
   /// Obstacle pass: guards node entries with solution-locked passages until complexity is
@@ -489,4 +495,6 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
     var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltSolutionPoi, obstacleIndex);
     return IdDerivation.Derive(subSeed, SaltSolutionPoi);
   }
+
+  #endregion
 }
