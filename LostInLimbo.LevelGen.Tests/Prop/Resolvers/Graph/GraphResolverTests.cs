@@ -49,6 +49,63 @@ public sealed class GraphResolverTests
       Assert.Equal(1, config.ProcOpts.NodeObjectives.GoalAmount);
       Assert.Equal(0, config.ProcOpts.NodeObjectives.OptGoalAmount);
       Assert.Equal(EnGraphBuilder.Linear, config.GraphBuilder.Builder);
+      Assert.Equal(1, config.ProcOpts.RelSecrets.Amount);
+      Assert.Equal(1, config.ProcOpts.NodeStyle.GroupCount);
+    }
+
+    [Fact]
+    public void Execute_WithLargerGraphPickingSimple_MatchesPinnedValues()
+    {
+      // Act: Resolve a 12-node, many-themes configuration whose seed picks the Simple builder.
+      var config = CreateLargeResolver(44).Execute();
+
+      // Assert: Every drawn field matches the pinned reference, including the builder
+      // sub-config and the processor options drawn after it.
+      Assert.Equal(16, config.Connectivity);
+      Assert.Equal(2, config.Complexity);
+      Assert.Equal(EnGraphBuilder.Simple, config.GraphBuilder.Builder);
+      Assert.Equal(0.5926749f, config.GraphBuilder.CnfSimple!.ChokepointChance);
+      Assert.Equal(2, config.GraphBuilder.CnfSimple.MaxExtraDegree);
+      Assert.Equal(5, config.GraphBuilder.CnfSimple.MaxExtraDegreeStar);
+      AssertProcOpts(config, secretAmount: 4, goalAmount: 2, optGoalAmount: 4, groupCount: 6);
+    }
+
+    [Fact]
+    public void Execute_WithLargerGraphPickingLinear_MatchesPinnedValues()
+    {
+      // Act: Resolve a 12-node, many-themes configuration whose seed picks the Linear builder.
+      var config = CreateLargeResolver(45).Execute();
+
+      // Assert: Every drawn field matches the pinned reference, including the builder
+      // sub-config and the processor options drawn after it.
+      Assert.Equal(5, config.Connectivity);
+      Assert.Equal(1, config.Complexity);
+      Assert.Equal(EnGraphBuilder.Linear, config.GraphBuilder.Builder);
+      Assert.Equal(6, config.GraphBuilder.CnfLinear!.MaxEdges);
+      Assert.Equal(3, config.GraphBuilder.CnfLinear.MaxExtraDegree);
+      Assert.Equal(3, config.GraphBuilder.CnfLinear.MaxConditionPerRel);
+      Assert.Equal(4, config.GraphBuilder.CnfLinear.MaxConditionDistance);
+      Assert.Equal(2, config.GraphBuilder.CnfLinear.MaxSkipDistance);
+      AssertProcOpts(config, secretAmount: 1, goalAmount: 2, optGoalAmount: 11, groupCount: 6);
+    }
+
+    /// <summary>Creates a resolver over a 12-node graph at difficulty 7 with many themes.</summary>
+    private static GraphResolver CreateLargeResolver(long propSeed)
+    {
+      return new GraphResolver(
+        new PropMain { TextSeed = "mordor", Difficulty = 7, ManyThemes = true },
+        PropData.Default with { Seed = propSeed, Size = 12 });
+    }
+
+    /// <summary>Asserts the drawn processor options and the fixed secret chances.</summary>
+    private static void AssertProcOpts(CnfGraph config, int secretAmount, int goalAmount, int optGoalAmount, int groupCount)
+    {
+      Assert.Equal(secretAmount, config.ProcOpts.RelSecrets.Amount);
+      Assert.Equal(0.1f, config.ProcOpts.RelSecrets.ChanceSecretInSecret);
+      Assert.Equal(0.05f, config.ProcOpts.RelSecrets.ChanceTwoPassages);
+      Assert.Equal(goalAmount, config.ProcOpts.NodeObjectives.GoalAmount);
+      Assert.Equal(optGoalAmount, config.ProcOpts.NodeObjectives.OptGoalAmount);
+      Assert.Equal(groupCount, config.ProcOpts.NodeStyle.GroupCount);
     }
 
     [Fact]

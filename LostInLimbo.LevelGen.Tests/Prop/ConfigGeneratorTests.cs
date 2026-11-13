@@ -1,5 +1,6 @@
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Config.Style;
 using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop;
@@ -115,6 +116,14 @@ public sealed class ConfigGeneratorTests
       Assert.Equal(5, config.Graph.Connectivity);
       Assert.Equal(1, config.Graph.Complexity);
       Assert.Equal(EnGraphBuilder.Linear, config.Graph.GraphBuilder.Builder);
+      Assert.Equal(CnfGraphBuilderLinear.Default with
+      {
+        MaxEdges = 5, MaxExtraDegree = 2, MaxConditionPerRel = 2, MaxConditionDistance = 2, MaxSkipDistance = 1,
+      }, config.Graph.GraphBuilder.CnfLinear);
+      Assert.Equal(3, config.Graph.ProcOpts.RelSecrets.Amount);
+      Assert.Equal(1, config.Graph.ProcOpts.NodeObjectives.GoalAmount);
+      Assert.Equal(1, config.Graph.ProcOpts.NodeObjectives.OptGoalAmount);
+      Assert.Equal(1, config.Graph.ProcOpts.NodeStyle.GroupCount);
     }
 
     [Fact]
@@ -294,6 +303,11 @@ public sealed class ConfigGeneratorTests
       Assert.Equal(PinnedConnectivity, config.Graph.Connectivity);
       Assert.Equal(PinnedComplexity, config.Graph.Complexity);
       Assert.Equal(PinnedBuilder, config.Graph.GraphBuilder.Builder);
+      Assert.Equal(PinnedLinear, config.Graph.GraphBuilder.CnfLinear);
+      Assert.Equal(PinnedSecretAmount, config.Graph.ProcOpts.RelSecrets.Amount);
+      Assert.Equal(PinnedGoalAmount, config.Graph.ProcOpts.NodeObjectives.GoalAmount);
+      Assert.Equal(PinnedOptGoalAmount, config.Graph.ProcOpts.NodeObjectives.OptGoalAmount);
+      Assert.Equal(PinnedGroupCount, config.Graph.ProcOpts.NodeStyle.GroupCount);
     }
 
     /// <summary>Pinned world seed for text seed "mordor" (raw text-seed hash).</summary>
@@ -308,6 +322,19 @@ public sealed class ConfigGeneratorTests
     private const int PinnedComplexity = 1;
     /// <summary>Pinned graph builder for "mordor" at difficulty 3.</summary>
     private const EnGraphBuilder PinnedBuilder = EnGraphBuilder.Linear;
+    /// <summary>Pinned Linear builder options for "mordor" at difficulty 3.</summary>
+    private static readonly CnfGraphBuilderLinear PinnedLinear = CnfGraphBuilderLinear.Default with
+    {
+      MaxEdges = 6, MaxExtraDegree = 2, MaxConditionPerRel = 1, MaxConditionDistance = 2, MaxSkipDistance = 1,
+    };
+    /// <summary>Pinned secret amount for "mordor" at difficulty 3.</summary>
+    private const int PinnedSecretAmount = 1;
+    /// <summary>Pinned mandatory goal amount for "mordor" at difficulty 3.</summary>
+    private const int PinnedGoalAmount = 1;
+    /// <summary>Pinned optional goal amount for "mordor" at difficulty 3.</summary>
+    private const int PinnedOptGoalAmount = 0;
+    /// <summary>Pinned style group count for "mordor" at difficulty 3.</summary>
+    private const int PinnedGroupCount = 1;
 
     [Fact]
     public void Execute_WithoutTextSeed_UsesClockForGeneralSeed()
