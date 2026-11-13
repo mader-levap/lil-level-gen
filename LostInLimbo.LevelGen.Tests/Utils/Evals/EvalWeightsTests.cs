@@ -1,7 +1,7 @@
-using LostInLimbo.LevelGen.Internal.Utils.Eval;
+using LostInLimbo.LevelGen.Internal.Utils.Evals;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
-namespace LostInLimbo.LevelGen.Tests.Utils.Eval;
+namespace LostInLimbo.LevelGen.Tests.Utils.Evals;
 
 /// <summary>
 /// Tests <see cref="EvalWeights"/>: reproducibility, range compliance, and boundary behavior.

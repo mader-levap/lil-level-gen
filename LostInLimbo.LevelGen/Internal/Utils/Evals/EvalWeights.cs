@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
-namespace LostInLimbo.LevelGen.Internal.Utils.Eval;
+namespace LostInLimbo.LevelGen.Internal.Utils.Evals;
 
 /// <summary>
 /// Evaluates result using given values and their weights.

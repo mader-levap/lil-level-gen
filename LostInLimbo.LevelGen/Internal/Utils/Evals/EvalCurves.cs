@@ -1,7 +1,7 @@
 using System;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
-namespace LostInLimbo.LevelGen.Internal.Utils.Eval;
+namespace LostInLimbo.LevelGen.Internal.Utils.Evals;
 
 /// <summary>
 /// Evaluates result using given value range and curve representing probability of getting particular value at given point.
