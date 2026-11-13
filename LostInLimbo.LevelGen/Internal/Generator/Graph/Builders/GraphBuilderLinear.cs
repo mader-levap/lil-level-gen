@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Status;
+using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Result.Graph;
-using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
@@ -53,25 +53,18 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// <summary>Builder configuration; defaults to <see cref="CnfGraphBuilderLinear.Default"/>.</summary>
   private readonly CnfGraphBuilderLinear _config = cnfGraphBuilder.CnfLinear ?? CnfGraphBuilderLinear.Default;
 
-  /// <summary>
-  /// Initial relative size of every node; replaced by the <see cref="ProcNodeRelSize"/>
-  /// pass once the whole graph (relationships and POIs included) is known.
-  /// </summary>
-  private const int NodeRelSize = 1;
-
   /// <summary>Passage ordinal of the skeleton edge between a node pair.</summary>
   private const int SkeletonPassage = 0;
   /// <summary>Passage ordinal of the extra edge between a node pair; one per pair at most.</summary>
   private const int ExtraPassage = 1;
 
-  /// <summary>Salt for node identifiers.</summary>
-  private const long SaltNode = 0x6E6F6465; // "node"
-  /// <summary>Salt for edge identifiers.</summary>
-  private const long SaltEdge = 0x65646765; // "edge"
-  /// <summary>Salt for the start POI identifier.</summary>
-  private const long SaltStartPoi = 0x7374617274; // "start"
-  /// <summary>Salt for the exit POI identifier.</summary>
-  private const long SaltExitPoi = 0x65786974; // "exit"
+  /// <summary>
+  /// Largest node index and passage ordinal the 8-bit edge-id packing of
+  /// <see cref="DeriveEdgeId"/> can hold without collisions; covers <see cref="CnfGraph.MaxSize"/>.
+  /// Widening the packing would change every Linear edge identifier.
+  /// </summary>
+  private const int MaxPackedEdgeComponent = byte.MaxValue;
+
   /// <summary>Salt for solution POI identifiers; one sub-channel per obstacle.</summary>
   private const long SaltSolutionPoi = 0x736F6C7574696F6E; // "solution"
 
@@ -90,7 +83,7 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
     var extraInDegrees = new int[size];
     var extraPairs = new bool[size, size];
 
-    var nodeIds = CreateNodes(size);
+    var nodeIds = CreateNodes(size, _config.MaxEdges); // Index order is chain order.
     cancellationToken.ThrowIfCancellationRequested();
     CreateSkeleton(size, nodeIds, degrees);
     cancellationToken.ThrowIfCancellationRequested();
@@ -99,17 +92,7 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
     AddExtraRelationships(connectivity, nodeIds, degrees, extraOutDegrees, extraInDegrees, extraPairs);
     cancellationToken.ThrowIfCancellationRequested();
     AddObstacles(complexity, nodeIds);
-
-    // Finalization.
-    var procOpts = Config.Graph.ProcOpts;
-    cancellationToken.ThrowIfCancellationRequested();
-    new ProcRelSecrets(Graph, procOpts.RelSecrets, PrepData.SeedGraph).Execute();
-    cancellationToken.ThrowIfCancellationRequested();
-    new ProcNodeObjectives(Graph, procOpts.NodeObjectives, PrepData.SeedGraph).Execute();
-    cancellationToken.ThrowIfCancellationRequested();
-    new ProcNodeRelSize(Graph, procOpts.NodeRelSize, PrepData.SeedGraph).Execute();
-    cancellationToken.ThrowIfCancellationRequested();
-    new ProcNodeStyle(Graph, procOpts.NodeStyle, PrepData.SeedGraph).Execute();
+    RunFinalization(cancellationToken);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return LilResult.Succeed();
@@ -118,31 +101,6 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   #endregion
 
   #region Skeleton pass
-
-  /// <summary>
-  /// Creates all nodes in chain order with deterministic identifiers.
-  /// </summary>
-  /// <param name="size">Number of nodes to create.</param>
-  /// <returns>Node identifiers in chain order.</returns>
-  private Guid[] CreateNodes(int size)
-  {
-    var nodeIds = new Guid[size];
-    for (var index = 0; index < size; index++)
-    {
-      // Nested derivation: index is the sub-channel, so ids are distinct per index
-      // and never collide with role salts of other identifiers.
-      var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltNode, index);
-      var id = IdDerivation.Derive(subSeed, SaltNode);
-      nodeIds[index] = id;
-      Graph.Nodes.Add(new LilNode { 
-        Id = id,
-        RelSize = NodeRelSize,
-        MaxEdges = _config.MaxEdges,
-      });
-    }
-
-    return nodeIds;
-  }
 
   /// <summary>
   /// Creates the linear skeleton: every node links to its next node, from the first up to the
@@ -168,16 +126,7 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   private void PlacePois()
   {
     // Nodes were added in chain order by CreateNodes, so index lookup is exact.
-    Graph.Nodes[0].Pois.Add(new LilPoi
-    {
-      Id = IdDerivation.Derive(PrepData.SeedGraph, SaltStartPoi),
-      Type = EnPoiType.Start,
-    });
-    Graph.Nodes[^1].Pois.Add(new LilPoi
-    {
-      Id = IdDerivation.Derive(PrepData.SeedGraph, SaltExitPoi),
-      Type = EnPoiType.Exit,
-    });
+    PlaceStartAndExit(0, Graph.Nodes.Count - 1);
   }
 
   #endregion
@@ -350,13 +299,19 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// <param name="toIndex">Index of the other endpoint node.</param>
   /// <param name="passage">Passage ordinal for the node pair.</param>
   /// <returns>Identifier unique per node pair and passage. Not <see cref="Guid.Empty"/>.</returns>
+  /// <exception cref="InvalidOperationException">
+  /// A node index or the passage ordinal exceeds <see cref="MaxPackedEdgeComponent"/>, so the
+  /// packed sub-channel could collide; unreachable for validated configs.
+  /// </exception>
   private Guid DeriveEdgeId(int fromIndex, int toIndex, int passage)
   {
     var low = Math.Min(fromIndex, toIndex);
     var high = Math.Max(fromIndex, toIndex);
+    if (high > MaxPackedEdgeComponent || passage > MaxPackedEdgeComponent)
+      throw new InvalidOperationException(
+        $"Edge ({low}, {high}) passage {passage} exceeds the {MaxPackedEdgeComponent} limit of edge-id packing.");
 
-    // Pack pair and passage into one sub-channel; 8 bits each leave room for up to
-    // 255 nodes (CnfGraph.MaxSize is 100) and 255 passages per pair.
+    // Pack pair and passage into one sub-channel, 8 bits each.
     var pairAndPassage = (uint)low | ((long)(uint)high << 8) | ((long)(uint)passage << 16);
     var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltEdge, pairAndPassage);
     return IdDerivation.Derive(subSeed, SaltEdge);

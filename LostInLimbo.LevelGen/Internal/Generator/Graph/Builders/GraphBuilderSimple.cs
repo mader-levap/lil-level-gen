@@ -4,7 +4,6 @@ using System.Threading;
 using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Result.Graph;
-using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
@@ -38,6 +37,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <param name="cnfGraphBuilder">Configuration for graph builders.</param>
 internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGraphBuilder
 {
+  #region Configuration and constants
+
   /// <summary>Builder configuration; defaults to <see cref="CnfGraphBuilderSimple.Default"/>.</summary>
   private readonly CnfGraphBuilderSimple _config = cnfGraphBuilder.CnfSimple ?? CnfGraphBuilderSimple.Default;
 
@@ -52,20 +53,6 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
     [EnSkeletonScenario.Linear, EnSkeletonScenario.Star, EnSkeletonScenario.Mixed];
   /// <summary>Smallest linear prefix of the Mixed scenario (inclusive): at least one chain link.</summary>
   private const int MinMixedLinearCount = 2;
-  /// <summary>
-  /// Initial relative size of every node; replaced by the <see cref="ProcNodeRelSize"/>
-  /// pass once the whole graph (relationships and POIs included) is known.
-  /// </summary>
-  private const int NodeRelSize = 1;
-
-  /// <summary>Salt for node identifiers.</summary>
-  private const long SaltNode = 0x6E6F6465; // "node"
-  /// <summary>Salt for edge identifiers.</summary>
-  private const long SaltEdge = 0x65646765; // "edge"
-  /// <summary>Salt for the start POI identifier.</summary>
-  private const long SaltStartPoi = 0x7374617274; // "start"
-  /// <summary>Salt for the exit POI identifier.</summary>
-  private const long SaltExitPoi = 0x65786974; // "exit"
 
   /// <summary>
   /// Skeleton scenario for the minimal spanning structure. All three come from the same
@@ -84,6 +71,10 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
     Mixed,
   }
 
+  #endregion
+
+  #region Build
+
   /// <inheritdoc/>
   protected override LilResult Build(CancellationToken cancellationToken)
   {
@@ -92,59 +83,24 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
     var degrees = new int[size];
     var adjacency = new bool[size, size];
 
-    var nodeIds = CreateNodes(size);
+    // Neither cap alone bounds total degree: the skeleton stays within MaxExtraDegreeStar,
+    // extras fill nodes up to MaxExtraDegree. The hard cap is whichever is larger.
+    var nodeIds = CreateNodes(size, Math.Max(_config.MaxExtraDegreeStar, _config.MaxExtraDegree));
     cancellationToken.ThrowIfCancellationRequested();
     CreateSkeleton(size, nodeIds, degrees, adjacency);
     cancellationToken.ThrowIfCancellationRequested();
     PlacePois();
     cancellationToken.ThrowIfCancellationRequested();
     AddExtraRelationships(connectivity, degrees, adjacency, nodeIds);
-
-    // Finalization.
-    var procOpts = Config.Graph.ProcOpts;
-    cancellationToken.ThrowIfCancellationRequested();
-    new ProcRelSecrets(Graph, procOpts.RelSecrets, PrepData.SeedGraph).Execute();
-    cancellationToken.ThrowIfCancellationRequested();
-    new ProcNodeObjectives(Graph, procOpts.NodeObjectives, PrepData.SeedGraph).Execute();
-    cancellationToken.ThrowIfCancellationRequested();
-    new ProcNodeRelSize(Graph, procOpts.NodeRelSize, PrepData.SeedGraph).Execute();
-    cancellationToken.ThrowIfCancellationRequested();
-    new ProcNodeStyle(Graph, procOpts.NodeStyle, PrepData.SeedGraph).Execute();
+    RunFinalization(cancellationToken);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return LilResult.Succeed();
   }
 
-  //
-  // Skeleton pass.
-  //
+  #endregion
 
-  /// <summary>
-  /// Creates all nodes in index order with deterministic identifiers.
-  /// </summary>
-  /// <param name="size">Number of nodes to create.</param>
-  /// <returns>Node identifiers in index order.</returns>
-  private Guid[] CreateNodes(int size)
-  {
-    var nodeIds = new Guid[size];
-    for (var index = 0; index < size; index++)
-    {
-      // Nested derivation: index is the sub-channel, so ids are distinct per index
-      // and never collide with role salts of other identifiers.
-      var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltNode, index);
-      var id = IdDerivation.Derive(subSeed, SaltNode);
-      nodeIds[index] = id;
-      Graph.Nodes.Add(new LilNode {
-        Id = id,
-        RelSize = NodeRelSize,
-        // Neither cap alone bounds total degree: the skeleton stays within MaxExtraDegreeStar,
-        // extras fill nodes up to MaxExtraDegree. The hard cap is whichever is larger.
-        MaxEdges = Math.Max(_config.MaxExtraDegreeStar, _config.MaxExtraDegree),
-      });
-    }
-
-    return nodeIds;
-  }
+  #region Skeleton pass
 
   /// <summary>
   /// Creates the minimal connected skeleton: a chain over a linear prefix of nodes, with
@@ -226,7 +182,7 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// <param name="degrees">Per-node relationship count.</param>
   /// <returns>Index of the chosen central node.</returns>
   /// <exception cref="InvalidOperationException">
-   /// No eligible node remains; unreachable as long as <see cref="CnfGraphBuilderSimple.MaxExtraDegreeStar"/> is at least two.
+  /// No eligible node remains; unreachable as long as <see cref="CnfGraphBuilderSimple.MaxExtraDegreeStar"/> is at least two.
   /// </exception>
   private int PickNextCentral(int[] degrees)
   {
@@ -244,12 +200,13 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
     return eligible[Random.NextInt(eligible.Count)];
   }
 
-  //
-  // POI pass.
-  //
+  #endregion
+
+  #region POI pass
 
   /// <summary>
   /// Places the start and exit POIs into two random nodes; both may be the same node.
+  /// Draws the start index first, then the exit index.
   /// </summary>
   private void PlacePois()
   {
@@ -257,21 +214,12 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
     var exitIndex = Random.NextInt(Graph.Nodes.Count);
 
     // Nodes were added in index order by CreateNodes, so index lookup is exact.
-    Graph.Nodes[startIndex].Pois.Add(new LilPoi
-    {
-      Id = IdDerivation.Derive(PrepData.SeedGraph, SaltStartPoi),
-      Type = EnPoiType.Start,
-    });
-    Graph.Nodes[exitIndex].Pois.Add(new LilPoi
-    {
-      Id = IdDerivation.Derive(PrepData.SeedGraph, SaltExitPoi),
-      Type = EnPoiType.Exit,
-    });
+    PlaceStartAndExit(startIndex, exitIndex);
   }
 
-  //
-  // Extra relationship pass.
-  //
+  #endregion
+
+  #region Extra relationship pass
 
   /// <summary>
   /// Adds random extra relationships on top of the skeleton until connectivity is spent or
@@ -358,4 +306,6 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
     var subSeed = SeedDerivation.Derive(PrepData.SeedGraph, SaltEdge, ((long)low << 32) | (uint)high);
     return IdDerivation.Derive(subSeed, SaltEdge);
   }
+
+  #endregion
 }

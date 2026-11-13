@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
@@ -107,7 +107,7 @@ internal sealed class ProcNodeRelSize
     var (minPois, maxPois) = GetPoiRange();
 
     // Visit in Id order so insertion order cannot influence which draws a node receives.
-    var order = BuildVisitOrder();
+    var order = GraphIndex.NodeVisitOrder(_graph);
     var weights = new float[_stepValues.Length];
     foreach (var index in order)
     {
@@ -132,20 +132,11 @@ internal sealed class ProcNodeRelSize
   /// <exception cref="ArgumentException">Two nodes share an identifier.</exception>
   private int[] GetDegrees()
   {
-    var indexById = new Dictionary<Guid, int>(_graph.Nodes.Count);
-    for (var i = 0; i < _graph.Nodes.Count; i++)
-    {
-      indexById.Add(_graph.Nodes[i].Id, i);
-    }
-
+    var indexById = GraphIndex.IndexNodesById(_graph);
     var degrees = new int[_graph.Nodes.Count];
     foreach (var edge in _graph.Edges)
     {
-      if (!indexById.TryGetValue(edge.From, out var from))
-        throw new InvalidOperationException($"Edge {edge.Id} references unknown node {edge.From}.");
-      if (!indexById.TryGetValue(edge.To, out var to))
-        throw new InvalidOperationException($"Edge {edge.Id} references unknown node {edge.To}.");
-
+      var (from, to) = GraphIndex.ResolveEndpoints(indexById, edge);
       degrees[from]++;
       degrees[to]++;
     }
@@ -154,27 +145,11 @@ internal sealed class ProcNodeRelSize
   }
 
   /// <summary>
-  /// Produces the node indices in ascending Id order.
-  /// </summary>
-  /// <returns>Node indices sorted by <see cref="LilNode.Id"/>.</returns>
-  private List<int> BuildVisitOrder()
-  {
-    var order = new List<int>(_graph.Nodes.Count);
-    for (var i = 0; i < _graph.Nodes.Count; i++)
-    {
-      order.Add(i);
-    }
-
-    order.Sort((left, right) => _graph.Nodes[left].Id.CompareTo(_graph.Nodes[right].Id));
-    return order;
-  }
-
-  /// <summary>
   /// Finds the smallest and largest value of a set of counts.
   /// </summary>
   /// <param name="values">Values to range over; must not be empty.</param>
   /// <returns>The minimum and maximum value.</returns>
-  private (int Min, int Max) GetRange(int[] values)
+  private static (int Min, int Max) GetRange(int[] values)
   {
     var min = values[0];
     var max = values[0];
@@ -212,7 +187,7 @@ internal sealed class ProcNodeRelSize
   /// <param name="min">Smallest count in the graph.</param>
   /// <param name="max">Largest count in the graph.</param>
   /// <returns>Normalized value, or 0 when all nodes share the same count - no distinction, no bias.</returns>
-  private float Normalize(int value, int min, int max)
+  private static float Normalize(int value, int min, int max)
   {
     if (max <= min) return 0f;
     return (value - min) / (float)(max - min);

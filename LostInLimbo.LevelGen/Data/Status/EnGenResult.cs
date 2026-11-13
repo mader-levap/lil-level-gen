@@ -29,7 +29,7 @@ public enum EnGenResult
   Finished,
   /// <summary>
   /// Generation failed on validation. Graph or graph and map data is available, though it may be
-  /// incomplete, inconsistent or errorenous. For debugging; see
+  /// incomplete, inconsistent or erroneous. For debugging; see
   /// <see cref="GenerationStatus.FailureReason"/> for the failing check.
   /// </summary>
   ValidationError,

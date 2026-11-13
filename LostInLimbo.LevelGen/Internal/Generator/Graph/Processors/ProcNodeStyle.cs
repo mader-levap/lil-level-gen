@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
@@ -90,7 +91,7 @@ internal sealed class ProcNodeStyle
     var groupCount = Math.Min(_options.GroupCount, nodeCount);
 
     var adjacency = BuildAdjacency();
-    var idOrder = BuildVisitOrder();
+    var idOrder = GraphIndex.NodeVisitOrder(_graph);
     var names = BuildGroupNames(groupCount);
     var capacity = SampleGroupCounts(nodeCount, groupCount);
     var groupOf = new string?[nodeCount];
@@ -258,7 +259,7 @@ internal sealed class ProcNodeStyle
   /// </summary>
   /// <param name="edge">Relationship to check.</param>
   /// <returns>True for secret, one-way or conditional relationships.</returns>
-  private bool IsRestricted(LilEdge edge)
+  private static bool IsRestricted(LilEdge edge)
   {
     return edge.Secret
         || edge.Direction == EnPassageDirection.OneWay
@@ -316,12 +317,7 @@ internal sealed class ProcNodeStyle
   /// <exception cref="ArgumentException">Two nodes share an identifier.</exception>
   private List<(int Target, int EdgeIndex)>[] BuildAdjacency()
   {
-    var indexById = new Dictionary<Guid, int>(_graph.Nodes.Count);
-    for (var i = 0; i < _graph.Nodes.Count; i++)
-    {
-      indexById.Add(_graph.Nodes[i].Id, i);
-    }
-
+    var indexById = GraphIndex.IndexNodesById(_graph);
     var adjacency = new List<(int, int)>[_graph.Nodes.Count];
     for (var i = 0; i < adjacency.Length; i++)
     {
@@ -329,22 +325,10 @@ internal sealed class ProcNodeStyle
     }
 
     // Visit edges in Id order so every adjacency list has a stable order.
-    var edgeOrder = new List<int>(_graph.Edges.Count);
-    for (var i = 0; i < _graph.Edges.Count; i++)
-    {
-      edgeOrder.Add(i);
-    }
-
-    edgeOrder.Sort((left, right) => _graph.Edges[left].Id.CompareTo(_graph.Edges[right].Id));
-
-    foreach (var edgeIndex in edgeOrder)
+    foreach (var edgeIndex in GraphIndex.EdgeVisitOrder(_graph))
     {
       var edge = _graph.Edges[edgeIndex];
-      if (!indexById.TryGetValue(edge.From, out var from))
-        throw new InvalidOperationException($"Edge {edge.Id} references unknown node {edge.From}.");
-      if (!indexById.TryGetValue(edge.To, out var to))
-        throw new InvalidOperationException($"Edge {edge.Id} references unknown node {edge.To}.");
-
+      var (from, to) = GraphIndex.ResolveEndpoints(indexById, edge);
       if (from == to) continue;
 
       adjacency[from].Add((to, edgeIndex));
@@ -355,22 +339,6 @@ internal sealed class ProcNodeStyle
     }
 
     return adjacency;
-  }
-
-  /// <summary>
-  /// Produces the node indices in ascending Id order.
-  /// </summary>
-  /// <returns>Node indices sorted by <see cref="LilNode.Id"/>.</returns>
-  private List<int> BuildVisitOrder()
-  {
-    var order = new List<int>(_graph.Nodes.Count);
-    for (var i = 0; i < _graph.Nodes.Count; i++)
-    {
-      order.Add(i);
-    }
-
-    order.Sort((left, right) => _graph.Nodes[left].Id.CompareTo(_graph.Nodes[right].Id));
-    return order;
   }
 
   /// <summary>

@@ -130,7 +130,8 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   private CnfGraphBuilder ResolveGraphBuilder()
   {
     EnGraphBuilder enGraphBuilder = PickGraphBuilder();
-    return new CnfGraphBuilder {
+    return new CnfGraphBuilder
+    {
       Builder = enGraphBuilder,
       CnfSimple = enGraphBuilder == EnGraphBuilder.Simple ?
         new BuilderSimpleResolver(_propMain, _propData).Execute() : null,
@@ -156,7 +157,8 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <returns>Processor options.</returns>
   private CnfProcOpt ResolveProcOpts()
   {
-    return new CnfProcOpt {
+    return new CnfProcOpt
+    {
       RelSecrets = ResolveSecrets(),
       NodeObjectives = ResolveObjectives(),
       NodeRelSize = ResolveRelSize(),

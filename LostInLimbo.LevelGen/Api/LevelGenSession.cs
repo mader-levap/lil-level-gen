@@ -35,10 +35,10 @@ public sealed class LevelGenSession
 
   /// <summary>
   /// Generator instance owned by the current or last run. Every read and write holds
-  /// <see cref="_runGate"/>; volatile so the pairing with the status store's snapshots
-  /// stays safe against out-of-thin-air staleness on weak memory models.
+  /// <see cref="_runGate"/>, which also provides the memory barriers, so the field needs no
+  /// <see langword="volatile"/>. The worker thread never reads it; it receives its generator directly.
   /// </summary>
-  private volatile LevelGenerator? _generator;
+  private LevelGenerator? _generator;
 
   /// <summary>
   /// Serializes the claim + install of a run's state and its replacement/disposal against

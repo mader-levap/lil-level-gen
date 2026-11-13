@@ -280,7 +280,7 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
   {
     var collectedPois = new HashSet<Guid>();
 
-    foreach (var nodeId in _startNodeIds!)
+    foreach (var nodeId in _startNodeIds)
       FloodNode(_flooded, collectedPois, nodeId);
 
     var changed = true;
@@ -433,7 +433,8 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     // Every exit must be reachable by at least one start.
     foreach (var exitId in _exitNodeIds)
     {
-      if (!_flooded.Contains(exitId)) {
+      if (!_flooded.Contains(exitId))
+      {
         if (_exitNodeIds.Count == 1) return LilResult.Fail("Exit POI is not reachable from start POI.");
         return LilResult.Fail("At least one exit POI is not reachable from any start POI.");
       }
@@ -447,7 +448,8 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     FloodBackwardsFromExits(canReachExit);
     foreach (var startId in _startNodeIds)
     {
-      if (!canReachExit.Contains(startId)) {
+      if (!canReachExit.Contains(startId))
+      {
         if (_startNodeIds.Count == 1) return LilResult.Fail("Exit POI is not reachable from start POI.");
         return LilResult.Fail("Exit POI is not reachable from at least one start POI.");
       }

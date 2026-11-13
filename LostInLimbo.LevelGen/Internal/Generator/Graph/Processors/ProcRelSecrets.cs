@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
@@ -121,7 +122,7 @@ internal sealed class ProcRelSecrets
 
     // Host candidates are the nodes present on entry, in Id order; secrets created by this
     // pass never become ordinary hosts - nesting only happens through the secret roll.
-    var hosts = BuildVisitOrder();
+    var hosts = GraphIndex.NodeVisitOrder(_graph);
     var degrees = BuildDegrees();
     var secrets = new List<LilNode>(_options.Amount);
 
@@ -147,7 +148,8 @@ internal sealed class ProcRelSecrets
         else exitId = FindExitNode(parent.Id, hosts, degrees, ignoreConditionals);
       }
 
-      _graph.Nodes.Add(new LilNode {
+      _graph.Nodes.Add(new LilNode
+      {
         Id = nodeId,
         RelSize = NodeRelSize,
         MaxEdges = _options.MaxEdges,
@@ -399,22 +401,6 @@ internal sealed class ProcRelSecrets
     }
 
     return degrees;
-  }
-
-  /// <summary>
-  /// Produces the node indices in ascending Id order.
-  /// </summary>
-  /// <returns>Node indices sorted by <see cref="LilNode.Id"/>.</returns>
-  private List<int> BuildVisitOrder()
-  {
-    var order = new List<int>(_graph.Nodes.Count);
-    for (var i = 0; i < _graph.Nodes.Count; i++)
-    {
-      order.Add(i);
-    }
-
-    order.Sort((left, right) => _graph.Nodes[left].Id.CompareTo(_graph.Nodes[right].Id));
-    return order;
   }
 
   /// <summary>

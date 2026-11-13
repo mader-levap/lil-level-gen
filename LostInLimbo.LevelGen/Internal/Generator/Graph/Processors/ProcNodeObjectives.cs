@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
@@ -142,7 +143,7 @@ internal sealed class ProcNodeObjectives
   private List<int> BuildCandidateIndices(bool allowSecret)
   {
     var candidates = new List<int>(_graph.Nodes.Count);
-    foreach (var index in BuildVisitOrder())
+    foreach (var index in GraphIndex.NodeVisitOrder(_graph))
     {
       var node = _graph.Nodes[index];
       if (!allowSecret && node.Secret) continue;
@@ -168,22 +169,6 @@ internal sealed class ProcNodeObjectives
     }
 
     return false;
-  }
-
-  /// <summary>
-  /// Produces the node indices in ascending Id order.
-  /// </summary>
-  /// <returns>Node indices sorted by <see cref="LilNode.Id"/>.</returns>
-  private List<int> BuildVisitOrder()
-  {
-    var order = new List<int>(_graph.Nodes.Count);
-    for (var i = 0; i < _graph.Nodes.Count; i++)
-    {
-      order.Add(i);
-    }
-
-    order.Sort((left, right) => _graph.Nodes[left].Id.CompareTo(_graph.Nodes[right].Id));
-    return order;
   }
 
   /// <summary>

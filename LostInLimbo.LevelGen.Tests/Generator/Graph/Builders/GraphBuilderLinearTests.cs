@@ -668,6 +668,33 @@ public sealed class GraphBuilderLinearTests
       Assert.DoesNotContain(poiIds[0], nodeIds);
       Assert.DoesNotContain(poiIds[1], nodeIds);
     }
+
+    [Fact]
+    public void Build_WithMaxSize_ProducesDistinctEdgeIdentifiers()
+    {
+      // Act: Build the largest allowed chain with plenty of extra relationships.
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      {
+        Size = CnfGraph.MaxSize,
+        Connectivity = CnfGraph.MaxSize,
+      });
+
+      // Assert: The packed edge-id sub-channel stays collision-free at the size cap.
+      Assert.True(result.Success);
+      Assert.Equal(graph.Edges.Count, graph.Edges.Select(edge => edge.Id).Distinct().Count());
+    }
+
+    [Fact]
+    public void Build_WithSizeBeyondEdgeIdPacking_ThrowsInvalidOperationException()
+    {
+      // Arrange: A size past the 8-bit node-index packing of edge identifiers. Config
+      // validation rejects it in production; the test helper skips validation on purpose.
+      const int size = 257;
+
+      // Act/Assert: The builder refuses to derive colliding edge identifiers.
+      Assert.Throws<InvalidOperationException>(
+        () => GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph { Size = size }));
+    }
   }
 
   /// <summary>Tests for beatability of the produced graphs.</summary>

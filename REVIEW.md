@@ -147,9 +147,9 @@ Rules for every phase (from AGENTS.md):
 **Done when:** the suite is green and the only output change is the intended one from C1.
 
 ### Phase 4: Refactors and cleanup (C7–C9)
-- [ ] C7: extract a shared graph-index helper (visit order, index-by-id, degrees) and move the shared builder steps into `AGraphBuilder`. The RNG draw order must not change.
-- [ ] C8: fix the stale and inconsistent comments, plus the 8-bit edge-ID packing guard.
-- [ ] C9: style fixes.
+- [x] C7: extract a shared graph-index helper (visit order, index-by-id, degrees) and move the shared builder steps into `AGraphBuilder`. The RNG draw order must not change.
+- [x] C8: fix the stale and inconsistent comments, plus the 8-bit edge-ID packing guard.
+- [x] C9: style fixes.
 
 **Done when:** the determinism tests show identical generated graphs before and after, and the suite is green.
 

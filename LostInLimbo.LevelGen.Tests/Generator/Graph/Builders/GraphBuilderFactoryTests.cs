@@ -38,6 +38,6 @@ public sealed class GraphBuilderFactoryTests
       () => GraphBuilderFactory.Create(CnfGraphBuilder.Default with { Builder = (EnGraphBuilder)99}));
 
     // Assert: Threw exception with correct data.
-    Assert.Equal("Builder", exception.ParamName);
+    Assert.Equal("cnfGraphBuilder", exception.ParamName);
   }
 }

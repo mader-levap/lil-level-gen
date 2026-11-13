@@ -61,7 +61,7 @@ public static class LevelGenSerializer
   /// <returns>The deserialized, validated configuration. Properties missing from the JSON keep their defaults.</returns>
   /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
   /// <exception cref="ArgumentException">
-  /// The JSON is empty, malformed, describes a newer <c>ConfigVersion</c> than this library
+  /// The JSON is empty, malformed, describes a <c>ConfigVersion</c> other than the one this library
   /// supports, or violates configuration invariants.
   /// </exception>
   public static CnfLevelGeneration DeserializeConfig(string json)
@@ -125,7 +125,7 @@ public static class LevelGenSerializer
   /// <returns>The deserialized, validated properties dataset. Properties missing from the JSON keep their defaults.</returns>
   /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
   /// <exception cref="ArgumentException">
-  /// The JSON is empty, malformed, describes a newer <c>ConfigVersion</c> than this library
+  /// The JSON is empty, malformed, describes a <c>ConfigVersion</c> other than the one this library
   /// supports, or violates properties dataset invariants.
   /// </exception>
   public static PropMain DeserializeProperties(string json)

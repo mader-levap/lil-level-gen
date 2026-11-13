@@ -31,7 +31,7 @@ internal static class GraphBuilderFactory
       EnGraphBuilder.OneNode => new GraphBuilderOneNode(),
       EnGraphBuilder.Simple => new GraphBuilderSimple(cnfGraphBuilder),
       EnGraphBuilder.Linear => new GraphBuilderLinear(cnfGraphBuilder),
-      _ => throw new ArgumentOutOfRangeException(nameof(cnfGraphBuilder.Builder), cnfGraphBuilder.Builder, "Unknown graph builder."),
+      _ => throw new ArgumentOutOfRangeException(nameof(cnfGraphBuilder), cnfGraphBuilder.Builder, $"Unknown graph builder {cnfGraphBuilder.Builder}."),
     };
   }
 }

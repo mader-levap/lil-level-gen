@@ -35,7 +35,7 @@ internal sealed class LevelGenerator
   /// <summary>Configuration data for level generation.</summary>
   private readonly CnfLevelGeneration _config;
   /// <summary>Preparatory data based on config.</summary>
-  private PrepData? _prepData = null;
+  private PrepData? _prepData;
   /// <summary>Shared, thread-safe status sink owned by the API layer.</summary>
   private readonly GenerationStatusStore _statusStore;
 
@@ -168,7 +168,7 @@ internal sealed class LevelGenerator
   /// pause precedence and consuming any pending pause request.
   /// </summary>
   /// <remarks>
-  /// Must be called while holding <see cref="_pauseGate"/> semantics (this method takes it):
+  /// Takes <see cref="_pauseGate"/> itself, so callers must not hold it:
   /// the pause flag is rewritten and cleared together with the publish, so a request accepted
   /// by <see cref="TryRequestPause"/> always belongs to the run that publishes next, and no
   /// stale pause leaks into a later run. Paused, finished and validation-failed results carry
@@ -465,7 +465,8 @@ internal sealed class LevelGenerator
     cancellationToken.ThrowIfCancellationRequested();
 
     LilResult mapValidationResult = new MapValidator(_world.Map, _config.Map.ValidatorOpts).Validate();
-    if (!mapValidationResult.Success) {
+    if (!mapValidationResult.Success)
+    {
       _validationFailureReason = mapValidationResult.FailureReason;
       return; // Still on Finalization phase.
     }

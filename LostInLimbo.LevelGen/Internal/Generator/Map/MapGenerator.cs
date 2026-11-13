@@ -11,9 +11,6 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Map;
 /// <remarks>
 /// <para>Currently PLACEHOLDER.</para>
 /// </remarks>
-/// <remarks>
-/// Prepares the map generator.
-/// </remarks>
 /// <param name="config">Configuration data for level generation. Must not be <see langword="null"/> and must be valid.</param>
 /// <param name="prepData">Preparatory data based on config.</param>
 /// <param name="world">World to modify.</param>

@@ -97,4 +97,16 @@ public sealed class LilPointTests
     Assert.NotEqual(point1, point2);
     Assert.True(point1 != point2);
   }
+
+  [Fact]
+  public void Move_WithUndefinedDimension_ThrowsArgumentOutOfRangeExceptionNamingParameter()
+  {
+    // Arrange: Point and a value outside the EnDimension members.
+    var point = new LilPoint(1, 2, 3);
+    const EnDimension undefined = (EnDimension)99;
+
+    // Act/Assert: The undefined dimension is rejected naming the parameter, not the type.
+    var exception = Assert.Throws<ArgumentOutOfRangeException>(() => point.Move(undefined, 1));
+    Assert.Equal("dimension", exception.ParamName);
+  }
 }
