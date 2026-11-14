@@ -92,6 +92,26 @@ public sealed record CnfProcObstaclePlacerOpt
   /// </summary>
   public float ChanceStack { get; init; } = 0.2f;
 
+  /// <summary>
+  /// Main pass: limit of stacking over the whole graph. With <c>locked</c> the number of
+  /// passages carrying a condition and <c>extra</c> the number of conditions beyond the first
+  /// on them, an obstacle that stacks is only placed while
+  /// <c>extra &lt;= FreeStackedConditions + MaxStackLoad * locked</c> still holds afterwards.
+  /// When only stacking is left and the limit forbids it, the main pass ends early and the
+  /// rest of its Complexity is not used by it.
+  /// <para>Must be a finite value of at least 0; 0 leaves only <see cref="FreeStackedConditions"/>,
+  /// a large value switches the limit off.</para>
+  /// </summary>
+  public float MaxStackLoad { get; init; } = 0.25f;
+
+  /// <summary>
+  /// Main pass: number of stacked conditions (conditions beyond the first on a passage) that
+  /// are always allowed, whatever <see cref="MaxStackLoad"/> says. Keeps stacking possible on
+  /// tiny graphs, where a few locked passages are all there is.
+  /// <para>Must not be negative.</para>
+  /// </summary>
+  public int FreeStackedConditions { get; init; } = 2;
+
   // Bypasses.
 
   /// <summary>
@@ -124,6 +144,11 @@ public sealed record CnfProcObstaclePlacerOpt
       throw new ArgumentOutOfRangeException(nameof(MaxEdgesPerObstacle), MaxEdgesPerObstacle, "MaxEdgesPerObstacle must be at least 1.");
     if (SmallComplexityMax < 0)
       throw new ArgumentOutOfRangeException(nameof(SmallComplexityMax), SmallComplexityMax, "SmallComplexityMax must not be negative.");
+
+    if (FreeStackedConditions < 0)
+      throw new ArgumentOutOfRangeException(nameof(FreeStackedConditions), FreeStackedConditions, "FreeStackedConditions must not be negative.");
+    if (!float.IsFinite(MaxStackLoad) || MaxStackLoad < 0f)
+      throw new ArgumentOutOfRangeException(nameof(MaxStackLoad), MaxStackLoad, "MaxStackLoad must be a finite value of at least 0.");
 
     ValidateChance(MainShare, nameof(MainShare));
     ValidateChance(ChanceReserveSide, nameof(ChanceReserveSide));

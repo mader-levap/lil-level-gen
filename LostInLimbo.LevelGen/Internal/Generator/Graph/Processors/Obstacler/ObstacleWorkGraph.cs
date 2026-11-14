@@ -304,6 +304,27 @@ internal sealed class ObstacleWorkGraph
     return costs;
   }
 
+  /// <summary>
+  /// Counts how loaded the passages are with conditions; the measure behind
+  /// <see cref="CnfProcObstaclePlacerOpt.MaxStackLoad"/>. Every passage counts, secret and
+  /// one-way ones included, and so do conditions that existed before the placer ran.
+  /// </summary>
+  /// <param name="locked">Number of passages carrying at least one condition.</param>
+  /// <param name="extra">Number of stacked conditions: conditions beyond the first, summed over all passages.</param>
+  public void CountConditionLoad(out int locked, out int extra)
+  {
+    locked = 0;
+    extra = 0;
+    foreach (var passage in _edges)
+    {
+      var count = passage.Conditions.Count;
+      if (count == 0) continue;
+
+      locked++;
+      extra += count - 1;
+    }
+  }
+
   #endregion
 
   #region Sides of a cut

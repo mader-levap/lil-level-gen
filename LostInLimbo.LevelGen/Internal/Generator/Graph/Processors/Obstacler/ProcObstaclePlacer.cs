@@ -32,7 +32,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// exit; skipped when both share a node. Secret passages that would bypass an obstacle are
 /// locked with it, except for rare deliberate bypasses
 /// (<see cref="CnfProcObstaclePlacerOpt.ChanceSecretBypass"/>,
-/// <see cref="CnfProcObstaclePlacerOpt.ChanceBypass"/>).</item>
+/// <see cref="CnfProcObstaclePlacerOpt.ChanceBypass"/>). Ends early when only stacking is
+/// left and <see cref="CnfProcObstaclePlacerOpt.MaxStackLoad"/> forbids it.</item>
 /// <item><b>Side pass</b> (<see cref="ObstaclePassSide"/>): obstacles guarding dead ends
 /// (pockets) with a secret node, a goal or an optional goal. Never bypassed.</item>
 /// </list>

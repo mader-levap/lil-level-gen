@@ -4,7 +4,7 @@ General processor that puts obstacles (conditions on edges) and solutions (POIs 
 arbitrary graph, softlock-free. First user: `GraphBuilderSimple` (end of `RunProcessorsShaping()`).
 `GraphBuilderLinear` keeps its own chain-based obstacle pass.
 
-Status: **all phases done** (1-7). Measurements and the outcome of tuning are in section 5.1. Phases are in section 6.
+Status: **all phases done** (1-7), plus the stack limit added afterwards (sections 4.2 and 5.2). Measurements and the outcome of tuning are in section 5.1. Phases are in section 6.
 
 Decisions taken:
 - Chokepoints: cut search *prefers* chokepoint passages; a locked non-chokepoint passage keeps its flag.
@@ -133,6 +133,13 @@ Keep a list of **required nodes** `Q`, initially `{exit node}`. Per obstacle:
 3. If no target was accepted but some stacking cut was refused, take the least stacked of them
    (ties: first in target order). Stacking is rare while alternatives exist, yet Complexity is not
    wasted on tiny graphs where stacking is the only option. No cut at all -> pass ends early.
+   **Stack limit** (added after phase 7): count `locked` = passages with a condition and `extra`
+   = conditions beyond the first on them, over the whole graph. A stacking cut is only
+   considered while `extra <= FreeStackedConditions + MaxStackLoad * locked` (defaults 2 and
+   0.25) still holds with the cut in place: each of its passages adds 1 to `locked` when fresh,
+   else 1 to `extra`. A cut over the limit is refused without a roll and cannot be forced either.
+   When nothing fresh is left the pass ends early; the unused Complexity falls to the side pass
+   or is dropped. Fresh cuts are never limited; pre-existing conditions and secret passages count.
    **Cramped cuts** come last of all, after forced stacking: a cut that leaves no node but the
    start for the solution (no other non-secret, unprotected node on the start side). It would put
    the key next to its door at the start, and such a solution cannot be guarded later. (Added in phase 7.)
@@ -249,7 +256,7 @@ Complexity `sqrt(Size)` and `2 * sqrt(Size)`, 300 seeds each, default options.
   connectivity size/4, and 11-42 % at connectivity = size with the higher Complexity; 3 conditions
   stay below 9 % (12 % on 5-node trees). The high values are forced stacking: on a dense graph
   only nodes with at most `MaxEdgesPerObstacle` passages can be cut off, and fresh cuts run out.
-  Left as is - the alternative is to drop those obstacles; `ChanceStack` does not affect it.
+  `ChanceStack` does not affect it; the stack limit added afterwards does (section 5.2).
 - **Cut width**: trees use single passages only; at connectivity size/4 widths 1 and 2 dominate;
   at connectivity = size 60-70 % of the obstacles lock 4 passages (the cap).
 - **Position along the start-exit path** (thirds of the path, share of locked path passages):
@@ -258,6 +265,23 @@ Complexity `sqrt(Size)` and `2 * sqrt(Size)`, 300 seeds each, default options.
 - **Mandatory for the exit**: 61-91 % of all solutions; the rest are side obstacles and bypasses.
 - **Defaults and cost constants are unchanged.** Nothing in the sweep called for exposing the
   cost constants as settings.
+
+### 5.2 Stack limit results
+
+Same sweep as 5.1, the limit switched off (`MaxStackLoad = 100`) against the defaults (0.25 / 2).
+Share of locked passages with 2 / 3 conditions, and share of the requested obstacles placed:
+
+| Graphs | 2 conditions | 3 conditions | Placed |
+|---|---|---|---|
+| Trees (connectivity 0), any size | unchanged (2-13 %) | 0-8 % -> 0-8 % (only 5-node trees keep 8 %) | unchanged, at most -2 points |
+| Connectivity size/4 | 4-20 % -> 4-19 % | 0-5 % -> 0-3 % | at most -3 points |
+| Connectivity = size, Complexity `sqrt(Size)` | 9-24 % -> 3-17 % | 0-3 % -> 0-1 % | -0 to -4 points |
+| Connectivity = size, Complexity `2 * sqrt(Size)` | 28-39 % -> 22-26 % | 5-8 % -> 0-2 % | 82-92 % -> 73-83 % |
+
+So the limit bites where it should - dense graphs asked for many obstacles - and costs there about
+8-9 points of placed obstacles. Variants tried: `MaxStackLoad = 0.15` (dense high-Complexity cases
+drop to 15-23 % doubled passages but only 72-77 % placed) and `FreeStackedConditions = 1` (removes
+triple stacks on 5-node graphs, costs 2-3 points on small graphs). Defaults stay 0.25 and 2.
 
 ## 6. Implementation plan
 
@@ -285,7 +309,7 @@ Changes to existing code:
 - `Data/Config/Graph/Proc/CnfProcObstaclePlacerOpt.cs` (new public record + `Validate()`), added to
   `CnfProcOpt` as `ObstaclePlacer`: `MaxConditionsPerEdge = 3`, `MaxEdgesPerObstacle = 4`,
   `MainShare = 0.7`, `SmallComplexityMax = 3`, `ChanceReserveSide = 0.75`, `ChanceReserveSideOnly = 0.2`,
-  `ChanceNestSolution = 0.4`, `ChanceStack = 0.2`, `ChanceSecretBypass = 0.25`, `ChanceBypass = 0.01`. Cost weights
+  `ChanceNestSolution = 0.4`, `ChanceStack = 0.2`, `MaxStackLoad = 0.25`, `FreeStackedConditions = 2`, `ChanceSecretBypass = 0.25`, `ChanceBypass = 0.01`. Cost weights
   (`CostChokepoint = 4`, `CostOpen = 6`, `CostStack = 2`, `CostSecret = 0`) stay
   named constants inside `ObstacleWorkGraph` until tuning shows they need exposing.
 - `Internal/Prop/Resolvers/Graph/GraphResolver.cs` (`ResolveProcOpts`): pass the default section.

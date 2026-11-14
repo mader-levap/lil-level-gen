@@ -268,6 +268,8 @@ public sealed class CnfProcOptsTests
       Assert.Equal(0.2f, opts.ChanceReserveSideOnly);
       Assert.Equal(0.4f, opts.ChanceNestSolution);
       Assert.Equal(0.2f, opts.ChanceStack);
+      Assert.Equal(0.25f, opts.MaxStackLoad);
+      Assert.Equal(2, opts.FreeStackedConditions);
       Assert.Equal(0.25f, opts.ChanceSecretBypass);
       Assert.Equal(0.01f, opts.ChanceBypass);
     }
@@ -286,6 +288,8 @@ public sealed class CnfProcOptsTests
         ChanceReserveSideOnly = 0f,
         ChanceNestSolution = 1f,
         ChanceStack = 0f,
+        MaxStackLoad = 0f,
+        FreeStackedConditions = 0,
         ChanceSecretBypass = 1f,
         ChanceBypass = 0f,
       };
@@ -358,6 +362,38 @@ public sealed class CnfProcOptsTests
       // Act/Assert: The out-of-range value is rejected naming the offending property.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
       Assert.Equal(property, exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-0.01f)]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    public void ObstaclePlacer_WithInvalidMaxStackLoad_ThrowsArgumentOutOfRangeException(float load)
+    {
+      // Arrange: A stack limit that is negative or not finite.
+      var opts = new CnfProcObstaclePlacerOpt { MaxStackLoad = load };
+
+      // Act/Assert: Validation rejects it naming the property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
+      Assert.Equal(nameof(CnfProcObstaclePlacerOpt.MaxStackLoad), exception.ParamName);
+    }
+
+    [Fact]
+    public void ObstaclePlacer_WithMaxStackLoadAboveOne_DoesNotThrow()
+    {
+      // Arrange/Act/Assert: The load is a ratio without an upper bound; a large value switches the limit off.
+      new CnfProcObstaclePlacerOpt { MaxStackLoad = 100f }.Validate();
+    }
+
+    [Fact]
+    public void ObstaclePlacer_WithNegativeFreeStackedConditions_ThrowsArgumentOutOfRangeException()
+    {
+      // Arrange: A negative allowance.
+      var opts = new CnfProcObstaclePlacerOpt { FreeStackedConditions = -1 };
+
+      // Act/Assert: Validation rejects it naming the property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
+      Assert.Equal(nameof(CnfProcObstaclePlacerOpt.FreeStackedConditions), exception.ParamName);
     }
 
     [Fact]

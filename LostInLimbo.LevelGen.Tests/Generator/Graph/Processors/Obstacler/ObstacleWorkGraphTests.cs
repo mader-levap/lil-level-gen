@@ -343,6 +343,35 @@ public sealed class ObstacleWorkGraphTests
   public sealed class BuildCandidateTests
   {
     [Fact]
+    public void CountConditionLoad_CountsLockedPassagesAndStackedConditions()
+    {
+      // Arrange: Passages with 0, 1, 3 and (secret) 2 conditions.
+      var graph = CreateWorkGraph(
+        5,
+        new Passage(1, 2),
+        new Passage(2, 3, Conditions: 1),
+        new Passage(3, 4, Conditions: 3),
+        new Passage(4, 5, Secret: true, Conditions: 2));
+
+      // Act: Count.
+      graph.CountConditionLoad(out var locked, out var extra);
+
+      // Assert: Three passages are locked; 0 + 2 + 1 conditions lie beyond the first.
+      Assert.Equal(3, locked);
+      Assert.Equal(3, extra);
+    }
+
+    [Fact]
+    public void CountConditionLoad_OnOpenGraph_CountsNothing()
+    {
+      // Arrange/Act: No conditions anywhere.
+      CreateWorkGraph(3, Chain(3)).CountConditionLoad(out var locked, out var extra);
+
+      // Assert: Nothing is locked or stacked.
+      Assert.Equal((0, 0), (locked, extra));
+    }
+
+    [Fact]
     public void BuildCandidate_OnChain_SplitsAtTheCut()
     {
       // Arrange: Chain 1 - 2 - 3 - 4, cut between 2 and 3.

@@ -29,6 +29,10 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// <item><b>Forced stacking.</b> When no target yields an accepted cut, the least stacked of
 /// the refused cuts is used, so Complexity is not wasted on graphs where stacking is the only
 /// option. With no cut at all the pass ends early.</item>
+/// <item><b>Stack limit.</b> A stacking cut is only considered while the graph stays within
+/// <see cref="CnfProcObstaclePlacerOpt.MaxStackLoad"/> with it (see <see cref="IsStackAllowed"/>);
+/// otherwise it is refused without a roll and cannot be forced either. When nothing fresh is
+/// left and the limit forbids stacking, the pass ends early.</item>
 /// <item><b>Cramped cuts last.</b> A cut that leaves no node but the start for the solution
 /// (a door at the start with its key lying next to it) is only used when nothing else is left,
 /// even after forced stacking. Such a solution cannot be guarded by a later obstacle either.</item>
@@ -163,6 +167,7 @@ internal sealed class ObstaclePassMain
   {
     // Costs follow the conditions, so they are rebuilt for every obstacle.
     var costs = _state.Work.BuildMainCutCosts();
+    _state.Work.CountConditionLoad(out var locked, out var extra);
     CutCandidate? leastStacked = null;
     CutCandidate? cramped = null;
 
@@ -173,24 +178,50 @@ internal sealed class ObstaclePassMain
       if (candidates.Count == 0)
       {
         // Only cramped cuts (or none): keep the cheapest of the first such target as a last resort.
-        if (cramped is null && all.Count > 0) cramped = all[0];
+        cramped ??= all.Find(candidate => candidate.MaxConditions == 0 || IsStackAllowed(candidate, locked, extra));
         continue;
       }
 
       var best = PickCheapest(candidates);
       if (best.MaxConditions == 0) return best;
 
-      var chance = (float)Math.Pow(_state.Options.ChanceStack, best.MaxConditions);
-      if (_state.Random.NextBool(chance)) return best;
+      // Over the stack limit: refused without a roll, and not available for forced stacking.
+      var allowed = IsStackAllowed(best, locked, extra);
+      if (allowed)
+      {
+        var chance = (float)Math.Pow(_state.Options.ChanceStack, best.MaxConditions);
+        if (_state.Random.NextBool(chance)) return best;
+      }
 
       // Stacking refused: a fresh cut of the same target is still better than moving on.
       var fresh = FindCheapestFresh(candidates);
       if (fresh != null) return fresh;
 
-      if (leastStacked is null || best.MaxConditions < leastStacked.MaxConditions) leastStacked = best;
+      if (allowed && (leastStacked is null || best.MaxConditions < leastStacked.MaxConditions)) leastStacked = best;
     }
 
     return leastStacked ?? cramped;
+  }
+
+  /// <summary>
+  /// Tells whether the graph stays within the stack limit when a cut is locked:
+  /// <c>extra &lt;= FreeStackedConditions + MaxStackLoad * locked</c>, counted with the cut in place.
+  /// </summary>
+  /// <param name="candidate">Cut to check; a fresh cut always passes.</param>
+  /// <param name="locked">Passages carrying a condition now.</param>
+  /// <param name="extra">Stacked conditions now (conditions beyond the first on a passage).</param>
+  /// <returns>True when the cut may be locked.</returns>
+  private bool IsStackAllowed(CutCandidate candidate, int locked, int extra)
+  {
+    foreach (var edge in candidate.LockEdges)
+    {
+      // A first condition locks one more passage; any further one is a stacked condition.
+      if (_state.Work.GetEdge(edge).Conditions.Count == 0) locked++;
+      else extra++;
+    }
+
+    var options = _state.Options;
+    return extra <= options.FreeStackedConditions + (double)options.MaxStackLoad * locked;
   }
 
   /// <summary>

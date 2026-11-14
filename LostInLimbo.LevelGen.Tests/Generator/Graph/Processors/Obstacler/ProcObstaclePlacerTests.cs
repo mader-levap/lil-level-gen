@@ -1075,4 +1075,142 @@ public sealed class ProcObstaclePlacerTests
       }
     }
   }
+
+  /// <summary>
+  /// Tests the stack limit of the main pass (<c>MaxStackLoad</c>, <c>FreeStackedConditions</c>).
+  /// Bypasses are off, so what the limit allowed is exactly what the graph carries afterwards.
+  /// </summary>
+  public sealed class StackLimitTests
+  {
+    /// <summary>Options that forbid every stacked condition.</summary>
+    private static readonly CnfProcObstaclePlacerOpt NoStacking =
+      NoBypass with { MaxStackLoad = 0f, FreeStackedConditions = 0 };
+
+    /// <summary>Measures the condition load of a graph like the placer does.</summary>
+    /// <param name="graph">Graph to measure.</param>
+    /// <returns>Passages with a condition, and conditions beyond the first on them.</returns>
+    private static (int Locked, int Extra) MeasureLoad(LilGraph graph)
+    {
+      var locked = graph.Edges.Count(edge => edge.Conditions.Count > 0);
+      return (locked, CountConditions(graph) - locked);
+    }
+
+    [Fact]
+    public void Execute_WithStackingForbidden_NeverStacks()
+    {
+      foreach (var (name, create) in Shapes())
+      {
+        for (var complexity = 1; complexity <= 6; complexity++)
+        {
+          for (var seed = 0; seed < SweepSeeds; seed++)
+          {
+            // Arrange/Act: A fresh graph per case.
+            var graph = create();
+            var placer = Run(graph, complexity, seed, NoStacking);
+
+            // Assert: No passage carries a second condition; everything else still holds.
+            var context = $"{name}, complexity {complexity}, seed {seed}";
+            Assert.All(graph.Edges, edge => Assert.True(edge.Conditions.Count <= 1, context));
+            AssertInvariants(graph, placer, complexity, NoStacking, context);
+          }
+        }
+      }
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 2)]
+    [InlineData(2, 3)]
+    [InlineData(5, 3)] // The cap of three conditions per passage still applies.
+    public void Execute_OnTwoNodeGraph_StacksOnlyWithinTheFreeAllowance(int freeStacked, int expectedConditions)
+    {
+      // Arrange: Start and exit joined by one passage; the ratio part of the limit is off.
+      var options = NoBypass with { MaxStackLoad = 0f, FreeStackedConditions = freeStacked };
+      var graph = CreateLevel(2, 1, 2, Chain(2));
+
+      // Act: Ask for more obstacles than fit.
+      var placer = Run(graph, 5, 42, options);
+
+      // Assert: One first condition plus the allowed stacked ones.
+      Assert.Equal(expectedConditions, placer.PlacedObstacles);
+      Assert.Equal(expectedConditions, graph.Edges[0].Conditions.Count);
+      GraphTestAssert.AssertBeatable(graph);
+    }
+
+    [Theory]
+    [InlineData(0.25f, 2)]
+    [InlineData(0.5f, 0)]
+    [InlineData(0f, 1)]
+    public void Execute_OverShapesAndSeeds_StaysWithinTheLimit(float maxStackLoad, int freeStacked)
+    {
+      // Arrange: Stacking always wanted, so only the limit holds it back.
+      var options = NoBypass with { ChanceStack = 1f, MaxStackLoad = maxStackLoad, FreeStackedConditions = freeStacked };
+      foreach (var (name, create) in Shapes())
+      {
+        for (var seed = 0; seed < SweepSeeds; seed++)
+        {
+          // Act: A generous Complexity on a fresh graph.
+          var graph = create();
+          Run(graph, 8, seed, options);
+
+          // Assert: Stacked conditions never exceed the allowance plus the share of locked passages.
+          var (locked, extra) = MeasureLoad(graph);
+          Assert.True(extra <= freeStacked + maxStackLoad * locked, $"{name}, seed {seed}: {extra} stacked on {locked} locked");
+        }
+      }
+    }
+
+    [Fact]
+    public void Execute_WithLimitSwitchedOff_StacksToTheCap()
+    {
+      // Arrange: Exit always targeted first, stacking always accepted, the limit far out of reach.
+      var options = NoBypass with { ChanceStack = 1f, ChanceNestSolution = 0f, MaxStackLoad = 100f, FreeStackedConditions = 0 };
+      var graph = CreateAdjacentLevel();
+
+      // Act: Three obstacles.
+      Run(graph, 3, 42, options);
+
+      // Assert: All three land on the direct passage.
+      Assert.Equal(3, graph.Edges[0].Conditions.Count);
+    }
+
+    [Fact]
+    public void Execute_WithLimitHit_RefusesStackingEvenWhenTheRollAccepts()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: Stacking always accepted by the roll, but forbidden by the limit.
+        var options = NoStacking with { ChanceStack = 1f };
+        var graph = CreateAdjacentLevel();
+
+        // Act: Four obstacles.
+        var placer = Run(graph, 4, seed, options);
+
+        // Assert: The direct passage is locked once; further obstacles guard solutions instead.
+        Assert.Single(graph.Edges[0].Conditions);
+        Assert.InRange(placer.PlacedObstacles, 1, 4);
+        AssertInvariants(graph, placer, 4, options, $"seed {seed}");
+      }
+    }
+
+    [Fact]
+    public void Execute_WhenMainPassEndsOnTheLimit_LeavesTheRestToTheSidePass()
+    {
+      // Arrange: Start 1 next to exit 2, a goal leaf 3 behind the exit; nothing reserved for the side pass.
+      var options = NoStacking with { MainShare = 1f };
+      var graph = CreateLevel(3, 1, 2, new Passage(1, 2), new Passage(2, 3));
+      AddGoal(graph, 3);
+
+      // Act: More Complexity than the main pass may use.
+      var placer = Run(graph, 5, 42, options);
+
+      // Assert: The main pass stops after one obstacle instead of stacking; the side pass locks the leaf.
+      Assert.Equal(0, placer.ReservedSideBudget);
+      Assert.Equal(1, placer.PlacedMainObstacles);
+      Assert.Equal(1, placer.PlacedSideObstacles);
+      Assert.Single(graph.Edges[0].Conditions);
+      Assert.Single(graph.Edges[1].Conditions);
+      AssertInvariants(graph, placer, 5, options, "leftover");
+    }
+  }
 }
