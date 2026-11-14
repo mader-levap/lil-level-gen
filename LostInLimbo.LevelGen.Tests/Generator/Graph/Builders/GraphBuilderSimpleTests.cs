@@ -527,25 +527,6 @@ public sealed class GraphBuilderSimpleTests
       Assert.NotEqual(first.Graph, second.Graph);
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(5)]
-    [InlineData(50)]
-    public void Build_WithAnyComplexity_ProducesIdenticalGraph(int complexity)
-    {
-      // Arrange: Reference build and builds with the complexity knob turned up.
-      var reference = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = 8, Connectivity = 4 });
-      var varied = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
-      {
-        Size = 8,
-        Connectivity = 4,
-        Complexity = complexity,
-      });
-
-      // Assert: Complexity is ignored - same graph in every run.
-      GraphTestAssert.AssertEqualGraphs(reference.Graph, varied.Graph);
-    }
-
     [Fact]
     public void Build_ProducesDistinctIdentifiers()
     {
@@ -567,6 +548,151 @@ public sealed class GraphBuilderSimpleTests
       Assert.Equal(poiIds.Count, poiIds.Distinct().Count());
       Assert.DoesNotContain(poiIds[0], nodeIds);
       Assert.DoesNotContain(poiIds[1], nodeIds);
+    }
+  }
+
+  /// <summary>Tests for obstacles: <c>Complexity</c> spent by the obstacle placer at the end of shaping.</summary>
+  public sealed class ObstacleTests
+  {
+    /// <summary>Mirrors <c>CnfProcObstaclePlacerOpt.Default.MaxConditionsPerEdge</c>.</summary>
+    private static readonly int MaxConditionsPerEdge = CnfProcObstaclePlacerOpt.Default.MaxConditionsPerEdge;
+
+    /// <summary>Proc options with frequent secrets of every kind, including two-passage routes.</summary>
+    private static readonly CnfProcOpt ManySecrets = CnfProcOpt.Default with
+    {
+      RelSecrets = CnfProcRelSecretsOpt.Default with { Amount = 3, ChanceTwoPassages = 0.5f },
+    };
+
+    /// <summary>Counts the solution POIs of a graph; one per obstacle.</summary>
+    /// <param name="graph">Graph to count in.</param>
+    /// <returns>Number of solution POIs.</returns>
+    private static int CountSolutions(LilGraph graph) => GraphTestSupport.GetPois(graph, EnPoiType.Solution).Count;
+
+    [Fact]
+    public void Build_WithZeroComplexity_LeavesEveryPassageOpen()
+    {
+      // Act: Build a well connected graph without complexity.
+      var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = 12, Connectivity = 6 });
+
+      // Assert: No conditions and no solutions anywhere.
+      GraphTestAssert.AssertOpenPassages(graph);
+      Assert.Equal(0, CountSolutions(graph));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(50)]
+    public void Build_WithComplexity_KeepsShapeAndAddsObstacles(int complexity)
+    {
+      // Arrange: Reference build without obstacles.
+      var reference = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph { Size = 12, Connectivity = 4 }).Graph;
+
+      // Act: Same config and seed with the complexity knob turned up.
+      var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      {
+        Size = 12,
+        Connectivity = 4,
+        Complexity = complexity,
+      });
+
+      // Assert: Obstacles are added on top - nodes and passages themselves are the same.
+      Assert.Equal(reference.Nodes.Select(node => node.Id), graph.Nodes.Select(node => node.Id));
+      Assert.Equal(
+        reference.Edges.Select(edge => (edge.Id, edge.From, edge.To, edge.Secret)),
+        graph.Edges.Select(edge => (edge.Id, edge.From, edge.To, edge.Secret)));
+
+      // Assert: At least one obstacle, never more than Complexity, and the level is beatable.
+      Assert.InRange(CountSolutions(graph), 1, complexity);
+      Assert.Contains(graph.Edges, edge => edge.Conditions.Count > 0);
+      GraphTestAssert.AssertBeatable(graph);
+    }
+
+    [Fact]
+    public void Build_WithComplexityAndSameSeed_ProducesIdenticalGraphs()
+    {
+      // Arrange: Config with obstacles and secrets.
+      var config = new CnfGraph { Size = 20, Connectivity = 8, Complexity = 6, ProcOpts = ManySecrets };
+
+      // Act: Build twice with the same seed.
+      var first = GraphTestSupport.Build(EnGraphBuilder.Simple, config, seedGraph: 7);
+      var second = GraphTestSupport.Build(EnGraphBuilder.Simple, config, seedGraph: 7);
+
+      // Assert: Same graph, obstacles included.
+      Assert.True(CountSolutions(first.Graph) > 0);
+      GraphTestAssert.AssertEqualGraphs(first.Graph, second.Graph);
+    }
+
+    [Fact]
+    public void Build_WithSingleNode_PlacesNoObstacles()
+    {
+      // Act: One node cannot hold an obstacle, whatever the complexity.
+      var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+      {
+        Size = 1,
+        Complexity = 5,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      });
+
+      // Assert: Nothing was placed.
+      Assert.Equal(0, CountSolutions(graph));
+      GraphTestAssert.AssertOpenPassages(graph);
+    }
+
+    [Fact]
+    public void Build_OverManyConfigs_IsAlwaysBeatableWithinLimits()
+    {
+      // Arrange: Sweep of sizes, connectivity and complexity, secrets of every kind enabled.
+      int[] sizes = [2, 3, 5, 8, 15, 30, 60];
+      int[] connectivities = [0, 3, 10, 40];
+      int[] complexities = [1, 2, 4, 8, 20];
+      const int seedCount = 8;
+      var totalObstacles = 0;
+
+      foreach (var size in sizes)
+      foreach (var connectivity in connectivities)
+      foreach (var complexity in complexities)
+      {
+        for (var seed = 0; seed < seedCount; seed++)
+        {
+          var label = $"size {size}, connectivity {connectivity}, complexity {complexity}, seed {seed}";
+
+          // Act: Build the graph.
+          var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Simple, new CnfGraph
+          {
+            Size = size,
+            Connectivity = connectivity,
+            Complexity = complexity,
+            ProcOpts = ManySecrets,
+          }, seedGraph: seed);
+
+          // Assert: Beatable, with obstacle and per-passage limits kept.
+          GraphTestAssert.AssertBeatable(graph, label);
+          var solutions = GraphTestSupport.GetPois(graph, EnPoiType.Solution);
+          Assert.True(solutions.Count <= complexity, $"{label}: {solutions.Count} obstacles.");
+          var solutionIds = solutions.Select(poi => poi.Id).ToHashSet();
+          Assert.Equal(solutions.Count, solutionIds.Count);
+          totalObstacles += solutions.Count;
+
+          foreach (var edge in graph.Edges)
+          {
+            Assert.True(edge.Conditions.Count <= MaxConditionsPerEdge, $"{label}: passage {edge.Id} is overloaded.");
+            // One-way passages are never locked; every condition names its own existing solution.
+            if (edge.Direction != EnPassageDirection.Bidirectional) Assert.Empty(edge.Conditions);
+            var required = edge.Conditions.Select(condition => condition.RequiresPoi).ToList();
+            Assert.All(required, id => Assert.True(solutionIds.Contains(id), label));
+            Assert.Equal(required.Count, required.Distinct().Count());
+          }
+
+          // Assert: Every solution locks something, and none hides in a secret node.
+          var usedIds = graph.Edges.SelectMany(edge => edge.Conditions).Select(condition => condition.RequiresPoi).ToHashSet();
+          Assert.All(solutionIds, id => Assert.Contains(id, usedIds));
+          Assert.DoesNotContain(graph.Nodes, node => node.Secret && node.Pois.Any(poi => poi.Type == EnPoiType.Solution));
+        }
+      }
+
+      // Assert: The sweep really exercised the placer.
+      Assert.True(totalObstacles > 0);
     }
   }
 

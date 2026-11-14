@@ -4,14 +4,15 @@ using System.Threading;
 using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Result.Graph;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
 /// <summary>
 /// <para>
-/// Builds the simple level graph: one or more nodes without obstacles. Start and exit may or
-/// may not be in the same node. Skeleton relationships may not exceed
+/// Builds the simple level graph: one or more nodes in a random shape, with obstacles placed by
+/// the general obstacle placer. Start and exit may or may not be in the same node. Skeleton relationships may not exceed
 /// <see cref="CnfGraphBuilderSimple.MaxExtraDegreeStar"/> per node; the extra-relationships phase skips any node whose
 /// total degree has already reached <see cref="CnfGraphBuilderSimple.MaxExtraDegree"/>. Every node's
 /// <see cref="LilNode.MaxEdges"/> hard cap is therefore the larger of the two values.
@@ -24,14 +25,16 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <item><c>CnfGraph.Connectivity</c> is the number of relationships above the minimum
 /// (the spanning structure). The builder can ignore excess Connectivity if it cannot make more
 /// relationships.</item>
-/// <item><c>CnfGraph.Complexity</c> is ignored (no obstacles, conditions always empty).</item>
+/// <item><c>CnfGraph.Complexity</c> is the largest number of obstacles. They are placed by
+/// <see cref="ProcObstaclePlacer"/> at the end of the shaping processors; 0 leaves every passage
+/// open. A soft constraint: obstacles that cannot be placed sensibly are dropped.</item>
 /// </list>
 /// <para>The graph is built in four passes:</para>
 /// <list type="bullet">
 /// <item>Create a minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
 /// <item>Add POIs. Start and exit are random and the same node is allowed.</item>
 /// <item>Extra relationships between random nodes up to connectivity and <see cref="CnfGraphBuilderSimple.MaxExtraDegree"/>.</item>
-/// <item>Processors: secret nodes, objective POIs, node relative size and grouping.</item>
+/// <item>Processors: secret nodes, objective POIs, obstacles, node relative size and grouping.</item>
 /// </list>
 /// </remarks>
 /// <param name="cnfGraphBuilder">Configuration for graph builders.</param>
@@ -74,6 +77,9 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
   #endregion
 
   #region Build
+
+  /// <inheritdoc/>
+  protected override bool UsesObstaclePlacer => true;
 
   /// <inheritdoc/>
   protected override LilResult Build(CancellationToken cancellationToken)

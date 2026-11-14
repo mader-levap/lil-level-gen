@@ -5,6 +5,7 @@ using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 using LostInLimbo.LevelGen.Internal.Generator.Prepass;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
 
@@ -120,6 +121,14 @@ internal abstract class AGraphBuilder
   /// <exception cref="OperationCanceledException">The token was cancelled; the graph may be partially filled.</exception>
   protected abstract LilResult Build(CancellationToken cancellationToken);
 
+  /// <summary>
+  /// Whether the shaping processors end with the general obstacle placer
+  /// (<see cref="ProcObstaclePlacer"/>), which spends <c>CnfGraph.Complexity</c> on obstacles.
+  /// Off by default: builders without obstacles and builders with their own obstacle pass
+  /// leave it off; a builder that wants general obstacles overrides it.
+  /// </summary>
+  protected virtual bool UsesObstaclePlacer => false;
+
   #region Shared build steps
 
   /// <summary>
@@ -202,6 +211,8 @@ internal abstract class AGraphBuilder
   /// </summary>
   /// <remarks>
   /// All processors that shape graph (add/change nodes/relationships/POIs/etc) are run here.
+  /// The obstacle placer comes last and only for builders with <see cref="UsesObstaclePlacer"/>:
+  /// it needs the final nodes, passages and objective POIs.
   /// </remarks>
   /// <param name="cancellationToken">Token checked before every processor.</param>
   private void RunProcessorsShaping(CancellationToken cancellationToken)
@@ -213,6 +224,13 @@ internal abstract class AGraphBuilder
 
     cancellationToken.ThrowIfCancellationRequested();
     new ProcNodeObjectives(Graph, procOpts.NodeObjectives, PrepData.SeedGraph).Execute();
+
+    if (UsesObstaclePlacer)
+    {
+      cancellationToken.ThrowIfCancellationRequested();
+      new ProcObstaclePlacer(Graph, procOpts.ObstaclePlacer, Config.Graph.Complexity, PrepData.SeedGraph)
+        .Execute(cancellationToken);
+    }
   }
 
   /// <summary>

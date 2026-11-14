@@ -35,7 +35,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// No nodes or passages are added, so <see cref="LilNode.MaxEdges"/> caps are untouched.
 /// Existing conditions and solutions are kept and respected. Deterministic for the same graph
 /// contents, options, complexity and seed; independent of the order of the graph lists.
-/// See <c>OBSTACLES.md</c> for the design.
+/// See <c>Docs/OBSTACLES.md</c> for the design.
 /// </para>
 /// </remarks>
 internal sealed class ProcObstaclePlacer
