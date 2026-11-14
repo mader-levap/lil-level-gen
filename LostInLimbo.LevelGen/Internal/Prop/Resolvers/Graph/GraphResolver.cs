@@ -254,10 +254,8 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <returns>Relative size options.</returns>
   private CnfProcNodeRelSizeOpt ResolveRelSize()
   {
-    return CnfProcNodeRelSizeOpt.Default with
-    {
-      // TODO
-    };
+    // Relative sizes do not depend on difficulty, so only the supporting data is passed.
+    return new ProcRelSizeResolver(_propData).Execute();
   }
 
   /// <summary>
