@@ -540,6 +540,46 @@ public sealed class ProcObstaclePlacerTests
     }
 
     [Fact]
+    public void Execute_WithChoiceOfCuts_AvoidsTheCutThatLeavesOnlyTheStart()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: Chain 1 - 2 - 3. Both passages cost the same, but locking the first one
+        // would leave only the start node for the solution.
+        var graph = CreateLevel(3, 1, 3, Chain(3));
+
+        // Act: One obstacle.
+        Run(graph, 1, seed);
+
+        // Assert: Always the passage in front of the exit.
+        Assert.Empty(graph.Edges[0].Conditions);
+        Assert.Single(graph.Edges[1].Conditions);
+      }
+    }
+
+    [Fact]
+    public void Execute_WhenOnlyCrampedCutsAreLeft_UsesThemAsLastResort()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: The same chain, one condition per passage.
+        var options = NoBypass with { MaxConditionsPerEdge = 1 };
+        var graph = CreateLevel(3, 1, 3, Chain(3));
+
+        // Act: Two obstacles; after the first, only the passage at the start can still be locked.
+        var placer = Run(graph, 2, seed, options);
+
+        // Assert: Complexity is not wasted - the cramped cut is used for the second obstacle,
+        // and its solution can only be in the start node.
+        Assert.Equal(2, placer.PlacedObstacles);
+        Assert.Single(graph.Edges[1].Conditions);
+        var atStart = Assert.Single(graph.Edges[0].Conditions);
+        Assert.Contains(graph.Nodes[0].Pois, poi => poi.Id == atStart.RequiresPoi);
+        AssertInvariants(graph, placer, 2, options, $"seed {seed}");
+      }
+    }
+
+    [Fact]
     public void Execute_OnTwoNodeGraph_StacksUpToTheCapAndStops()
     {
       // Arrange: Start and exit joined by one passage; nothing else to lock.

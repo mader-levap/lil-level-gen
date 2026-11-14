@@ -4,7 +4,7 @@ General processor that puts obstacles (conditions on edges) and solutions (POIs 
 arbitrary graph, softlock-free. First user: `GraphBuilderSimple` (end of `RunProcessorsShaping()`).
 `GraphBuilderLinear` keeps its own chain-based obstacle pass.
 
-Status: **phases 1-6 done** (config, cut machinery, main pass, wired into `GraphBuilderSimple`, side pass with budget split, bypasses). Next: phase 7 (tuning). Phases are in section 6.
+Status: **all phases done** (1-7). Measurements and the outcome of tuning are in section 5.1. Phases are in section 6.
 
 Decisions taken:
 - Chokepoints: cut search *prefers* chokepoint passages; a locked non-chokepoint passage keeps its flag.
@@ -133,6 +133,9 @@ Keep a list of **required nodes** `Q`, initially `{exit node}`. Per obstacle:
 3. If no target was accepted but some stacking cut was refused, take the least stacked of them
    (ties: first in target order). Stacking is rare while alternatives exist, yet Complexity is not
    wasted on tiny graphs where stacking is the only option. No cut at all -> pass ends early.
+   **Cramped cuts** come last of all, after forced stacking: a cut that leaves no node but the
+   start for the solution (no other non-secret, unprotected node on the start side). It would put
+   the key next to its door at the start, and such a solution cannot be guarded later. (Added in phase 7.)
 4. Lock the cut, place the solution, add its node to `Q` (unless it is the start node).
 
 Every main obstacle guards a node the player must visit, so **all of them are mandatory for the
@@ -193,7 +196,8 @@ No-op when: `Complexity == 0`; fewer than two nodes; not exactly one start node 
 - **Candidates cluster on a unique cheapest bottleneck**: when one passage is strictly cheaper than
   all others, the whole target series lands on it and other positions only come from the source
   series (at most `MaxBallRadius` = 3 hops from start). `CostStack` evens this out once the
-  bottleneck carries a condition. Check in phase 7 whether long corridors need a larger radius.
+  bottleneck carries a condition. Measured in phase 7 (section 5.1): long corridors are covered
+  well enough, the radius stays.
 - **Stacking frequency (measured in phase 3)**: start next to exit with five leaves on the start,
   Complexity 3, 2000 seeds; share of seeds by number of conditions on the direct passage:
 
@@ -206,7 +210,8 @@ No-op when: `Complexity == 0`; fewer than two nodes; not exactly one start node 
   Part of the "2" share is forced stacking (a solution landed in the start node, so nothing
   else could be locked), which no `ChanceStack` value removes.
 - **Large pockets take solution room from the main pass**: a protected pocket may be a whole
-  branch (up to half of the graph), and no main solution goes into it. Check in phase 7 whether
+  branch (up to half of the graph), and no main solution goes into it. Not tuned in phase 7
+  (no problem seen in the sweep); revisit if levels show that
   `ChanceLargestPocket` or the size cap needs tuning.
 - **`MainShare` rounding**: the main budget is `round(Complexity * MainShare)` with halves rounded
   up, computed in decimal so that 5 * 0.7 gives 4, not 3.
@@ -228,6 +233,31 @@ No-op when: `Complexity == 0`; fewer than two nodes; not exactly one start node 
   `CancellationToken` checked per obstacle anyway.
 - **Determinism**: own salted RNG stream, all enumeration in Id order, solution Ids derived from
   the obstacle ordinal with a dedicated salt; no dictionary/set iteration feeds the output.
+
+### 5.1 Tuning results (phase 7)
+
+Sweep through `GraphBuilderSimple`: sizes 5 / 10 / 20 / 40 / 80, connectivity 0 / size/4 / size,
+Complexity `sqrt(Size)` and `2 * sqrt(Size)`, 300 seeds each, default options.
+
+- **Complexity used**: 82-99 % of the requested obstacles are placed (lowest on 5-node graphs).
+  The side pass places about 1-2 obstacles per level.
+- **Solutions in the start node** were the one real problem: 9-42 % of all solutions, because
+  the cut around the start is often as cheap as any other and leaves the solution nowhere else to
+  go. Fix: cramped cuts are a last resort (section 4.2). Afterwards: 2-8 % at size 20 and above,
+  6-17 % at size 10, 21-32 % at size 5 (few other places exist there).
+- **Stacking**: share of locked passages with 2 conditions is 2-12 % on trees, 7-20 % at
+  connectivity size/4, and 11-42 % at connectivity = size with the higher Complexity; 3 conditions
+  stay below 9 % (12 % on 5-node trees). The high values are forced stacking: on a dense graph
+  only nodes with at most `MaxEdgesPerObstacle` passages can be cut off, and fresh cuts run out.
+  Left as is - the alternative is to drop those obstacles; `ChanceStack` does not affect it.
+- **Cut width**: trees use single passages only; at connectivity size/4 widths 1 and 2 dominate;
+  at connectivity = size 60-70 % of the obstacles lock 4 passages (the cap).
+- **Position along the start-exit path** (thirds of the path, share of locked path passages):
+  42 / 24 / 34 % on 80-node trees (path about 16 passages), close to even on shorter paths. The
+  middle of long corridors is thinner but not empty, so `MaxBallRadius` stays 3.
+- **Mandatory for the exit**: 61-91 % of all solutions; the rest are side obstacles and bypasses.
+- **Defaults and cost constants are unchanged.** Nothing in the sweep called for exposing the
+  cost constants as settings.
 
 ## 6. Implementation plan
 
@@ -278,8 +308,7 @@ where practical, per `AGENTS.md`. The tests of section 7 are written in the phas
 | 7. Tuning | Statistics over a seed sweep (obstacles placed vs Complexity, stacking rate, solutions in or next to start, cut widths); adjust defaults and cost constants, expose constants as settings if needed; final pass over this document (status, deviations). | Better defaults only. |
 
 Notes:
-- Settings exist from phase 1 but stay inert until their phase (5: budget split; 6: bypass chances).
-  Until phase 6 the placer behaves as if both bypass chances were 0.
+- Settings existed from phase 1 and became active in their phase (5: budget split; 6: bypass chances).
 - Phases 2 and 3 are unreachable from the public API, so they cannot break generation.
 - Phase 4 is the first one that changes generated worlds; phases 5 and 6 change them again for the same seed.
 

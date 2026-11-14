@@ -29,6 +29,9 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// <item><b>Forced stacking.</b> When no target yields an accepted cut, the least stacked of
 /// the refused cuts is used, so Complexity is not wasted on graphs where stacking is the only
 /// option. With no cut at all the pass ends early.</item>
+/// <item><b>Cramped cuts last.</b> A cut that leaves no node but the start for the solution
+/// (a door at the start with its key lying next to it) is only used when nothing else is left,
+/// even after forced stacking. Such a solution cannot be guarded by a later obstacle either.</item>
 /// </list>
 /// <para>
 /// <b>Bypasses.</b> After the solution is placed, some passages of the cut may be opened again
@@ -161,11 +164,18 @@ internal sealed class ObstaclePassMain
     // Costs follow the conditions, so they are rebuilt for every obstacle.
     var costs = _state.Work.BuildMainCutCosts();
     CutCandidate? leastStacked = null;
+    CutCandidate? cramped = null;
 
     foreach (var target in targets)
     {
-      var candidates = _state.Search.FindCandidates(start, target, costs);
-      if (candidates.Count == 0) continue;
+      var all = _state.Search.FindCandidates(start, target, costs);
+      var candidates = all.FindAll(HasRoomForSolution);
+      if (candidates.Count == 0)
+      {
+        // Only cramped cuts (or none): keep the cheapest of the first such target as a last resort.
+        if (cramped is null && all.Count > 0) cramped = all[0];
+        continue;
+      }
 
       var best = PickCheapest(candidates);
       if (best.MaxConditions == 0) return best;
@@ -180,7 +190,34 @@ internal sealed class ObstaclePassMain
       if (leastStacked is null || best.MaxConditions < leastStacked.MaxConditions) leastStacked = best;
     }
 
-    return leastStacked;
+    return leastStacked ?? cramped;
+  }
+
+  /// <summary>
+  /// Tells whether a cut leaves the solution somewhere to go besides the start node: a node on
+  /// the start side that is neither secret nor protected.
+  /// </summary>
+  /// <remarks>
+  /// A quick structural check; the exact answer (reachability with other obstacles in the way)
+  /// is given later by <see cref="ObstacleState.TryPlaceObstacle"/>.
+  /// </remarks>
+  /// <param name="candidate">Cut to inspect.</param>
+  /// <returns>True when at least one such node exists.</returns>
+  private bool HasRoomForSolution(CutCandidate candidate)
+  {
+    var work = _state.Work;
+    var far = new bool[work.NodeCount];
+    foreach (var node in candidate.FarNodes) far[node] = true;
+
+    for (var node = 0; node < far.Length; node++)
+    {
+      if (far[node] || node == work.StartNode) continue;
+      if (work.GetNode(node).Secret) continue;
+      if (_protectedNodes != null && _protectedNodes[node]) continue;
+      return true;
+    }
+
+    return false;
   }
 
   #region Bypasses
