@@ -184,6 +184,28 @@ internal sealed class ObstacleWorkGraph
   public IReadOnlyList<int> IncidentEdges(int node) => _incident[node];
 
   /// <summary>
+  /// Checks whether a node is a dead end: all its ordinary (non-secret) passages lead to at
+  /// most one other node. Parallel passages to the same neighbour do not change that, and a
+  /// node whose only passages are secret counts as a dead end too.
+  /// </summary>
+  /// <param name="node">Work index of the node.</param>
+  /// <returns>True when the node has at most one distinct ordinary neighbour.</returns>
+  public bool IsDeadEnd(int node)
+  {
+    var neighbour = NoNode;
+    foreach (var edge in _incident[node])
+    {
+      if (_edges[edge].Secret) continue;
+
+      var other = OtherEnd(edge, node);
+      if (neighbour == NoNode) neighbour = other;
+      else if (other != neighbour) return false;
+    }
+
+    return true;
+  }
+
+  /// <summary>
   /// Creates a cut finder over the same node and edge indices.
   /// </summary>
   /// <returns>A new finder; it shares no mutable state with this view.</returns>

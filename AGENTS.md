@@ -49,10 +49,10 @@ lil-level-gen/
  ├─ AGENTS.md                     - This file.
  ├─ README.md                     - Project notes.
  ├─ TODO.md                       - Current tasks.
- ├─ GENERATOR.md                  - Description of level generator.
  ├─ LostInLimbo.LevelGen/
  │   ├─ Api/                      - Contains public API.
  │   ├─ Data/                     - Contains public data contracts.
+ │   ├─ Docs/                     - Additional documentation as .md files.
  │   └─ Internal/                 - Contains internal code.
  └─ LostInLimbo.LevelGen.Tests/
 ```

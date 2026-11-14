@@ -67,6 +67,35 @@ internal static class ObstaclerTestSupport
     return graph;
   }
 
+  /// <summary>Identifier of the start POI added by <see cref="CreateLevel"/>.</summary>
+  public const int StartPoiId = 500;
+  /// <summary>Identifier of the exit POI added by <see cref="CreateLevel"/>.</summary>
+  public const int ExitPoiId = 501;
+
+  /// <summary>
+  /// Creates a graph like <see cref="CreateGraph"/> and adds a start and an exit POI.
+  /// </summary>
+  /// <param name="nodeCount">Number of nodes.</param>
+  /// <param name="start">Number (one-based) of the node receiving the start POI.</param>
+  /// <param name="exit">Number (one-based) of the node receiving the exit POI; may equal <paramref name="start"/>.</param>
+  /// <param name="passages">Passages; the k-th one gets work index k.</param>
+  /// <returns>The graph.</returns>
+  public static LilGraph CreateLevel(int nodeCount, int start, int exit, params Passage[] passages)
+  {
+    var graph = CreateGraph(nodeCount, passages);
+    graph.Nodes[start - 1].Pois.Add(GraphTestCreate.Poi(StartPoiId, EnPoiType.Start));
+    graph.Nodes[exit - 1].Pois.Add(GraphTestCreate.Poi(ExitPoiId, EnPoiType.Exit));
+    return graph;
+  }
+
+  /// <summary>Marks nodes of a graph as secret (replaces the node records).</summary>
+  /// <param name="graph">Graph to change in place.</param>
+  /// <param name="nodes">Numbers (one-based) of the nodes to mark.</param>
+  public static void MarkSecret(LilGraph graph, params int[] nodes)
+  {
+    foreach (var node in nodes) graph.Nodes[node - 1] = graph.Nodes[node - 1] with { Secret = true };
+  }
+
   /// <summary>
   /// Creates the work graph of <see cref="CreateGraph"/> with default options.
   /// </summary>

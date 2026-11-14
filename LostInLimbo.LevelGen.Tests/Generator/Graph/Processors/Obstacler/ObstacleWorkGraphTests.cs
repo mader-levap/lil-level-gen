@@ -109,6 +109,27 @@ public sealed class ObstacleWorkGraphTests
     }
 
     [Fact]
+    public void IsDeadEnd_CountsDistinctOrdinaryNeighbours()
+    {
+      // Arrange: Node 1 has two parallel passages to node 2; node 2 also leads to node 3;
+      // node 3 has a secret passage to node 4; node 5 has no passage at all.
+      var work = CreateWorkGraph(
+        5,
+        new Passage(1, 2),
+        new Passage(2, 1),
+        new Passage(2, 3),
+        new Passage(3, 4, Secret: true));
+
+      // Assert: Parallel passages to one neighbour still make a dead end; two neighbours do
+      // not; secret passages are not counted, so nodes 3 and 4 are dead ends as well.
+      Assert.True(work.IsDeadEnd(0));
+      Assert.False(work.IsDeadEnd(1));
+      Assert.True(work.IsDeadEnd(2));
+      Assert.True(work.IsDeadEnd(3));
+      Assert.True(work.IsDeadEnd(4));
+    }
+
+    [Fact]
     public void StartAndExit_WithOneNodeEach_AreFound()
     {
       // Arrange: Start in node 2, exit in node 3.

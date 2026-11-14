@@ -90,7 +90,7 @@ public sealed record CnfProcObstaclePlacerOpt
   /// nothing else can be locked.
   /// <para>Must be a finite value within [0, 1].</para>
   /// </summary>
-  public float ChanceStack { get; init; } = 0.3f;
+  public float ChanceStack { get; init; } = 0.2f;
 
   // Bypasses.
 
