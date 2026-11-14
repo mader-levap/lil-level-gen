@@ -42,6 +42,11 @@ internal sealed class BuilderLinearResolver(PropMain propMain, PropData propData
   /// <summary>Upper bound of the drawn <see cref="CnfGraphBuilderLinear.MaxSkipDistance"/> (exclusive).</summary>
   private const int MaxSkipDistanceMaxExclusive = 4;
 
+  /// <summary>Smallest drawn <see cref="CnfGraphBuilderLinear.ChanceObstacleBypass"/> (inclusive).</summary>
+  private const float ChanceObstacleBypassMin = 0f;
+  /// <summary>Upper bound of the drawn <see cref="CnfGraphBuilderLinear.ChanceObstacleBypass"/> (exclusive); bypasses stay rare.</summary>
+  private const float ChanceObstacleBypassMaxExclusive = 0.05f;
+
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain = propMain;
   /// <summary>Supporting data.</summary>
@@ -62,6 +67,8 @@ internal sealed class BuilderLinearResolver(PropMain propMain, PropData propData
       MaxConditionPerRel = _random.NextInt(MaxConditionPerRelMin, MaxConditionPerRelMaxExclusive),
       MaxConditionDistance = _random.NextInt(MaxConditionDistanceMin, MaxConditionDistanceMaxExclusive),
       MaxSkipDistance = _random.NextInt(MaxSkipDistanceMin, MaxSkipDistanceMaxExclusive),
+      // Drawn last so the earlier draws keep their values.
+      ChanceObstacleBypass = _random.NextFloat(ChanceObstacleBypassMin, ChanceObstacleBypassMaxExclusive),
     };
   }
 }

@@ -41,6 +41,13 @@ public sealed record CnfGraphBuilderLinear
   /// <summary>Maximum number of nodes that can be skipped by an extra relationship.</summary>
   public int MaxSkipDistance { get; init; } = 2;
 
+  /// <summary>
+  /// Chance (0 to 1) that a skip relationship crossing a guarded cut stays unguarded, so it
+  /// bypasses that obstacle. Rolled per obstacle and crossing skip relationship; direct entries
+  /// from the guarded node's chain predecessor are always guarded.
+  /// </summary>
+  public float ChanceObstacleBypass { get; init; } = 0.05f;
+
   // Helpers.
 
   /// <summary>
@@ -59,5 +66,7 @@ public sealed record CnfGraphBuilderLinear
       throw new ArgumentOutOfRangeException(nameof(MaxConditionDistance), MaxConditionDistance, "MaxConditionDistance must be at least 0.");
     if (MaxSkipDistance < 0)
       throw new ArgumentOutOfRangeException(nameof(MaxSkipDistance), MaxSkipDistance, "MaxSkipDistance must be at least 0.");
+    if (float.IsNaN(ChanceObstacleBypass) || ChanceObstacleBypass < 0f || ChanceObstacleBypass > 1f)
+      throw new ArgumentOutOfRangeException(nameof(ChanceObstacleBypass), ChanceObstacleBypass, "ChanceObstacleBypass must be a number between 0 and 1.");
   }
 }

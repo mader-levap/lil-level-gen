@@ -39,9 +39,10 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <item>Extra relationships between nodes up to connectivity, <see cref="CnfGraphBuilderLinear.MaxExtraDegree"/>
 /// and the node <see cref="LilNode.MaxEdges"/> hard cap.</item>
 /// <item>Create obstacles for relationships up to complexity and
-/// <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/>: one shared solution condition per chosen node's
-/// incoming relationships, solution most likely near its guarded passage within
-/// <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/>.</item>
+/// <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/>: one shared solution condition on every
+/// relationship crossing the cut in front of a chosen node (skips over it included, except for
+/// rare bypasses by <see cref="CnfGraphBuilderLinear.ChanceObstacleBypass"/>), solution most likely
+/// near its guarded passage within <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/>.</item>
 /// <item>Finalization: secret nodes, objective POIs, node relative size and grouping.</item>
 /// </list>
 /// </remarks>
@@ -324,36 +325,45 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   #region Obstacle pass
 
   /// <summary>
-  /// Obstacle pass: guards node entries with solution-locked passages until complexity is
-  /// spent or every relationship is saturated.
+  /// Obstacle pass: guards cuts of the chain with solution-locked passages until complexity
+  /// is spent or every cut is saturated.
   /// </summary>
   /// <remarks>
+  /// <para>An obstacle at target node T guards the cut between chain positions T-1 and T: every
+  /// relationship from a node before T to a node at or after T. Guarding only the passages into
+  /// T would leak twice - a skip over T jumps past it, and since passages are bidirectional, a
+  /// player behind T walks back into T through its unguarded outgoing passages.</para>
   /// <para>One obstacle per iteration, up to <paramref name="complexity"/> iterations:</para>
   /// <list type="number">
-  /// <item>Among all nodes but the first that still have capacity (see
+  /// <item>Among all nodes but the first whose cut still has capacity (see
   /// <see cref="FindObstacleTargets"/>), one target is picked uniformly.</item>
   /// <item>A new solution POI is created and placed by <see cref="PickSolutionNode"/>, so it
   /// is most likely right before the guarded passage and falls off with distance up to
   /// <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/>.</item>
-  /// <item>Every relationship going into the target node gains the same new condition
-  /// (<see cref="EnConditionType.RequiresSolution"/> pointing at that POI).</item>
+  /// <item>Every relationship crossing the cut gains the same new condition
+  /// (<see cref="EnConditionType.RequiresSolution"/> pointing at that POI). Direct entries from
+  /// the chain predecessor always do; each skip relationship stays unguarded with
+  /// <see cref="CnfGraphBuilderLinear.ChanceObstacleBypass"/>, a rare deliberate bypass.</item>
   /// </list>
-  /// <para>Conditions only ever enter a node's relationships all at once, so all of them
-  /// stay identical and saturate together at <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/>. Once no
-  /// target with capacity remains, excess complexity is discarded silently - complexity is a
-  /// soft constraint, just like connectivity. Guaranteed solvable: a solution always lands
-  /// at or before the chain predecessor of its guarded node, so the chain reaches it before
-  /// any guarded passage is needed.</para>
+  /// <para>A skip relationship crossing several guarded cuts collects several conditions (a
+  /// door with several locks). Once no cut with capacity remains, excess complexity is
+  /// discarded silently - complexity is a soft constraint, just like connectivity. Guaranteed
+  /// solvable: a solution always lands at or before the chain predecessor of its guarded node,
+  /// and the solutions of earlier cuts land earlier still, so the chain reaches each solution
+  /// before its guarded passages are needed.</para>
   /// </remarks>
   /// <param name="complexity">Requested number of obstacles, from <c>CnfGraph.Complexity</c>.</param>
   /// <param name="nodeIds">Node identifiers in chain order.</param>
   private void AddObstacles(int complexity, Guid[] nodeIds)
   {
     var size = nodeIds.Length;
+    var chainIndices = new Dictionary<Guid, int>(size);
+    for (var index = 0; index < size; index++) chainIndices[nodeIds[index]] = index;
+
     var added = 0;
     while (added < complexity)
     {
-      var targets = FindObstacleTargets(size, nodeIds);
+      var targets = FindObstacleTargets(size, chainIndices);
       if (targets.Count == 0) break;
 
       var target = targets[Random.NextInt(targets.Count)];
@@ -366,7 +376,7 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
       };
       Graph.Nodes[PickSolutionNode(target - 1)].Pois.Add(solutionPoi);
 
-      // Every relationship into the target gets the same condition.
+      // Every relationship crossing the cut gets the same condition, except for rare bypasses.
       var condition = new LilCondition
       {
         Type = EnConditionType.RequiresSolution,
@@ -374,7 +384,13 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
       };
       foreach (var edge in Graph.Edges)
       {
-        if (edge.To == nodeIds[target]) edge.Conditions.Add(condition);
+        var from = chainIndices[edge.From];
+        var to = chainIndices[edge.To];
+        if (!CrossesCut(from, to, target)) continue;
+
+        // Roll only for skips, so graphs without them keep their random stream.
+        var bypass = !IsAdjacentEntry(from, to, target) && Random.NextBool(_config.ChanceObstacleBypass);
+        if (!bypass) edge.Conditions.Add(condition);
       }
 
       added++;
@@ -382,16 +398,15 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   }
 
   /// <summary>
-  /// Collects all nodes but the first whose relationships all still have room for one more
-  /// condition under <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/>.
+  /// Collects all nodes but the first whose cut still has room for one more condition: no
+  /// relationship crossing it has reached <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/>.
   /// </summary>
-  /// <remarks>Because <see cref="AddObstacles"/> always conditions a node's relationships
-  /// together, they saturate together - a node either has full capacity on all of them or on
-  /// none, and the check never splits a set of parallel passages.</remarks>
+  /// <remarks>A single full relationship saturates the whole cut, so the hard cap holds even
+  /// for skip relationships that collect conditions from several cuts.</remarks>
   /// <param name="size">Total number of nodes.</param>
-  /// <param name="nodeIds">Node identifiers in chain order.</param>
+  /// <param name="chainIndices">Chain index of every builder node, by identifier.</param>
   /// <returns>Target node indices in ascending chain order; empty when everything is saturated.</returns>
-  private List<int> FindObstacleTargets(int size, Guid[] nodeIds)
+  private List<int> FindObstacleTargets(int size, Dictionary<Guid, int> chainIndices)
   {
     var targets = new List<int>(size - 1);
     for (var target = 1; target < size; target++)
@@ -399,7 +414,7 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
       var eligible = true;
       foreach (var edge in Graph.Edges)
       {
-        if (edge.To != nodeIds[target]) continue;
+        if (!CrossesCut(chainIndices[edge.From], chainIndices[edge.To], target)) continue;
         if (edge.Conditions.Count >= _config.MaxConditionPerRel)
         {
           eligible = false;
@@ -411,6 +426,32 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
     }
 
     return targets;
+  }
+
+  /// <summary>
+  /// Checks whether a relationship crosses the cut in front of the target, i.e. links a node
+  /// before the target to the target or a node after it.
+  /// </summary>
+  /// <param name="from">Chain index of the earlier endpoint; Linear relationships always point forward.</param>
+  /// <param name="to">Chain index of the later endpoint.</param>
+  /// <param name="target">Chain index of the guarded node.</param>
+  /// <returns>True when the relationship crosses the cut.</returns>
+  private static bool CrossesCut(int from, int to, int target)
+  {
+    return from < target && to >= target;
+  }
+
+  /// <summary>
+  /// Checks whether a relationship is a direct entry into the target from its chain
+  /// predecessor - the skeleton passage or its parallel extra.
+  /// </summary>
+  /// <param name="from">Chain index of the earlier endpoint.</param>
+  /// <param name="to">Chain index of the later endpoint.</param>
+  /// <param name="target">Chain index of the guarded node.</param>
+  /// <returns>True for a direct entry; false for a skip relationship.</returns>
+  private static bool IsAdjacentEntry(int from, int to, int target)
+  {
+    return from == target - 1 && to == target;
   }
 
   /// <summary>

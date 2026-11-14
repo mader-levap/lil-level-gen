@@ -34,6 +34,21 @@ public sealed class BuilderLinearResolverTests
     Assert.InRange(config.MaxConditionDistance, 2, 4);
     Assert.Equal(1, config.MaxSkipDistance);
     Assert.InRange(config.MaxSkipDistance, 1, 3);
+    Assert.Equal(0.0075154635f, config.ChanceObstacleBypass);
+    Assert.InRange(config.ChanceObstacleBypass, 0f, 0.05f);
+  }
+
+  [Fact]
+  public void Execute_OverManySeeds_DrawsBypassChanceInsideRange()
+  {
+    // Act: Resolve the bypass chance from many seeds.
+    var chances = Enumerable.Range(0, 100)
+      .Select(seed => CreateResolver(seed).Execute().ChanceObstacleBypass)
+      .ToList();
+
+    // Assert: Every draw stays inside [0, 0.05) and the draws actually vary.
+    Assert.All(chances, chance => Assert.True(chance is >= 0f and < 0.05f, $"Chance {chance} is out of range."));
+    Assert.True(chances.Distinct().Count() > 1, "Bypass chance is not randomized.");
   }
 
   [Fact]

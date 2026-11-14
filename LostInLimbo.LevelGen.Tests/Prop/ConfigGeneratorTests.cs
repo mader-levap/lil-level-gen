@@ -118,7 +118,7 @@ public sealed class ConfigGeneratorTests
       Assert.Equal(EnGraphBuilder.Linear, config.Graph.GraphBuilder.Builder);
       Assert.Equal(CnfGraphBuilderLinear.Default with
       {
-        MaxEdges = 5, MaxExtraDegree = 2, MaxConditionPerRel = 2, MaxConditionDistance = 2, MaxSkipDistance = 1,
+        MaxEdges = 5, MaxExtraDegree = 2, MaxConditionPerRel = 2, MaxConditionDistance = 2, MaxSkipDistance = 1, ChanceObstacleBypass = 0.0075154635f,
       }, config.Graph.GraphBuilder.CnfLinear);
       Assert.Equal(3, config.Graph.ProcOpts.RelSecrets.Amount);
       Assert.Equal(1, config.Graph.ProcOpts.NodeObjectives.GoalAmount);
@@ -325,7 +325,7 @@ public sealed class ConfigGeneratorTests
     /// <summary>Pinned Linear builder options for "mordor" at difficulty 3.</summary>
     private static readonly CnfGraphBuilderLinear PinnedLinear = CnfGraphBuilderLinear.Default with
     {
-      MaxEdges = 6, MaxExtraDegree = 2, MaxConditionPerRel = 1, MaxConditionDistance = 2, MaxSkipDistance = 1,
+      MaxEdges = 6, MaxExtraDegree = 2, MaxConditionPerRel = 1, MaxConditionDistance = 2, MaxSkipDistance = 1, ChanceObstacleBypass = 0.024041189f,
     };
     /// <summary>Pinned secret amount for "mordor" at difficulty 3.</summary>
     private const int PinnedSecretAmount = 1;

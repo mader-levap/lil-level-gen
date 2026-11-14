@@ -1,3 +1,4 @@
+using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
@@ -393,36 +394,6 @@ public sealed class GraphBuilderLinearTests
       GraphTestAssert.AssertBeatable(graph, "Saturated graph must stay beatable.");
     }
 
-    [Theory]
-    [InlineData(6, 8, 12)]
-    [InlineData(10, 20, 50)]
-    public void Build_WithObstacles_GuardsAllPassagesIntoNodeWithSameSolution(int size, int connectivity, int complexity)
-    {
-      for (var seed = 0; seed < 5; seed++)
-      {
-        // Act: Build with extras so nodes carry parallel and shortcut in-passages.
-        var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
-        {
-          Size = size,
-          Connectivity = connectivity,
-          Complexity = complexity,
-        }, seed);
-        var positions = GraphAssertions.GetPositions(graph);
-
-        // Assert: All relationships into one node carry an identical condition list -
-        // the obstacle pass conditions them together, so they never diverge.
-        var conditionsByTarget = new Dictionary<int, List<(Guid Poi, EnConditionType Type)>>();
-        foreach (var edge in graph.Edges)
-        {
-          var target = positions[edge.To];
-          var actual = edge.Conditions.Select(condition => (condition.RequiresPoi, condition.Type)).ToList();
-          if (!conditionsByTarget.TryGetValue(target, out var expected))
-            conditionsByTarget[target] = actual;
-          else Assert.Equal(expected, actual);
-        }
-      }
-    }
-
     [Fact]
     public void Build_WithObstacles_KeepsSolutionsWithinMaxConditionDistance()
     {
@@ -437,18 +408,17 @@ public sealed class GraphBuilderLinearTests
         }, seed);
         var positions = GraphAssertions.GetPositions(graph);
 
-        // Map every solution POI to the node its passages guard.
-        var guardedNodeByPoi = new Dictionary<Guid, int>();
+        // Map every solution POI to the node its cut guards.
+        var guardedNodeByPoi = GraphAssertions.GetGuardedNodes(graph, positions);
         foreach (var edge in graph.Edges)
         {
           foreach (var condition in edge.Conditions)
           {
-            if (!guardedNodeByPoi.TryAdd(condition.RequiresPoi, positions[edge.To]))
-            {
-              // Assert: One solution guards exactly one node - all in-passages of a node
-              // share the same obstacle.
-              Assert.Equal(positions[edge.To], guardedNodeByPoi[condition.RequiresPoi]);
-            }
+            // Assert: One solution guards exactly one cut - every passage carrying it
+            // crosses the cut in front of the guarded node.
+            var cut = guardedNodeByPoi[condition.RequiresPoi];
+            Assert.True(positions[edge.From] < cut && positions[edge.To] >= cut,
+              $"Passage {positions[edge.From]}->{positions[edge.To]} does not cross cut {cut} (seed {seed}).");
           }
         }
 
@@ -481,10 +451,7 @@ public sealed class GraphBuilderLinearTests
         }, seed);
         var positions = GraphAssertions.GetPositions(graph);
 
-        var guardedNodeByPoi = new Dictionary<Guid, int>();
-        foreach (var edge in graph.Edges)
-        foreach (var condition in edge.Conditions)
-          guardedNodeByPoi[condition.RequiresPoi] = positions[edge.To];
+        var guardedNodeByPoi = GraphAssertions.GetGuardedNodes(graph, positions);
 
         for (var position = 0; position < graph.Nodes.Count; position++)
         {
@@ -529,6 +496,164 @@ public sealed class GraphBuilderLinearTests
         GraphTestAssert.AssertValidEdges(graph, allowDuplicates: true);
         GraphTestAssert.AssertBeatable(graph, $"Conditioned graph must stay beatable (size {size}, seed {seed}).");
       }
+    }
+  }
+
+  /// <summary>
+  /// Tests that an obstacle guards the whole cut between its guarded node and the chain
+  /// predecessor, so passages can bypass it only through the configured rare chance.
+  /// </summary>
+  public sealed class ObstacleBypassTests
+  {
+    /// <summary>Number of seeds the tests iterate over.</summary>
+    private const int SeedCount = 20;
+
+    /// <summary>Upper bound of the bypass share with the default chance; far above the default.</summary>
+    private const double MaxDefaultBypassShare = 0.15;
+
+    /// <summary>Builds a Linear graph with many skips and obstacles and without secret nodes.</summary>
+    private static LilGraph BuildObstacleGraph(int size, int seed, CnfGraphBuilderLinear? linearConfig = null)
+    {
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = linearConfig ?? CnfGraphBuilderLinear.Default,
+      };
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      {
+        Size = size,
+        Connectivity = size,
+        Complexity = size / 2,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      }, seed, builderConfig);
+      Assert.True(result.Success);
+      return graph;
+    }
+
+    /// <summary>
+    /// Finds the guarded cut of every solution (the chain position of its guarded node), in
+    /// solution placement order; every solution must guard something.
+    /// </summary>
+    private static List<(Guid Solution, int Cut)> GetCuts(LilGraph graph, Dictionary<Guid, int> positions)
+    {
+      var guardedNodes = GraphAssertions.GetGuardedNodes(graph, positions);
+      return GraphTestSupport.GetPois(graph, EnPoiType.Solution)
+        .Select(solution => (solution.Id, guardedNodes[solution.Id]))
+        .ToList();
+    }
+
+    /// <summary>Checks whether a passage crosses the cut in front of the given chain position.</summary>
+    private static bool CrossesCut(LilEdge edge, int cut, Dictionary<Guid, int> positions)
+    {
+      return positions[edge.From] < cut && positions[edge.To] >= cut;
+    }
+
+    /// <summary>Checks whether a passage is a direct entry from the chain predecessor of the cut.</summary>
+    private static bool IsAdjacentEntry(LilEdge edge, int cut, Dictionary<Guid, int> positions)
+    {
+      return positions[edge.From] == cut - 1 && positions[edge.To] == cut;
+    }
+
+    /// <summary>Checks whether a passage carries the condition of the given solution.</summary>
+    private static bool IsGuardedBy(LilEdge edge, Guid solution)
+    {
+      return edge.Conditions.Any(condition => condition.RequiresPoi == solution);
+    }
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(20)]
+    public void Build_WithBypassChanceZero_NoObstacleCanBeBypassed(int size)
+    {
+      for (var seed = 0; seed < SeedCount; seed++)
+      {
+        // Act: Build a graph full of skips and obstacles; bypasses are switched off.
+        var graph = BuildObstacleGraph(size, seed, CnfGraphBuilderLinear.Default with { ChanceObstacleBypass = 0f });
+        var positions = GraphAssertions.GetPositions(graph);
+        var startId = Assert.Single(GraphTestSupport.GetPois(graph, EnPoiType.Start)).Id;
+        var solutions = GraphTestSupport.GetPois(graph, EnPoiType.Solution).Select(poi => poi.Id).ToList();
+
+        foreach (var (solution, cut) in GetCuts(graph, positions))
+        {
+          // Act: Walk from the start holding every solution but the one guarding this cut.
+          var held = solutions.Where(id => id != solution).ToList();
+          var reached = LevelGraphReach.GetReachableNodes(graph, startId, held);
+
+          // Assert: Nothing at or behind the guarded node is reachable - no skip jumps over
+          // the obstacle and no back door leads into the guarded node.
+          Assert.All(reached, nodeId => Assert.True(
+            positions[nodeId] < cut,
+            $"Node {positions[nodeId]} reached without the solution of cut {cut} (seed {seed})."));
+        }
+      }
+    }
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(20)]
+    public void Build_WithBypassChanceZero_GuardsEveryPassageCrossingTheCut(int size)
+    {
+      for (var seed = 0; seed < SeedCount; seed++)
+      {
+        // Act: Build a graph full of skips and obstacles; bypasses are switched off.
+        var graph = BuildObstacleGraph(size, seed, CnfGraphBuilderLinear.Default with { ChanceObstacleBypass = 0f });
+        var positions = GraphAssertions.GetPositions(graph);
+
+        // Assert: A solution guards exactly the passages crossing its cut.
+        foreach (var (solution, cut) in GetCuts(graph, positions))
+        {
+          foreach (var edge in graph.Edges)
+            Assert.Equal(CrossesCut(edge, cut, positions), IsGuardedBy(edge, solution));
+        }
+      }
+    }
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(20)]
+    public void Build_WithBypassChanceOne_GuardsOnlyAdjacentEntries(int size)
+    {
+      for (var seed = 0; seed < SeedCount; seed++)
+      {
+        // Act: Build a graph where every skip over an obstacle bypasses it.
+        var graph = BuildObstacleGraph(size, seed, CnfGraphBuilderLinear.Default with { ChanceObstacleBypass = 1f });
+        var positions = GraphAssertions.GetPositions(graph);
+
+        // Assert: Only the direct entries from the chain predecessor carry the condition.
+        foreach (var (solution, cut) in GetCuts(graph, positions))
+        {
+          foreach (var edge in graph.Edges)
+            Assert.Equal(IsAdjacentEntry(edge, cut, positions), IsGuardedBy(edge, solution));
+        }
+      }
+    }
+
+    [Fact]
+    public void Build_WithDefaultBypassChance_BypassesAreRare()
+    {
+      // Arrange: Count skip passages crossing a guarded cut, and those left unguarded.
+      var crossings = 0;
+      var bypasses = 0;
+      for (var seed = 0; seed < SeedCount; seed++)
+      {
+        // Act: Build with the default config.
+        var graph = BuildObstacleGraph(20, seed);
+        var positions = GraphAssertions.GetPositions(graph);
+        foreach (var (solution, cut) in GetCuts(graph, positions))
+        {
+          foreach (var edge in graph.Edges.Where(edge =>
+            CrossesCut(edge, cut, positions) && !IsAdjacentEntry(edge, cut, positions)))
+          {
+            crossings++;
+            if (!IsGuardedBy(edge, solution)) bypasses++;
+          }
+        }
+      }
+
+      // Assert: Plenty of skips cross guarded cuts, yet only a small share bypasses them.
+      Assert.True(crossings > 100, $"Too few skip crossings to judge ({crossings}).");
+      var share = (double)bypasses / crossings;
+      Assert.True(share < MaxDefaultBypassShare, $"Bypass share {share:F3} ({bypasses}/{crossings}) is not rare.");
     }
   }
 
@@ -774,6 +899,30 @@ public sealed class GraphBuilderLinearTests
       return graph.Nodes
         .Select((node, index) => (node.Id, index))
         .ToDictionary(pair => pair.Id, pair => pair.index);
+    }
+
+    /// <summary>
+    /// Maps every solution POI to the chain position of the node its obstacle guards: the
+    /// earliest target among passages carrying its condition. Skips over the cut reach further.
+    /// </summary>
+    /// <param name="graph">Graph to inspect.</param>
+    /// <param name="positions">Chain positions from <see cref="GetPositions"/>.</param>
+    /// <returns>Guarded node position per solution POI identifier.</returns>
+    public static Dictionary<Guid, int> GetGuardedNodes(LilGraph graph, Dictionary<Guid, int> positions)
+    {
+      var guardedNodeByPoi = new Dictionary<Guid, int>();
+      foreach (var edge in graph.Edges)
+      {
+        foreach (var condition in edge.Conditions)
+        {
+          var target = positions[edge.To];
+          guardedNodeByPoi[condition.RequiresPoi] = guardedNodeByPoi.TryGetValue(condition.RequiresPoi, out var known)
+            ? Math.Min(known, target)
+            : target;
+        }
+      }
+
+      return guardedNodeByPoi;
     }
 
     /// <summary>
@@ -1225,6 +1374,20 @@ public sealed class GraphBuilderLinearTests
       // Assert: Validation rejects the value.
       var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
       Assert.Equal(nameof(CnfGraphBuilderLinear.MaxSkipDistance), ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-0.1f)]
+    [InlineData(1.1f)]
+    [InlineData(float.NaN)]
+    public void Validate_ChanceObstacleBypassOutOfRange_ThrowsArgumentOutOfRange(float chance)
+    {
+      // Arrange: The bypass chance must be a probability.
+      var config = CnfGraphBuilderLinear.Default with { ChanceObstacleBypass = chance };
+
+      // Assert: Validation rejects the value.
+      var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+      Assert.Equal(nameof(CnfGraphBuilderLinear.ChanceObstacleBypass), ex.ParamName);
     }
 
     [Fact]
