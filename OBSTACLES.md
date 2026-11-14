@@ -4,7 +4,7 @@ General processor that puts obstacles (conditions on edges) and solutions (POIs 
 arbitrary graph, softlock-free. First user: `GraphBuilderSimple` (end of `RunProcessorsShaping()`).
 `GraphBuilderLinear` keeps its own chain-based obstacle pass.
 
-Status: **phase 1 done** (config section, resolver default, `GraphFlood` edge filter). Next: phase 2. Phases are in section 6.
+Status: **phases 1-2 done** (config section, resolver default, `GraphFlood` edge filter; cut machinery, not wired). Next: phase 3. Phases are in section 6.
 
 Decisions taken:
 - Chokepoints: cut search *prefers* chokepoint passages; a locked non-chokepoint passage keeps its flag.
@@ -174,6 +174,10 @@ No-op when: `Complexity == 0`; fewer than two nodes; not exactly one start node 
 - **Reserved side Complexity going unused**: handled by the pocket pre-scan and protected pockets
   (section 4.2). Leftover risk is small: a main cut could still put a condition inside a protected
   pocket (only through zero-cost secret edges); re-validation then skips that pocket.
+- **Candidates cluster on a unique cheapest bottleneck**: when one passage is strictly cheaper than
+  all others, the whole target series lands on it and other positions only come from the source
+  series (at most `MaxBallRadius` = 3 hops from start). `CostStack` evens this out once the
+  bottleneck carries a condition. Check in phase 7 whether long corridors need a larger radius.
 - **Solutions piling up near start** when cuts land close to it: handled by solution weights and by
   preferring target-side cuts (radius 0 first). Watch in seed sweeps.
 - **Locked non-chokepoint passages**: the map generator must guard every opening of such a passage (accepted).
@@ -201,7 +205,8 @@ New code, namespace `LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Ob
 | `ProcObstaclePlacer.cs` | Entry: `ctor(graph, options, complexity, seedGraph)`, `Execute(cancellationToken)`. Early exits, budget split, runs the passes. |
 | `ObstacleWorkGraph.cs` | Index view of the graph (Id order via `GraphIndex`), start/exit lookup, capacities, BFS balls, side assignment, `AddObstacle(cut, solutionNode)` (creates POI + conditions). |
 | `MinCutFinder.cs` | Max-flow / min cut on the index view with contracted terminals. |
-| `CutCandidate.cs` | Record: cut edges, far-side nodes, ordinary width, cost. |
+| `CutCandidate.cs` | Cut edges, far-side nodes, ordinary width, cost, highest existing condition count. |
+| `CutSearch.cs` | Candidate cuts per target: ball-grown terminals, dedupe, width cap, cost order. (Added in phase 2; split out of `ObstacleWorkGraph`.) |
 | `SolutionPicker.cs` | Blocked flood + weighted node pick, with an exclusion set (protected pockets, side pockets). |
 | `ObstaclePassMain.cs`, `ObstaclePassSide.cs` | The two passes; the side pass also exposes the pocket pre-scan used by the budget split. |
 
@@ -214,7 +219,8 @@ Changes to existing code:
 - `Data/Config/Graph/Proc/CnfProcObstaclePlacerOpt.cs` (new public record + `Validate()`), added to
   `CnfProcOpt` as `ObstaclePlacer`: `MaxConditionsPerEdge = 3`, `MaxEdgesPerObstacle = 4`,
   `MainShare = 0.7`, `SmallComplexityMax = 3`, `ChanceReserveSide = 0.75`, `ChanceReserveSideOnly = 0.2`,
-  `ChanceNestSolution = 0.4`, `ChanceStack = 0.3`, `ChanceSecretBypass = 0.25`, `ChanceBypass = 0.01`. Cost weights stay
+  `ChanceNestSolution = 0.4`, `ChanceStack = 0.3`, `ChanceSecretBypass = 0.25`, `ChanceBypass = 0.01`. Cost weights
+  (`CostChokepoint = 4`, `CostOpen = 6`, `CostStack = 2`, `CostSecret = 0`) stay
   named constants inside `ObstacleWorkGraph` until tuning shows they need exposing.
 - `Internal/Prop/Resolvers/Graph/GraphResolver.cs` (`ResolveProcOpts`): pass the default section.
 - `GENERATOR.md`: describe the processor and the new Simple behaviour.
