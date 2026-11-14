@@ -8,7 +8,7 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Processors;
 /// <summary>
 /// Tests <see cref="ProcRelSecrets"/>: option validation, secret-node shape, host picking,
 /// secret-in-secret nesting, the two-passage layout, determinism and the hand-off to the
-/// later finalization passes.
+/// later processor passes.
 /// </summary>
 /// <remarks>
 /// The pass works on a finished <see cref="LilGraph"/>, so most tests construct graphs
@@ -516,7 +516,7 @@ public sealed class ProcRelSecretsTests
       var graph = CreateStartExitChainGraph(4);
       var options = CnfProcRelSecretsOpt.Default with { Amount = 2, ChanceSecretInSecret = 0.5f };
 
-      // Act: Run the finalization passes in builder order.
+      // Act: Run the processor passes in builder order.
       new ProcRelSecrets(graph, options, Seed).Execute();
       new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpt.Default, Seed).Execute();
       new ProcNodeStyle(graph, CnfProcNodeStyleOpt.Default, Seed).Execute();

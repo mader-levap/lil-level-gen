@@ -73,7 +73,7 @@ internal static class GraphTestAssert
   /// <param name="graph">Graph to check.</param>
   /// <param name="maxDegree">Allowed relationships per node, inclusive.</param>
   /// <param name="includeSecretEdges">
-  /// When false, secret relationships (appended by the finalization pass) are not counted -
+  /// When false, secret relationships (appended by the processor pass) are not counted -
   /// builder-owned degree caps only cover builder-created passages.
   /// </param>
   public static void AssertDegreeCap(LilGraph graph, int maxDegree, bool includeSecretEdges = true)
@@ -87,7 +87,7 @@ internal static class GraphTestAssert
   /// <summary>
   /// Asserts that every node respects its own <see cref="LilNode.MaxEdges"/> hard cap;
   /// a negative cap means no limit. Counts every relationship touching the node, including
-  /// secret relationships of the finalization pass.
+  /// secret relationships of the processor pass.
   /// </summary>
   /// <param name="graph">Graph to check.</param>
   public static void AssertMaxEdges(LilGraph graph)

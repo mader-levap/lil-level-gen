@@ -178,13 +178,13 @@ internal abstract class AGraphBuilder
   }
 
   /// <summary>
-  /// Runs the finalization processors in their fixed order: secret nodes, objective POIs,
+  /// Runs the processors in their fixed order: secret nodes, objective POIs,
   /// node relative size and grouping. Each processor uses its own salted stream of the graph
   /// sub-seed, so it never shifts the builder's <see cref="Random"/> draws.
   /// </summary>
   /// <param name="cancellationToken">Token checked before every processor.</param>
   /// <exception cref="OperationCanceledException">The token was cancelled.</exception>
-  protected void RunFinalization(CancellationToken cancellationToken)
+  protected void RunProcessors(CancellationToken cancellationToken)
   {
     var procOpts = Config.Graph.ProcOpts;
     cancellationToken.ThrowIfCancellationRequested();

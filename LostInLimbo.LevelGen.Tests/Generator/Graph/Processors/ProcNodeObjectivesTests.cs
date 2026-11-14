@@ -9,7 +9,7 @@ namespace LostInLimbo.LevelGen.Tests.Generator.Graph.Processors;
 /// <summary>
 /// Tests <see cref="ProcNodeObjectives"/>: option validation, placement shape, the
 /// secret-node rules, one-goal-per-node, excess handling, determinism and the hand-off to
-/// the later finalization passes.
+/// the later processor passes.
 /// </summary>
 /// <remarks>
 /// The pass works on a finished <see cref="LilGraph"/>, so most tests construct graphs
@@ -263,7 +263,7 @@ public sealed class ProcNodeObjectivesTests
       var graph = CreateStartExitChainGraph(5);
       var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 2, OptGoalAmount = 1 };
 
-      // Act: Run the finalization passes in builder order.
+      // Act: Run the processor passes in builder order.
       new ProcRelSecrets(graph, CnfProcRelSecretsOpt.Default, Seed).Execute();
       new ProcNodeObjectives(graph, options, Seed).Execute();
       new ProcNodeRelSize(graph, CnfProcNodeRelSizeOpt.Default, Seed).Execute();

@@ -12,7 +12,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors;
 /// Graph pass that places objective POIs onto existing nodes: a configurable number of
 /// mandatory goals (<see cref="EnPoiType.Goal"/>) and optional goals
 /// (<see cref="EnPoiType.OptionalGoal"/>). A mandatory goal is never placed into a secret
-/// node; an optional goal may be, but does not have to be. The pass runs in finalization,
+/// node; an optional goal may be, but does not have to be. The pass runs in processor pass,
 /// right after the pass that adds nodes (<see cref="ProcRelSecrets"/>), so it sees the
 /// complete node set and still runs before relative size and grouping.
 /// </para>

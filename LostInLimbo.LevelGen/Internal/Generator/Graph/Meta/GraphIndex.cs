@@ -5,7 +5,7 @@ using LostInLimbo.LevelGen.Data.Result.Graph;
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 
 /// <summary>
-/// Index-based lookups over a level graph shared by the finalization processors: stable visit
+/// Index-based lookups over a level graph shared by the processors: stable visit
 /// orders, node index by identifier and strict edge-endpoint resolution.
 /// </summary>
 /// <remarks>

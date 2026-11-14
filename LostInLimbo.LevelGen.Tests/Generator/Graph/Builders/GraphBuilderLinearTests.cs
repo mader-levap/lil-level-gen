@@ -120,7 +120,7 @@ public sealed class GraphBuilderLinearTests
       var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph { Size = size });
 
       // Assert: Exactly one POI of each type exists across the graph - Start, Exit and
-      // the two objectives placed by the finalization pass.
+      // the two objectives placed by the processor pass.
       var pois = graph.Nodes.SelectMany(node => node.Pois).ToList();
       Assert.Equal(4, pois.Count);
       Assert.Single(pois.Where(poi => poi.Type == EnPoiType.Start));
@@ -129,7 +129,7 @@ public sealed class GraphBuilderLinearTests
       Assert.Single(pois.Where(poi => poi.Type == EnPoiType.OptionalGoal));
 
       // Assert: The start lives in the first chain node, the exit in the last one; the
-      // secret node appended by finalization never carries Start, Exit or a mandatory
+      // secret node appended by processor never carries Start, Exit or a mandatory
       // goal - only an optional goal may land there.
       var chain = graph.Nodes.Where(node => !node.Secret).ToList();
       Assert.Single(chain[0].Pois.Where(poi => poi.Type == EnPoiType.Start));
@@ -162,7 +162,7 @@ public sealed class GraphBuilderLinearTests
       });
 
       // Assert: No relationship is possible, yet both POIs and the mandatory goal live on
-      // the single ordinary node; the finalization pass appends one secret node hanging
+      // the single ordinary node; the processor pass appends one secret node hanging
       // off it, which hosts the optional goal (allowed in secret nodes).
       Assert.True(result.Success);
       var ordinary = Assert.Single(graph.Nodes.Where(node => !node.Secret));
@@ -657,7 +657,7 @@ public sealed class GraphBuilderLinearTests
     }
   }
 
-  /// <summary>Tests for the secret-node pass run first in the finalization.</summary>
+  /// <summary>Tests for the secret-node pass run first in the processor pass.</summary>
   public sealed class SecretTests
   {
     [Theory]

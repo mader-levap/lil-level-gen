@@ -31,7 +31,7 @@ public sealed class GraphGeneratorTests
     var result = generator.Execute();
 
     // Assert: The graph holds the configured number of nodes plus the one secret node of
-    // the finalization pass, the chain skeleton on top of which every requested extra
+    // the processor pass, the chain skeleton on top of which every requested extra
     // relationship was placed plus the secret relationship, and start/exit POIs.
     Assert.Equal(EnGenerationOutcome.Success, result.Outcome);
     Assert.Null(result.FailureReason);
@@ -57,7 +57,7 @@ public sealed class GraphGeneratorTests
     var result = generator.Execute();
 
     // Assert: The graph holds the configured number of nodes plus the one secret node of
-    // the finalization pass, a start and an exit POI.
+    // the processor pass, a start and an exit POI.
     Assert.Equal(EnGenerationOutcome.Success, result.Outcome);
     Assert.Null(result.FailureReason);
     Assert.Equal(5 + 1, world.Graph.Nodes.Count);

@@ -38,7 +38,7 @@ Configuration must be (de)serializable to/from JSON.
     - `Size`: Size of the graph. Usually the number of nodes. Soft cap - the builder is allowed to add more nodes if a small number of nodes makes it impossible to make the graph while fulfilling other settings. The hard cap is 100 (`CnfGraph.MaxSize`).
     - `Connectivity`: General connectivity of the graph. It is not the number of relationships between nodes, at least not directly.
     - `Complexity`: General complexity of the graph. Usually the number of obstacles.
-    - `ProcOpts` (`CnfProcOpts`): Options of the graph finalization processors. One section per processor; sections left out keep defaults matching the hardcoded values used before options became configurable. Ignored by builders that run no processors (`OneNode`).
+    - `ProcOpts` (`CnfProcOpts`): Options of the graph processors. One section per processor; sections left out keep defaults matching the hardcoded values used before options became configurable. Ignored by builders that run no processors (`OneNode`).
   - `CnfMap`: Map configuration. Currently placeholder.
   - `CnfDebug`: Debug configuration data.
 
@@ -97,7 +97,7 @@ Validation failure is special: when the built graph is rejected by the validator
 
 Debug early stop: `CnfDebug.EndAtPhase` ends the run right after the named phase finishes, as if paused at the start of the next phase (`EnGenResult.Paused`, world published). With `EnPhase.Graph` the world holds the complete graph in phase `Map` with no map steps, so graph-only tests skip map generation. The stop fires once, so resuming continues normally; a validation failure still wins, and `Finalization`/`Completed` have no effect.
 
-`Simple` and `Linear` finish with the same four finalization processors in the fixed order - secrets, objectives, relative size, grouping - each parameterized by its section of `CnfGraph.ProcOpts`.
+`Simple` and `Linear` finish with the same processors pass in the fixed order - secrets, objectives, relative size, grouping - each parameterized by its section of `CnfGraph.ProcOpts`.
 
 ### Map
 

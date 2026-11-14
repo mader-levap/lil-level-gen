@@ -31,7 +31,7 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// <item>Create a minimal connected skeleton - a randomly chosen scenario between linear, star and mix.</item>
 /// <item>Add POIs. Start and exit are random and the same node is allowed.</item>
 /// <item>Extra relationships between random nodes up to connectivity and <see cref="CnfGraphBuilderSimple.MaxExtraDegree"/>.</item>
-/// <item>Finalization: secret nodes, objective POIs, node relative size and grouping.</item>
+/// <item>Processors: secret nodes, objective POIs, node relative size and grouping.</item>
 /// </list>
 /// </remarks>
 /// <param name="cnfGraphBuilder">Configuration for graph builders.</param>
@@ -92,7 +92,7 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
     PlacePois();
     cancellationToken.ThrowIfCancellationRequested();
     AddExtraRelationships(connectivity, degrees, adjacency, nodeIds);
-    RunFinalization(cancellationToken);
+    RunProcessors(cancellationToken);
 
     // Soft constraints only; there is no configuration this builder cannot satisfy.
     return LilResult.Succeed();

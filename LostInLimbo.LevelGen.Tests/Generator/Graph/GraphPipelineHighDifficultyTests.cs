@@ -191,7 +191,7 @@ public sealed class GraphPipelineHighDifficultyTests
       return violations; // Graph may be partial; further structural checks would only add noise.
     }
 
-    // Node count: configured size plus secret nodes appended by the finalization pass.
+    // Node count: configured size plus secret nodes appended by the processor pass.
     int regularNodes = graph.Nodes.Count(node => !node.Secret);
     if (regularNodes != config.Graph.Size)
       violations.Add($"{regularNodes} non-secret nodes, expected {config.Graph.Size} {shape}");

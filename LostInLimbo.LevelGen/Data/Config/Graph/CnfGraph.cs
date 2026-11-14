@@ -58,7 +58,7 @@ public sealed record CnfGraph
   public CnfGraphBuilder GraphBuilder { get; init; } = CnfGraphBuilder.Default;
 
   /// <summary>
-  /// Options of the graph finalization processors. Ignored by builders that run no processors.
+  /// Options of the graph processors pass. Ignored by builders that run no processors.
   /// </summary>
   public CnfProcOpt ProcOpts { get; init; } = CnfProcOpt.Default;
 
