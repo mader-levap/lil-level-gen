@@ -1,4 +1,4 @@
-We need algorithm that can put obstacles and solutions on any graph. Separate class `ProcObstaclePlacer` in separate subdirectory and appropriate namespace: `Internal.Generator.Graph.Processors.Obstacler`. I expect it will need some auxillary classes.
+We need algorithm that can put obstacles (on edges) and solutions (in nodes) on any graph. Separate class `ProcObstaclePlacer` in separate subdirectory and namespace: `Internal.Generator.Graph.Processors.Obstacler`. I expect it will need some auxillary classes.
 For now it will be used only in `GraphBuilderSimple` (in `RunProcessorsShaping()`, at end). `GraphBuilderLinear` uses its own algo to place obstacles taking advantage of linear nature of this builder and other builders do not exist yet.
 It will likely have multiple passes and use flood algo. We need to ensure there is no softlock (that's it, solution to obstacle behind that obstacle).
 
@@ -12,5 +12,5 @@ Features:
 - Side pass: can deal separately with secrets, goals or optional goals in leaf or dead end nodes (cannot contain exit, obstacles or solutions to prevent possible softlocks), blocking them off with obstacle and dropping solution elsewhere in graph. Only if there is Complexity to spare.
 - Unused Complexity simply is ignored. There is limit of max obstacles on passage (3).
 
-Investigate possibilities. If you have better idea or algo, propose it.
+Investigate possibilities, consider potential issues. If you have better idea or algorithm, propose it.
 This is pure planning session. Save findings in `OBSTACLES.md`. This is also where plan for it goes.

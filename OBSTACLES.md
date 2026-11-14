@@ -1,0 +1,272 @@
+# Obstacle placer (`ProcObstaclePlacer`) - findings and plan
+
+General processor that puts obstacles (conditions on edges) and solutions (POIs in nodes) on an
+arbitrary graph, softlock-free. First user: `GraphBuilderSimple` (end of `RunProcessorsShaping()`).
+`GraphBuilderLinear` keeps its own chain-based obstacle pass.
+
+Status: **planned, not implemented.** Work is split into phases, see section 6.
+
+Decisions taken:
+- Chokepoints: cut search *prefers* chokepoint passages; a locked non-chokepoint passage keeps its flag.
+- Secret passages: free to cut, get locked with the rest of the cut, small chance to stay open (bypass).
+
+## 1. Findings from the code
+
+- An obstacle = one new `Solution` POI + the same `LilCondition` (`ReqSolution`) on one or more edges.
+  `Complexity` counts **obstacles (solutions)**, not conditioned edges.
+- Solutions are never consumed (`GraphValidator`, `GraphFlood`: a collected POI opens every edge that
+  requires it). So reachability is monotone: more keys/edges never hurt, as long as passages are two-way.
+- Processors run in `AGraphBuilder.RunProcessorsShaping()` (private, shared by all builders):
+  `ProcRelSecrets` -> `ProcNodeObjectives`. The placer goes last there, so it sees secret nodes
+  (leaf, nested, two-passage through-routes, one-way `A -> S -> A` loops) and Goal/OptionalGoal POIs.
+- One-way edges exist only as `A -> S -> A` secret detours today.
+- `GraphFlood.Run(start, held, collectible, blockedPoi)` already answers "what is reachable without
+  solution X" - exactly the softlock test. Reads `edge.Conditions` and `node.Pois` live, so one
+  instance survives in-place edits.
+- `GraphIndex` gives Id-ordered visit orders (determinism independent of list order).
+- `Complexity` is at most about `2 * sqrt(Size)` (~21 at Size 110): any polynomial approach is cheap.
+- `CnfGraphBuilderLinear.MaxConditionPerRel = 3` is the existing "max obstacles per passage".
+
+## 2. Softlock rule (the one invariant)
+
+> A new obstacle `k` with solution in node `n` is safe iff `n` is reachable from start **without**
+> **holding `k`** (flood with `k` blocked) on the graph that already carries `k`'s conditions.
+
+Proof sketch: before `k` the flood reached everything. With `k` blocked the flood still reaches `n`,
+so the real flood picks `k` up; from then on every `k` condition is satisfied and the flood is a
+superset of the old one. By induction the graph stays fully reachable after every obstacle.
+
+Consequences: no rollback needed (lock edges, flood, pick solution node from the flood result);
+correctness does not depend on how clever cut selection is; cuts may cross each other freely.
+
+Extra conservatism for the solution flood (stronger than the validator):
+- ignores **secret** edges and never picks **secret nodes** - progress never requires finding a secret;
+- ignores **one-way** edges - the solution is reachable inside the two-way part, so the player can
+  always walk back. One-way edges are never locked and never cross a cut (infinite capacity).
+
+## 3. Alternatives considered
+
+| Approach | Verdict |
+|---|---|
+| Random lock + random key, validate, retry | Correct, but no control over depth or bottlenecks. Rejected. |
+| Key-level labelling (Metazelda style: node level = keys needed, edge gets all keys between levels) | Clean nested cuts, but one total order: depth capped at `3 * distance(start, exit)`, cannot express "key behind another lock elsewhere". Subsumed by the chosen design. |
+| Bridge tree only (lock bridges on the start-exit path) | Perfect bottlenecks, but nothing to lock inside 2-edge-connected parts or with adjacent start/exit. Subsumed: min cut finds bridges as width-1 cuts. |
+| **Target-driven min cuts + blocked-flood key placement** | Chosen. See below. |
+
+## 4. Chosen algorithm
+
+### 4.1 Building blocks
+
+- **Min cut** between start `s` and a target node `T` (max-flow, Edmonds-Karp; flows are tiny).
+  Edge capacities: one-way or already at `MaxConditionsPerEdge` -> infinite (uncuttable); secret -> 0
+  (free); chokepoint -> `CostChokepoint`; non-chokepoint -> `CostOpen` (higher); plus `CostStack` per
+  condition already on the edge (prefers fresh cuts over stacking, stacking still possible).
+- **Candidates**: several cuts per target, by contracting the BFS ball of radius `r = 0, 1, 2...`
+  around `T` (and around `s`) into the terminal before the flow. Gives cuts at different positions
+  along the corridor. Deduplicate by edge set; reject cuts with more than `MaxEdgesPerObstacle`
+  ordinary edges or infinite cost. Pick the cheapest, ties and near-ties broken by seeded roll.
+- **Sides**: `A` = nodes reached from `s` over ordinary edges without the cut; the rest of the ordinary
+  nodes are `B`. Secret nodes join `A` first (flood over secret edges), then `B`. Every edge between
+  `A` and `B` gets the condition - except a *secret* edge may stay open with `ChanceSecretBypass`.
+- **Solution placement**: flood with `k` blocked (section 2), weighted pick among reached nodes:
+  lower weight for the start node and for nodes already holding solutions, bonus for leaves/dead
+  ends and for distance from the locked passages. Candidates enumerated in Id order.
+
+- **Parallel passages** (several edges between the same two nodes) are separate edges everywhere:
+  the flow is indexed by edge, never by a node-pair matrix. Sides are per node, so all parallels
+  between `A` and `B` are locked together; each counts toward cost and `MaxEdgesPerObstacle`; one
+  saturated parallel makes the whole pair uncuttable. "Prefer chokepoints" is a summed per-edge
+  cost, it never locks one parallel and leaves the other open. Candidates are deduplicated by edge set.
+- **Dead end / leaf** (solution weights, side pass) means all passages lead to one other node,
+  counted by distinct neighbour, not by edge count.
+
+- **Ordinary bypass** (main pass only): after the solution is placed, one roll per obstacle with
+  `ChanceBypass` (default 0.01). On a hit, one ordinary passage of the cut is left without the
+  condition - a locked shortcut with an open way around. Rules:
+  - the cut must hold at least two ordinary passages (secret ones do not count), so at least one
+    ordinary passage always stays locked;
+  - a passage with a parallel passage in the same cut is never the one left open (an open door
+    next to a locked one between the same two nodes would make the obstacle meaningless);
+  - the open passage is picked by seeded roll among the eligible ones, in Id order;
+  - rolled after solution placement, so the solution stays on the start side of the cut.
+  Never used by the side pass: all passages of a pocket join one node pair.
+
+Property: with both bypass chances 0, every edge between `A` and `B` requires `k`, so `k` is unavoidable for `T`.
+
+### 4.2 Main pass (start -> exit)
+
+Skipped when start and exit share a node (the side pass then gets all Complexity).
+
+Budget split, decided once before the pass:
+- **Normal** (`Complexity > SmallComplexityMax`): main gets `round(Complexity * MainShare)`, side the rest.
+- **Small** (`Complexity <= SmallComplexityMax`, default 3): main gets everything, except that one
+  Complexity is left for the side pass with `ChanceReserveSide` (default 0.75).
+- **Complexity 1**: reserving would leave the main pass nothing, so the chance drops to
+  `ChanceReserveSideOnly` (default 0.2); on a hit only the side pass runs.
+
+**Pocket pre-scan.** Before the split, the side pass lists the valid pockets (section 4.3) in its
+seeded-shuffled order, with the pocket size roll already made. Then:
+- no valid pocket -> nothing is reserved in any of the three cases, the main pass gets everything;
+- otherwise the side budget is capped at the number of pockets found, the rest goes to main, and
+  the first `side budget` pockets become **protected**: the main pass never puts a solution into
+  a node of a protected pocket.
+
+Whatever the main pass could not spend also falls to the side pass (it then uses unprotected
+pockets that are still valid).
+
+Keep a list of **required nodes** `Q`, initially `{exit node}`. Per obstacle:
+1. Order the targets: the exit first for the first obstacle; afterwards the most recent solution
+   node first with `ChanceNestSolution`, else the exit first. The remaining members of `Q` follow
+   in seeded-shuffled order (shuffled from Id order).
+2. Walk the targets in that order and take the best cut of each:
+   - a **fresh** cut (no edge of it carries a condition yet) is accepted at once;
+   - a **stacking** cut (`c` = highest condition count on its edges, 1 or 2) is accepted only with
+     chance `ChanceStack ^ c` (default 0.3: 30 %, then 9 %); otherwise the next target is tried.
+3. If no target was accepted but some stacking cut was refused, take the least stacked of them
+   (ties: first in target order). Stacking is rare while alternatives exist, yet Complexity is not
+   wasted on tiny graphs where stacking is the only option. No cut at all -> pass ends early.
+4. Lock the cut, place the solution, add its node to `Q` (unless it is the start node).
+
+Every main obstacle guards a node the player must visit, so **all of them are mandatory for the
+exit** (testable through `GraphMetadata`: exit `Reach` lists every main solution when bypass is 0).
+
+Edge cases this covers without special code:
+- **Start and exit adjacent**: every start-exit cut contains the direct edge. The first obstacle
+  locks it. Later obstacles mostly lock away earlier solutions instead (chain: solution 1 behind
+  obstacle 2, solution 2 behind obstacle 3...), because re-targeting the exit means stacking and
+  must pass the `ChanceStack` roll. After 3 conditions the edge is uncuttable anyway. Three
+  stacked obstacles with unrelated solutions ("collect three keys") are the rare outcome, or the
+  forced one when the graph offers nothing else to lock.
+- **Bottlenecks**: a bridge is the cheapest cut, so it wins; wide cuts only when nothing narrower
+  exists, and never above `MaxEdgesPerObstacle`.
+- **Fragmentation**: a cut may split off a group of nodes; fine by the softlock rule.
+- **Dense graph / exit with high degree**: no cut under the width cap -> fewer obstacles, Complexity unused.
+
+### 4.3 Side pass (secrets, goals, optional goals)
+
+Runs with the Complexity left after the main pass (also when the main pass was skipped). Pockets
+come from the pre-scan of section 4.2, protected ones first; each is re-validated right before
+locking, and an invalid one is skipped for the next in the list.
+- Treasure nodes: secret nodes, nodes with `Goal` or `OptionalGoal` POI. Shuffled from Id order.
+- Pocket of a treasure: far side of a cut `s | treasure` whose edges all join **one node pair**
+  (one pocket node, one host node outside). Parallel passages between that pair still make a dead
+  end. For this search the cost is 1 per node pair, secret edges included.
+  Roll between the smallest pocket (cut nearest the treasure) and the largest dead-end branch.
+- Valid pocket: no passage of the pair carries a condition; at most `MaxEdgesPerObstacle` passages;
+  pocket holds no Start, Exit or Solution POI and no conditioned edge.
+- One obstacle locks **every** passage of the pair that leads into the pocket (bidirectional ones and
+  one-way ones pointing in). A one-way passage pointing out stays open: it cannot be used to enter.
+  This covers the `A -> S -> A` secret loop - only the entry `A -> S` is locked. It is the one case
+  where a one-way passage gets a condition; safe, because the softlock rule only needs the solution
+  to be reachable without it.
+- A pocket with several treasures still costs one obstacle.
+- Solution: same blocked flood, but never inside any side pocket. So side obstacles never chain.
+
+### 4.4 Early exits and limits
+
+No-op when: `Complexity == 0`; fewer than two nodes; not exactly one start node and one exit node
+(missing, or several - unsupported in v1); no edges. Unused Complexity is dropped silently.
+`MaxConditionsPerEdge` (3) is enforced through infinite capacity. No nodes or edges are added, so
+`MaxEdges` caps are untouched. Pre-existing conditions are tolerated (count toward the cap, honoured by floods).
+
+## 5. Potential issues
+
+- **Reserved side Complexity going unused**: handled by the pocket pre-scan and protected pockets
+  (section 4.2). Leftover risk is small: a main cut could still put a condition inside a protected
+  pocket (only through zero-cost secret edges); re-validation then skips that pocket.
+- **Solutions piling up near start** when cuts land close to it: handled by solution weights and by
+  preferring target-side cuts (radius 0 first). Watch in seed sweeps.
+- **Locked non-chokepoint passages**: the map generator must guard every opening of such a passage (accepted).
+- **Ordinary bypass** makes its obstacle optional, and with it every obstacle that only guarded
+  its solution. Safe (more open passages never hurt), but such a level is easier than its
+  Complexity suggests. At 0.01 it is too rare for seed sweeps; tests force it with chance 1.
+- **Secret bypass** intentionally breaks "mandatory" for that obstacle; tests of the property use chance 0 for both bypasses.
+- **`ChanceIgnoreConditionals` of `ProcRelSecrets`** has no effect in Simple (no conditions exist
+  yet when secrets are made); `ChanceSecretBypass` takes over that role.
+- **Goal in a main-locked region or side pocket** makes that obstacle mandatory; harmless.
+- **Future builders with real points of no return**: one-way edges are uncuttable and ignored by the
+  solution flood, which is conservative; the validator stays the final arbiter.
+- **Cost**: about `Complexity * candidates` max-flows plus one flood each; negligible at Size 110.
+  `CancellationToken` checked per obstacle anyway.
+- **Determinism**: own salted RNG stream, all enumeration in Id order, solution Ids derived from
+  the obstacle ordinal with a dedicated salt; no dictionary/set iteration feeds the output.
+
+## 6. Implementation plan
+
+New code, namespace `LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler`
+(folder `Internal/Generator/Graph/Processors/Obstacler/`):
+
+| File | Role |
+|---|---|
+| `ProcObstaclePlacer.cs` | Entry: `ctor(graph, options, complexity, seedGraph)`, `Execute(cancellationToken)`. Early exits, budget split, runs the passes. |
+| `ObstacleWorkGraph.cs` | Index view of the graph (Id order via `GraphIndex`), start/exit lookup, capacities, BFS balls, side assignment, `AddObstacle(cut, solutionNode)` (creates POI + conditions). |
+| `MinCutFinder.cs` | Max-flow / min cut on the index view with contracted terminals. |
+| `CutCandidate.cs` | Record: cut edges, far-side nodes, ordinary width, cost. |
+| `SolutionPicker.cs` | Blocked flood + weighted node pick, with an exclusion set (protected pockets, side pockets). |
+| `ObstaclePassMain.cs`, `ObstaclePassSide.cs` | The two passes; the side pass also exposes the pocket pre-scan used by the budget split. |
+
+Changes to existing code:
+- `Internal/Generator/Graph/Meta/GraphFlood.cs`: optional edge filter in the constructor (skip
+  secret / one-way edges for the solution flood). Existing callers unchanged.
+- `Internal/Generator/Graph/Builders/AGraphBuilder.cs`: `protected virtual bool UsesObstaclePlacer => false`;
+  `RunProcessorsShaping()` runs the placer last when true.
+- `GraphBuilderSimple.cs`: override to `true`; fix docs ("Complexity is ignored", "without obstacles").
+- `Data/Config/Graph/Proc/CnfProcObstaclePlacerOpt.cs` (new public record + `Validate()`), added to
+  `CnfProcOpt` as `ObstaclePlacer`: `MaxConditionsPerEdge = 3`, `MaxEdgesPerObstacle = 4`,
+  `MainShare = 0.7`, `SmallComplexityMax = 3`, `ChanceReserveSide = 0.75`, `ChanceReserveSideOnly = 0.2`,
+  `ChanceNestSolution = 0.4`, `ChanceStack = 0.3`, `ChanceSecretBypass = 0.25`, `ChanceBypass = 0.01`. Cost weights stay
+  named constants inside `ObstacleWorkGraph` until tuning shows they need exposing.
+- `Internal/Prop/Resolvers/Graph/GraphResolver.cs` (`ResolveProcOpts`): pass the default section.
+- `GENERATOR.md`: describe the processor and the new Simple behaviour.
+
+### Phases
+
+Work goes phase by phase. Every phase ends with `dotnet build LostInLimbo.slnx` and
+`dotnet test LostInLimbo.slnx` green, then **stops for review** (the user commits). Tests come first
+where practical, per `AGENTS.md`. The tests of section 7 are written in the phase that adds the behaviour.
+
+| Phase | Content | Visible effect |
+|---|---|---|
+| 1. Foundations | `CnfProcObstaclePlacerOpt` (all settings at once, with `Validate()`), added to `CnfProcOpt`; default section in `GraphResolver`; `GraphFlood` edge filter. | None. Generated graphs unchanged. |
+| 2. Cut machinery | `ObstacleWorkGraph` (index view, capacities, BFS balls, side assignment), `MinCutFinder`, `CutCandidate`. Tests on hand-made graphs: chain, cycle, star, parallel passages, saturated edge, one-way, secret edges. | None. Not wired. |
+| 3. Main pass | `SolutionPicker`, `ProcObstaclePlacer` (early exits, solution Ids, `AddObstacle`), `ObstaclePassMain` (targets, nesting, `ChanceStack`). All Complexity goes to the main pass; secret passages on a cut are always locked; no bypasses. Tests on hand-made graphs, validator as oracle. | None. Not wired. |
+| 4. Wiring | `UsesObstaclePlacer` hook in `AGraphBuilder`, enabled in `GraphBuilderSimple`; builder docs and `GENERATOR.md`; sweep test over seeds x sizes x connectivity x complexity; existing Simple tests adjusted (graphs now carry conditions). | `GraphBuilderSimple` produces obstacles between start and exit. Can be inspected in the editor. |
+| 5. Side pass | `ObstaclePassSide` (pockets, incl. parallel passages and `A -> S -> A` entries), pocket pre-scan, budget split (`MainShare`, `SmallComplexityMax`, `ChanceReserveSide`, `ChanceReserveSideOnly`), protected pockets. | Secrets, goals and optional goals in dead ends get locked. |
+| 6. Bypasses | `ChanceSecretBypass` and `ChanceBypass`. | Rare open shortcuts past obstacles. |
+| 7. Tuning | Statistics over a seed sweep (obstacles placed vs Complexity, stacking rate, solutions in or next to start, cut widths); adjust defaults and cost constants, expose constants as settings if needed; final pass over this document (status, deviations). | Better defaults only. |
+
+Notes:
+- Settings exist from phase 1 but stay inert until their phase (5: budget split; 6: bypass chances).
+  Until phase 6 the placer behaves as if both bypass chances were 0.
+- Phases 2 and 3 are unreachable from the public API, so they cannot break generation.
+- Phase 4 is the first one that changes generated worlds; phases 5 and 6 change them again for the same seed.
+
+## 7. Tests (`LostInLimbo.LevelGen.Tests/Generator/Graph/Processors/Obstacler/`)
+
+- Pocket pre-scan: no valid pocket -> main pass gets all Complexity; side budget never exceeds the
+  pocket count; no main solution inside a protected pocket; reserved Complexity is actually spent.
+- Budget split: Complexity above the small limit follows `MainShare`; small Complexity reserves one for
+  the side pass at chance 1 and never at chance 0; Complexity 1 uses `ChanceReserveSideOnly`.
+- Early exits: Complexity 0, one node, missing start/exit -> graph unchanged.
+- Determinism: same seed -> identical graph; shuffled node/edge list order -> same result.
+- Limits: obstacles <= Complexity; conditions per edge <= 3; ordinary edges per obstacle <= cap;
+  no condition on one-way edges except pocket entries; no solution in secret nodes; every condition points at an existing Solution POI.
+- Softlock: `GraphValidator` passes; additionally each solution is reachable with its own POI blocked
+  and secret edges removed.
+- Main pass: with both bypass chances 0, exit `Reach` (via `GraphMetadata`) contains every main solution; chain
+  graph gets width-1 cuts only; cycle gets a 2-edge cut; start adjacent to exit (triangle, direct
+  edge only): nesting dominates over many seeds, stacking only when rolled or forced (two-node graph stacks up to 3); start == exit -> only side obstacles.
+- Side pass: pocket contents rule; solution outside all pockets; pocket behind parallel passages
+  gets all of them locked with one solution; `A -> S -> A` secret gets only its entry locked;
+  no side obstacles without spare Complexity.
+- Ordinary bypass: chance 1 leaves exactly one ordinary passage open per multi-passage cut, never on a
+  single-passage cut, never a parallel of a locked passage, never in the side pass; graph still validates.
+- Secret bypass: chance 1 leaves secret cut edges open and the graph still validates.
+- Cancellation: cancelled token throws `OperationCanceledException`.
+- Sweep through `GraphBuilderSimple`: many seeds x sizes x connectivity x complexity, secrets with
+  two passages enabled -> always beatable, caps hold.
+
+## 8. Verification
+
+`dotnet build LostInLimbo.slnx` and `dotnet test LostInLimbo.slnx` after each step; the
+`GraphBuilderSimple` sweep test is the end-to-end check.
