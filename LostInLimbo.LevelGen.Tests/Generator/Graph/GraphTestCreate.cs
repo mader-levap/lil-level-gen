@@ -114,10 +114,10 @@ internal static class GraphTestCreate
 
   /// <summary>Creates a solution requirement pointing at the given POI.</summary>
   /// <param name="poiId">Small integer identifier of the required POI.</param>
-  /// <returns>A condition of type <see cref="EnConditionType.RequiresSolution"/>.</returns>
+  /// <returns>A condition of type <see cref="EnConditionType.ReqSolution"/>.</returns>
   public static LilCondition Condition(int poiId) => new()
   {
-    Type = EnConditionType.RequiresSolution,
+    Type = EnConditionType.ReqSolution,
     RequiresPoi = Id(poiId),
   };
 

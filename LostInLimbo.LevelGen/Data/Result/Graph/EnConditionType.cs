@@ -11,5 +11,5 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 public enum EnConditionType
 {
   /// <summary>Specific solution POI must be collected first (e.g. particular key for a door).</summary>
-  RequiresSolution = 0,
+  ReqSolution = 0,
 }

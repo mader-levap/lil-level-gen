@@ -20,7 +20,7 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// entries on the same edge, each pointing to the respective key POI.
 /// </para>
 /// Invariants (enforced by <see cref="LostInLimbo.LevelGen.Api.LevelGraphValidation"/>):
-/// for <see cref="EnConditionType.RequiresSolution"/>,
+/// for <see cref="EnConditionType.ReqSolution"/>,
 /// <see cref="RequiresPoi"/> must not be <see cref="Guid.Empty"/> and
 /// must reference an existing POI whose type is
 /// <see cref="EnPoiType.Solution"/>.

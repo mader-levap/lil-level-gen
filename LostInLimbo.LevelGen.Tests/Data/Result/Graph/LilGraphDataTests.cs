@@ -77,7 +77,7 @@ public sealed class LilGraphDataTests
             Id = Guid.NewGuid(),
             From = keyNodeId,
             To = exitId,
-            Conditions = [new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = keyPoiId }],
+            Conditions = [new LilCondition { Type = EnConditionType.ReqSolution, RequiresPoi = keyPoiId }],
           },
         ],
       };
@@ -256,8 +256,8 @@ public sealed class LilGraphDataTests
         Direction = EnPassageDirection.OneWay,
         Conditions =
         [
-          new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = redKeyId },
-          new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = blueKeyId },
+          new LilCondition { Type = EnConditionType.ReqSolution, RequiresPoi = redKeyId },
+          new LilCondition { Type = EnConditionType.ReqSolution, RequiresPoi = blueKeyId },
         ],
       };
 
@@ -265,9 +265,9 @@ public sealed class LilGraphDataTests
 
       // Assert: Both conditions are present and reference the correct POIs.
       Assert.Equal(2, edge.Conditions.Count);
-      Assert.Equal(EnConditionType.RequiresSolution, edge.Conditions[0].Type);
+      Assert.Equal(EnConditionType.ReqSolution, edge.Conditions[0].Type);
       Assert.Equal(redKeyId, edge.Conditions[0].RequiresPoi);
-      Assert.Equal(EnConditionType.RequiresSolution, edge.Conditions[1].Type);
+      Assert.Equal(EnConditionType.ReqSolution, edge.Conditions[1].Type);
       Assert.Equal(blueKeyId, edge.Conditions[1].RequiresPoi);
       Assert.Equal(EnPassageDirection.OneWay, edge.Direction);
     }
@@ -295,14 +295,14 @@ public sealed class LilGraphDataTests
         Id = Guid.NewGuid(),
         From = keyNode.Id,
         To = Guid.NewGuid(),
-        Conditions = [new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = redKeyId }],
+        Conditions = [new LilCondition { Type = EnConditionType.ReqSolution, RequiresPoi = redKeyId }],
       };
       var doorB = new LilEdge
       {
         Id = Guid.NewGuid(),
         From = keyNode.Id,
         To = Guid.NewGuid(),
-        Conditions = [new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = blueKeyId }],
+        Conditions = [new LilCondition { Type = EnConditionType.ReqSolution, RequiresPoi = blueKeyId }],
       };
 
       // Act: Nothing; verifying construction.
@@ -327,7 +327,7 @@ public sealed class LilGraphDataTests
         Id = id,
         From = from,
         To = to,
-        Conditions = [new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = Guid.NewGuid() }],
+        Conditions = [new LilCondition { Type = EnConditionType.ReqSolution, RequiresPoi = Guid.NewGuid() }],
       };
       var edge2 = new LilEdge
       {
@@ -357,8 +357,8 @@ public sealed class LilGraphDataTests
     {
       // Arrange: Same type and target POI.
       var poi = Guid.NewGuid();
-      var condition1 = new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = poi };
-      var condition2 = new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = poi };
+      var condition1 = new LilCondition { Type = EnConditionType.ReqSolution, RequiresPoi = poi };
+      var condition2 = new LilCondition { Type = EnConditionType.ReqSolution, RequiresPoi = poi };
 
       // Act/Assert: Record equality holds for instances with the same values.
       Assert.Equal(condition1, condition2);

@@ -47,7 +47,7 @@ public sealed class ResultEnumValuesTests
   public void EnConditionType_HasPinnedValues()
   {
     // Assert: Every member keeps its stored value.
-    Assert.Equal(0, (int)EnConditionType.RequiresSolution);
+    Assert.Equal(0, (int)EnConditionType.ReqSolution);
     Assert.Single(Enum.GetValues<EnConditionType>());
   }
 }

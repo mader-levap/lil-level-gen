@@ -335,7 +335,7 @@ public sealed class GraphBuilderLinearTests
           foreach (var condition in edge.Conditions)
           {
             // Assert: The condition demands an existing solution POI.
-            Assert.Equal(EnConditionType.RequiresSolution, condition.Type);
+            Assert.Equal(EnConditionType.ReqSolution, condition.Type);
             Assert.Contains(condition.RequiresPoi, solutionIds);
           }
         }

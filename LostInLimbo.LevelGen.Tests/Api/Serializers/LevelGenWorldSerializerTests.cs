@@ -87,7 +87,7 @@ public sealed class LevelGenWorldSerializerTests
       To = nodeB,
       Direction = EnPassageDirection.OneWay,
       Chokepoint = true,
-      Conditions = [new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = poiKey }],
+      Conditions = [new LilCondition { Type = EnConditionType.ReqSolution, RequiresPoi = poiKey }],
     });
     return world;
   }

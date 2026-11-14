@@ -341,7 +341,7 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// is most likely right before the guarded passage and falls off with distance up to
   /// <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/>.</item>
   /// <item>Every relationship crossing the cut gains the same new condition
-  /// (<see cref="EnConditionType.RequiresSolution"/> pointing at that POI). Direct entries from
+  /// (<see cref="EnConditionType.ReqSolution"/> pointing at that POI). Direct entries from
   /// the chain predecessor always do; each skip relationship stays unguarded with
   /// <see cref="CnfGraphBuilderLinear.ChanceObstacleBypass"/>, a rare deliberate bypass.</item>
   /// </list>
@@ -379,7 +379,7 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
       // Every relationship crossing the cut gets the same condition, except for rare bypasses.
       var condition = new LilCondition
       {
-        Type = EnConditionType.RequiresSolution,
+        Type = EnConditionType.ReqSolution,
         RequiresPoi = solutionPoi.Id,
       };
       foreach (var edge in Graph.Edges)

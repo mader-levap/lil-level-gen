@@ -68,7 +68,7 @@ public sealed class LilWorldCopyTests
             To = Guid.NewGuid(),
             Direction = EnPassageDirection.OneWay,
             Chokepoint = true,
-            Conditions = [new LilCondition { Type = EnConditionType.RequiresSolution, RequiresPoi = keyPoiId }],
+            Conditions = [new LilCondition { Type = EnConditionType.ReqSolution, RequiresPoi = keyPoiId }],
           },
         ],
       },
@@ -205,7 +205,7 @@ public sealed class LilWorldCopyTests
     // Act: Mutate every mutable surface of the copy.
     var copy = LilWorldCopy.Copy(source);
     Assert.NotNull(copy);
-    
+
     foreach (var node in copy.Graph.Nodes)
     {
       node.Pois.Clear();

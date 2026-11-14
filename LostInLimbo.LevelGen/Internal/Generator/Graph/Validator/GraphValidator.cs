@@ -66,7 +66,7 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
   private readonly LilGraph? _graph = graph;
   /// <summary>Validator options.</summary>
   private readonly CnfValidGraphOpt _options = options;
-  
+
   /// <summary>All nodes mapped by id.</summary>
   private Dictionary<Guid, LilNode>? _nodesById;
   /// <summary>All start nodes.</summary>
@@ -232,7 +232,7 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
         if (!_poiTypes.TryGetValue(condition.RequiresPoi, out var poiType))
           return LilResult.Fail($"Condition on edge {edge.Id} references missing POI {condition.RequiresPoi}.");
 
-        if (condition.Type == EnConditionType.RequiresSolution && poiType != EnPoiType.Solution)
+        if (condition.Type == EnConditionType.ReqSolution && poiType != EnPoiType.Solution)
           return LilResult.Fail(
             $"Condition on edge {edge.Id} references non-Solution POI {condition.RequiresPoi} (type {poiType}).");
       }

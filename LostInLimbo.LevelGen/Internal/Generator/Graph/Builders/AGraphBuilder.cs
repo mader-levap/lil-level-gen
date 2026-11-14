@@ -178,21 +178,57 @@ internal abstract class AGraphBuilder
   }
 
   /// <summary>
-  /// Runs the processors in their fixed order: secret nodes, objective POIs,
-  /// node relative size and grouping. Each processor uses its own salted stream of the graph
-  /// sub-seed, so it never shifts the builder's <see cref="Random"/> draws.
+  /// Runs the processors in their fixed order.
   /// </summary>
+  /// <remarks>
+  /// <para>
+  /// Each processor uses its own salted stream of the graph sub-seed, so it never shifts
+  /// the builder's <see cref="Random"/> draws.
+  /// </para>
+  /// <para>
+  /// Order is important, as later processors may use data added by earlier processors.
+  /// </para>
+  /// </remarks>
   /// <param name="cancellationToken">Token checked before every processor.</param>
   /// <exception cref="OperationCanceledException">The token was cancelled.</exception>
   protected void RunProcessors(CancellationToken cancellationToken)
   {
+    RunProcessorsShaping(cancellationToken);
+    RunProcessorsFinal(cancellationToken);
+  }
+
+  /// <summary>
+  /// Run shaping processors.
+  /// </summary>
+  /// <remarks>
+  /// All processors that shape graph (add/change nodes/relationships/POIs/etc) are run here.
+  /// </remarks>
+  /// <param name="cancellationToken">Token checked before every processor.</param>
+  private void RunProcessorsShaping(CancellationToken cancellationToken)
+  {
     var procOpts = Config.Graph.ProcOpts;
+
     cancellationToken.ThrowIfCancellationRequested();
     new ProcRelSecrets(Graph, procOpts.RelSecrets, PrepData.SeedGraph).Execute();
+
     cancellationToken.ThrowIfCancellationRequested();
     new ProcNodeObjectives(Graph, procOpts.NodeObjectives, PrepData.SeedGraph).Execute();
+  }
+
+  /// <summary>
+  /// Run final processors.
+  /// </summary>
+  /// <remarks>
+  /// Must be run last, as they need all data already in place.
+  /// </remarks>
+  /// <param name="cancellationToken">Token checked before every processor.</param>
+  private void RunProcessorsFinal(CancellationToken cancellationToken)
+  {
+    var procOpts = Config.Graph.ProcOpts;
+
     cancellationToken.ThrowIfCancellationRequested();
     new ProcNodeRelSize(Graph, procOpts.NodeRelSize, PrepData.SeedGraph).Execute();
+
     cancellationToken.ThrowIfCancellationRequested();
     new ProcNodeStyle(Graph, procOpts.NodeStyle, PrepData.SeedGraph).Execute();
   }
