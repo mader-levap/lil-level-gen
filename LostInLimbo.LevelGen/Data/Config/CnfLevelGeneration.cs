@@ -16,7 +16,7 @@ namespace LostInLimbo.LevelGen.Data.Config;
 /// The same seed with the same configuration always produces the same level.
 /// </para>
 /// <para>
-/// This is the root of the JSON configuration file. The shape maps one-to-one to JSON via <see cref="Api.LevelGenSerializer"/>.
+/// This is the root of the JSON configuration file. The shape maps one-to-one to JSON via <see cref="Api.Serializers.LevelGenSerializer"/>.
 /// </para>
 /// </remarks>
 public sealed record CnfLevelGeneration

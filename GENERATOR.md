@@ -49,6 +49,8 @@ Configuration must be (de)serializable to/from JSON.
   - Contains `LilMap`. This is the concrete representation of the map that can be used for generating meshes and objects in the game.
   - Contains `LilStats`. Various statistics about the current state of the world, like the count of areas, how many steps were made, etc.
 
+The world is saved and loaded as binary data (it gets large once it carries a map) by `LevelGenWorldSerializer` in `Api/Serializers`: a `"LILW"` signature and format version, then length-prefixed sections (world, stats, graph, map), little-endian. It works on a caller-provided `Stream`; opening files and optional compression stay with the caller. A file loads only with the same format version. Any change to the saved data must bump `WorldBinaryFormat.FormatVersion` and update the pinned-bytes test.
+
 ### Graph
 
 - `LilGraph`: Contains all nodes and relationships between them.

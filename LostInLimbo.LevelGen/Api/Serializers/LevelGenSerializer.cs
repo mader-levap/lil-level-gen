@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Prop;
 
-namespace LostInLimbo.LevelGen.Api;
+namespace LostInLimbo.LevelGen.Api.Serializers;
 
 /// <summary>
 /// Serializes and deserializes data to and from JSON strings.

@@ -19,7 +19,8 @@ namespace LostInLimbo.LevelGen.Data.Result;
 /// <para>
 /// Maintenance rule: when mutable state is added to <see cref="LilWorld"/>, <see cref="LilGraph"/>,
 /// <see cref="LilNode"/>, <see cref="LilEdge"/> or <see cref="LilStats"/>, extend
-/// <see cref="Copy"/> accordingly so the detachment guarantee holds. Leaf records
+/// <see cref="Copy"/> accordingly so the detachment guarantee holds, and extend the binary world
+/// format (bumping its format version) so the new state is saved too. Leaf records
 /// (<see cref="LilPoi"/>, <see cref="LilCondition"/>, <see cref="LilStyle"/>) are immutable
 /// (init-only) and are shared as list elements; they need no copying.
 /// Note that <see cref="LilNode.Reach"/> and <see cref="LilNode.OpenReach"/> count as mutable

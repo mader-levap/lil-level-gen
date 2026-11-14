@@ -17,6 +17,8 @@ Read the entire `README.md`. There is some configuration that needs to be done b
 
 ### Usage
 
+#### Generate world
+
 Use `LevelGenSession` instance.
 
 Very simple example using default props:
@@ -25,6 +27,15 @@ private readonly LevelGenSession _levelGenSession = new();
 PropMain propMain = new();
 CnfLevelGeneration config = LevelGenConfig.Execute(propMain);
 _levelGenSession.Start(EnRunKind.All, config);
+```
+
+#### Save/load of world
+
+Save and load a generated world (binary; the library only works on streams, files are up to you):
+```csharp
+LilWorld? world = _levelGenSession.World();
+using (var file = File.Create("level.lilw")) LevelGenWorldSerializer.Write(world!, file);
+using (var file = File.OpenRead("level.lilw")) world = LevelGenWorldSerializer.Read(file);
 ```
 
 ## Releases

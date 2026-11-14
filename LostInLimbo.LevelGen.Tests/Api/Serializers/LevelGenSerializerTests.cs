@@ -1,13 +1,13 @@
 using System.Text.Json;
 
-using LostInLimbo.LevelGen.Api;
+using LostInLimbo.LevelGen.Api.Serializers;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Prop;
 
-namespace LostInLimbo.LevelGen.Tests.Api;
+namespace LostInLimbo.LevelGen.Tests.Api.Serializers;
 
 /// <summary>
 /// Tests the canonical JSON (de)serialization of level generation config, grouped into

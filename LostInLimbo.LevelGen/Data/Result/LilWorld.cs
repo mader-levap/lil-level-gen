@@ -8,7 +8,8 @@ namespace LostInLimbo.LevelGen.Data.Result;
 /// Result of generation.
 /// </summary>
 /// <remarks>
-/// Pure, mutable data. Must be serializable.
+/// Pure, mutable data. Saved and loaded as binary data by
+/// <see cref="Api.Serializers.LevelGenWorldSerializer"/>.
 /// <para>
 /// <see cref="Api.LevelGenSession.World"/> returns a private deep copy on every call, so a
 /// consumer may modify it freely without affecting the generator or other callers. A
