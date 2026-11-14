@@ -41,15 +41,26 @@ internal sealed class ObstaclePassMain
 {
   /// <summary>Shared state of the run.</summary>
   private readonly ObstacleState _state;
+  /// <summary>Flag per node: must not receive a solution (protected side pockets); null protects nothing.</summary>
+  private readonly bool[]? _protectedNodes;
 
   /// <summary>
   /// Prepares the pass.
   /// </summary>
   /// <param name="state">Shared state; its graph must have a single start node and a single exit node.</param>
+  /// <param name="protectedNodes">
+  /// Flag per node work index: nodes that must not receive a solution of this pass - the
+  /// pockets reserved for the side pass. Null protects nothing.
+  /// </param>
   /// <exception cref="ArgumentNullException"><paramref name="state"/> is null.</exception>
-  public ObstaclePassMain(ObstacleState state)
+  /// <exception cref="ArgumentException"><paramref name="protectedNodes"/> does not hold one flag per node.</exception>
+  public ObstaclePassMain(ObstacleState state, bool[]? protectedNodes = null)
   {
     _state = state ?? throw new ArgumentNullException(nameof(state));
+    if (protectedNodes != null && protectedNodes.Length != state.Work.NodeCount)
+      throw new ArgumentException("One flag per node is required.", nameof(protectedNodes));
+
+    _protectedNodes = protectedNodes;
   }
 
   /// <summary>
@@ -78,7 +89,7 @@ internal sealed class ObstaclePassMain
       var cut = ChooseCut(start, targets);
       if (cut is null) break; // Nothing left to lock.
 
-      if (!_state.TryPlaceObstacle(cut.LockEdges, excludedSolutionNodes: null, out var solutionNode)) break;
+      if (!_state.TryPlaceObstacle(cut.LockEdges, _protectedNodes, out var solutionNode)) break;
 
       placed++;
       if (solutionNode == start)

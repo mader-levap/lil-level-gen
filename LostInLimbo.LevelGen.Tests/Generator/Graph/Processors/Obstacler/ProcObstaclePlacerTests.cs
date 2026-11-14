@@ -93,13 +93,15 @@ public sealed class ProcObstaclePlacerTests
     // Assert: One solution per obstacle, never more than Complexity.
     Assert.True(placer.PlacedObstacles <= complexity, context);
     Assert.Equal(placer.PlacedObstacles, solutions.Count);
+    Assert.Equal(placer.PlacedObstacles, placer.PlacedMainObstacles + placer.PlacedSideObstacles);
     Assert.Equal(solutions.Count, new HashSet<Guid>(solutions).Count);
 
-    // Assert: Per passage - cap respected, only known solutions, none twice, one-way untouched.
+    // Assert: Per passage - cap respected, only known solutions, none twice; a one-way passage
+    // can only be locked once, as the entry of a side pocket.
     foreach (var edge in graph.Edges)
     {
       Assert.True(edge.Conditions.Count <= options.MaxConditionsPerEdge, context);
-      if (edge.Direction == EnPassageDirection.OneWay) Assert.Empty(edge.Conditions);
+      if (edge.Direction == EnPassageDirection.OneWay) Assert.True(edge.Conditions.Count <= 1, context);
 
       var seen = new HashSet<Guid>();
       foreach (var condition in edge.Conditions)
@@ -141,18 +143,22 @@ public sealed class ProcObstaclePlacerTests
   }
 
   /// <summary>
-  /// Asserts that every solution is unavoidable on the way to the exit, using the reach metadata.
+  /// Asserts that every main pass solution is unavoidable on the way to the exit, using the
+  /// reach metadata. Side pass solutions guard dead ends and are usually not needed.
   /// </summary>
   /// <param name="graph">Graph after the run.</param>
+  /// <param name="placer">Placer that ran.</param>
   /// <param name="context">Text naming the case, for failure messages.</param>
-  private static void AssertAllSolutionsMandatoryForExit(LilGraph graph, string context)
+  private static void AssertMainSolutionsMandatoryForExit(LilGraph graph, ProcObstaclePlacer placer, string context)
   {
     new GraphMetadata(graph).Generate();
     var exitNode = graph.Nodes.Find(node => node.HasPoi(EnPoiType.Exit))!;
     var needed = exitNode.Reach[GraphTestCreate.Id(StartPoiId)];
 
-    // Assert: Each placed solution is among the ones every route to the exit needs.
-    foreach (var solutionId in SolutionIds(graph)) Assert.True(needed.Contains(solutionId), context);
+    // Assert: At least as many solutions are needed on every route to the exit as the main
+    // pass placed.
+    var mandatory = SolutionIds(graph).FindAll(needed.Contains).Count;
+    Assert.True(mandatory >= placer.PlacedMainObstacles, context);
   }
 
   /// <summary>Named graph factories for the sweep tests; each call builds a fresh graph.</summary>
@@ -332,7 +338,7 @@ public sealed class ProcObstaclePlacerTests
       // Arrange: Start and exit share node 2 of a chain.
       var graph = CreateLevel(4, 2, 2, Chain(4));
 
-      // Act/Assert: The main pass is skipped. (Until the side pass exists, nothing is placed.)
+      // Act/Assert: The main pass is skipped, and without a treasure the side pass has nothing to guard.
       AssertUntouched(graph, Run(graph, 3, 42));
     }
 
@@ -457,10 +463,10 @@ public sealed class ProcObstaclePlacerTests
         {
           // Arrange/Act: A fresh graph with a generous Complexity.
           var graph = create();
-          Run(graph, 5, seed);
+          var placer = Run(graph, 5, seed);
 
           // Assert: No obstacle of the main pass can be skipped.
-          AssertAllSolutionsMandatoryForExit(graph, $"{name}, seed {seed}");
+          AssertMainSolutionsMandatoryForExit(graph, placer, $"{name}, seed {seed}");
         }
       }
     }
@@ -637,13 +643,14 @@ public sealed class ProcObstaclePlacerTests
         MarkSecret(graph, 4);
 
         // Act: One obstacle.
-        Run(graph, 1, seed);
+        var placer = Run(graph, 1, seed);
 
         // Assert: The secret way into the exit carries the same solution, so the obstacle
         // cannot be bypassed.
         var solution = Assert.Single(SolutionIds(graph));
         Assert.Contains(graph.Edges[3], EdgesRequiring(graph, solution));
-        AssertAllSolutionsMandatoryForExit(graph, $"seed {seed}");
+        Assert.Equal(1, placer.PlacedMainObstacles);
+        AssertMainSolutionsMandatoryForExit(graph, placer, $"seed {seed}");
       }
     }
 
@@ -667,6 +674,178 @@ public sealed class ProcObstaclePlacerTests
         Assert.Equal(2, placer.PlacedObstacles);
         GraphTestAssert.AssertBeatable(graph, $"seed {seed}");
       }
+    }
+  }
+
+  /// <summary>Tests how Complexity is split between the main pass and the side pass.</summary>
+  public sealed class BudgetSplitTests
+  {
+    /// <summary>Number of goal leaves, and so of pockets, in <see cref="CreateLevelWithPockets"/>.</summary>
+    private const int PocketCount = 3;
+
+    /// <summary>
+    /// Chain 1 - 6 from start to exit, with goal leaves 7, 8 and 9 hanging on nodes 2, 3 and 4.
+    /// Edges 5, 6 and 7 are the leaf passages.
+    /// </summary>
+    /// <returns>The graph.</returns>
+    private static LilGraph CreateLevelWithPockets()
+    {
+      var passages = new List<Passage>(Chain(6)) { new(2, 7), new(3, 8), new(4, 9) };
+      var graph = CreateLevel(9, 1, 6, [.. passages]);
+      AddGoal(graph, 7);
+      AddGoal(graph, 8, optional: true);
+      AddGoal(graph, 9);
+      return graph;
+    }
+
+    [Theory]
+    [InlineData(4, 0.7f, 1)] // round(2.8) = 3 for main.
+    [InlineData(5, 0.7f, 1)] // round(3.5) = 4 for main.
+    [InlineData(10, 0.7f, 3)]
+    [InlineData(10, 0.5f, 3)] // 5 wanted, capped at the three pockets.
+    [InlineData(10, 1f, 0)]
+    [InlineData(4, 0f, 3)]
+    public void Execute_WithLargeComplexity_ReservesByMainShare(int complexity, float mainShare, int expectedReserve)
+    {
+      var options = CnfProcObstaclePlacerOpt.Default with { MainShare = mainShare };
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange/Act: Complexity above the small limit.
+        var graph = CreateLevelWithPockets();
+        var placer = Run(graph, complexity, seed, options);
+
+        // Assert: The reserve follows the share, never exceeds the pocket count and is spent.
+        Assert.Equal(expectedReserve, placer.ReservedSideBudget);
+        Assert.True(placer.PlacedSideObstacles >= expectedReserve, $"seed {seed}");
+        Assert.True(placer.PlacedMainObstacles <= complexity - expectedReserve, $"seed {seed}");
+        AssertInvariants(graph, placer, complexity, options, $"seed {seed}");
+      }
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void Execute_WithSmallComplexity_ReservesOneByChance(int complexity)
+    {
+      var always = CnfProcObstaclePlacerOpt.Default with { ChanceReserveSide = 1f, ChanceReserveSideOnly = 0f };
+      var never = CnfProcObstaclePlacerOpt.Default with { ChanceReserveSide = 0f, ChanceReserveSideOnly = 1f };
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Act: The same level with the reserve forced on and off.
+        var reserved = Run(CreateLevelWithPockets(), complexity, seed, always);
+        var unreserved = Run(CreateLevelWithPockets(), complexity, seed, never);
+
+        // Assert: Exactly one point is reserved, or none; the chance for Complexity 1 is not used.
+        Assert.Equal(1, reserved.ReservedSideBudget);
+        Assert.Equal(complexity - 1, reserved.PlacedMainObstacles);
+        Assert.Equal(1, reserved.PlacedSideObstacles);
+        Assert.Equal(0, unreserved.ReservedSideBudget);
+        Assert.Equal(complexity, unreserved.PlacedMainObstacles);
+      }
+    }
+
+    [Fact]
+    public void Execute_WithComplexityOne_UsesItsOwnReserveChance()
+    {
+      var always = CnfProcObstaclePlacerOpt.Default with { ChanceReserveSide = 0f, ChanceReserveSideOnly = 1f };
+      var never = CnfProcObstaclePlacerOpt.Default with { ChanceReserveSide = 1f, ChanceReserveSideOnly = 0f };
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Act: Complexity 1 with the reserve forced on and off.
+        var sideOnly = Run(CreateLevelWithPockets(), 1, seed, always);
+        var mainOnly = Run(CreateLevelWithPockets(), 1, seed, never);
+
+        // Assert: The single obstacle goes to the side pass or to the main pass.
+        Assert.Equal((0, 1), (sideOnly.PlacedMainObstacles, sideOnly.PlacedSideObstacles));
+        Assert.Equal((1, 0), (mainOnly.PlacedMainObstacles, mainOnly.PlacedSideObstacles));
+      }
+    }
+
+    [Fact]
+    public void Execute_WithoutPockets_GivesEverythingToTheMainPass()
+    {
+      // Arrange: Reserve chances forced on, but the chain has no treasure.
+      var options = CnfProcObstaclePlacerOpt.Default with { ChanceReserveSide = 1f, ChanceReserveSideOnly = 1f, MainShare = 0f };
+      foreach (var complexity in new[] { 1, 3, 5 })
+      {
+        var graph = CreateLevel(6, 1, 6, Chain(6));
+
+        // Act: Run the placer.
+        var placer = Run(graph, complexity, 42, options);
+
+        // Assert: Nothing is reserved; the chain has five passages for the main pass.
+        Assert.Equal(0, placer.ReservedSideBudget);
+        Assert.Equal(0, placer.PlacedSideObstacles);
+        Assert.Equal(complexity, placer.PlacedMainObstacles);
+      }
+    }
+
+    [Fact]
+    public void Execute_WithReservedPockets_KeepsMainSolutionsOutOfThem()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange/Act: All three pockets are reserved.
+        var graph = CreateLevelWithPockets();
+        var placer = Run(graph, 10, seed);
+
+        // Assert: Every pocket is locked exactly once and holds no solution.
+        Assert.Equal(PocketCount, placer.PlacedSideObstacles);
+        for (var leaf = 7; leaf <= 9; leaf++)
+        {
+          Assert.False(graph.Nodes[leaf - 1].HasPoi(EnPoiType.Solution), $"seed {seed}");
+          Assert.Single(graph.Edges[leaf - 2].Conditions);
+        }
+      }
+    }
+
+    [Fact]
+    public void Execute_WithStartAndExitInSameNode_GivesEverythingToTheSidePass()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: Start and exit share node 1; goal leaves as before.
+        var passages = new List<Passage>(Chain(6)) { new(2, 7), new(3, 8), new(4, 9) };
+        var graph = CreateLevel(9, 1, 1, [.. passages]);
+        AddGoal(graph, 7);
+        AddGoal(graph, 8);
+        AddGoal(graph, 9);
+
+        // Act: More Complexity than pockets.
+        var placer = Run(graph, 5, seed);
+
+        // Assert: Only side obstacles, one per pocket.
+        Assert.Equal(0, placer.PlacedMainObstacles);
+        Assert.Equal(PocketCount, placer.PlacedSideObstacles);
+        AssertInvariants(graph, placer, 5, CnfProcObstaclePlacerOpt.Default, $"seed {seed}");
+      }
+    }
+
+    [Fact]
+    public void Execute_WhenMainPassCannotSpendItsBudget_LeavesTheRestToTheSidePass()
+    {
+      // Arrange: Nothing reserved, one condition per passage: the main pass can lock the
+      // direct passage 1 - 2 once, and at most the goal leaf 3 when its solution landed there.
+      var options = CnfProcObstaclePlacerOpt.Default with { MainShare = 1f, MaxConditionsPerEdge = 1 };
+      const int seeds = 300; // The solution lands in the start node only rarely.
+      var sideUsedLeftover = false;
+      for (var seed = 0; seed < seeds; seed++)
+      {
+        var graph = CreateLevel(3, 1, 2, new Passage(1, 2), new Passage(1, 3));
+        AddGoal(graph, 3);
+
+        // Act: Far more Complexity than fits.
+        var placer = Run(graph, 4, seed, options);
+
+        // Assert: Nothing was reserved, both passages end up locked, by either pass.
+        Assert.Equal(0, placer.ReservedSideBudget);
+        Assert.Equal(2, placer.PlacedObstacles);
+        AssertInvariants(graph, placer, 4, options, $"seed {seed}");
+        sideUsedLeftover |= placer.PlacedSideObstacles == 1;
+      }
+
+      // Assert: In some runs the leaf was locked by the side pass, from the unspent budget.
+      Assert.True(sideUsedLeftover);
     }
   }
 }

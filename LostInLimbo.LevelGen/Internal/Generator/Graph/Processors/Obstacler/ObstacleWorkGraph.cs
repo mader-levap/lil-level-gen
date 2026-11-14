@@ -261,10 +261,16 @@ internal sealed class ObstacleWorkGraph
   /// <returns>True when an obstacle may lock the passage.</returns>
   public bool IsLockable(int edge)
   {
-    var passage = _edges[edge];
-    return passage.Direction == EnPassageDirection.Bidirectional
-           && passage.Conditions.Count < _options.MaxConditionsPerEdge;
+    return _edges[edge].Direction == EnPassageDirection.Bidirectional && HasConditionRoom(edge);
   }
+
+  /// <summary>
+  /// Tells whether a passage is below the condition cap
+  /// (<see cref="CnfProcObstaclePlacerOpt.MaxConditionsPerEdge"/>), whatever its direction.
+  /// </summary>
+  /// <param name="edge">Work index of the passage.</param>
+  /// <returns>True when one more condition fits.</returns>
+  public bool HasConditionRoom(int edge) => _edges[edge].Conditions.Count < _options.MaxConditionsPerEdge;
 
   /// <summary>
   /// Cost of cutting a passage in the main pass. Reads the conditions live.

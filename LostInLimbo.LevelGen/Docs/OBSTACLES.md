@@ -4,7 +4,7 @@ General processor that puts obstacles (conditions on edges) and solutions (POIs 
 arbitrary graph, softlock-free. First user: `GraphBuilderSimple` (end of `RunProcessorsShaping()`).
 `GraphBuilderLinear` keeps its own chain-based obstacle pass.
 
-Status: **phases 1-4 done** (config, cut machinery, main pass, wired into `GraphBuilderSimple`). Next: phase 5. Phases are in section 6.
+Status: **phases 1-5 done** (config, cut machinery, main pass, wired into `GraphBuilderSimple`, side pass with budget split). Next: phase 6. Phases are in section 6.
 
 Decisions taken:
 - Chokepoints: cut search *prefers* chokepoint passages; a locked non-chokepoint passage keeps its flag.
@@ -150,19 +150,27 @@ Runs with the Complexity left after the main pass (also when the main pass was s
 come from the pre-scan of section 4.2, protected ones first; each is re-validated right before
 locking, and an invalid one is skipped for the next in the list.
 - Treasure nodes: secret nodes, nodes with `Goal` or `OptionalGoal` POI. Shuffled from Id order.
+  A treasure already inside a listed pocket is skipped, and listed pockets never overlap.
 - Pocket of a treasure: far side of a cut `s | treasure` whose edges all join **one node pair**
   (one pocket node, one host node outside). Parallel passages between that pair still make a dead
   end. For this search the cost is 1 per node pair, secret edges included.
-  Roll between the smallest pocket (cut nearest the treasure) and the largest dead-end branch.
-- Valid pocket: no passage of the pair carries a condition; at most `MaxEdgesPerObstacle` passages;
-  pocket holds no Start, Exit or Solution POI and no conditioned edge.
+  Roll between the smallest pocket (cut nearest the treasure) and the largest dead-end branch
+  (`ChanceLargestPocket` = 0.5, a constant in `ObstaclePassSide`).
+  Implementation: every joined node pair is tried - take its passages away, and whatever loses
+  its way to the start is the pocket behind that pair.
+- Valid pocket: no passage of the pair carries a condition; at least one and at most
+  `MaxEdgesPerObstacle` entry passages; pocket holds no Start, Exit or Solution POI and no
+  conditioned edge; pocket holds at most half of all nodes (`MaxPocketNodeShareDivisor` = 2,
+  added in phase 5: with the start in a dead end, the rest of the level would otherwise count
+  as one huge pocket).
 - One obstacle locks **every** passage of the pair that leads into the pocket (bidirectional ones and
   one-way ones pointing in). A one-way passage pointing out stays open: it cannot be used to enter.
   This covers the `A -> S -> A` secret loop - only the entry `A -> S` is locked. It is the one case
   where a one-way passage gets a condition; safe, because the softlock rule only needs the solution
   to be reachable without it.
 - A pocket with several treasures still costs one obstacle.
-- Solution: same blocked flood, but never inside any side pocket. So side obstacles never chain.
+- Solution: same blocked flood, but never inside any listed pocket. So side obstacles never chain.
+  When no node outside the pockets can hold the solution, the pocket stays open.
 
 ### 4.4 Early exits and limits
 
@@ -191,6 +199,11 @@ No-op when: `Complexity == 0`; fewer than two nodes; not exactly one start node 
 
   Part of the "2" share is forced stacking (a solution landed in the start node, so nothing
   else could be locked), which no `ChanceStack` value removes.
+- **Large pockets take solution room from the main pass**: a protected pocket may be a whole
+  branch (up to half of the graph), and no main solution goes into it. Check in phase 7 whether
+  `ChanceLargestPocket` or the size cap needs tuning.
+- **`MainShare` rounding**: the main budget is `round(Complexity * MainShare)` with halves rounded
+  up, computed in decimal so that 5 * 0.7 gives 4, not 3.
 - **Solutions piling up near start** when cuts land close to it: handled by solution weights and by
   preferring target-side cuts (radius 0 first). Watch in seed sweeps.
 - **Locked non-chokepoint passages**: the map generator must guard every opening of such a passage (accepted).
@@ -222,7 +235,8 @@ New code, namespace `LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Ob
 | `CutCandidate.cs` | Cut edges, far-side nodes, ordinary width, cost, highest existing condition count. |
 | `CutSearch.cs` | Candidate cuts per target: ball-grown terminals, dedupe, width cap, cost order. (Added in phase 2; split out of `ObstacleWorkGraph`.) |
 | `SolutionPicker.cs` | Weighted node pick among the nodes the blocked flood reached, with an exclusion set (protected pockets, side pockets). The flood itself lives in `ObstacleState`. |
-| `ObstaclePassMain.cs`, `ObstaclePassSide.cs` | The two passes; the side pass also exposes the pocket pre-scan used by the budget split. |
+| `ObstaclePassMain.cs`, `ObstaclePassSide.cs` | The two passes; the side pass also exposes the pocket pre-scan (`Scan`, `BuildNodeMask`) used by the budget split. |
+| `ObstaclePocket.cs` | One pocket: gate node, host node, nodes, passages of the pair, entry passages. (Added in phase 5.) |
 
 Changes to existing code:
 - `Internal/Generator/Graph/Meta/GraphFlood.cs`: optional edge filter in the constructor (skip

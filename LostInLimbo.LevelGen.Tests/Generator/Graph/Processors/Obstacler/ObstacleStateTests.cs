@@ -162,6 +162,25 @@ public sealed class ObstacleStateTests
   }
 
   [Fact]
+  public void TryPlaceObstacle_WithOneWayAllowed_LocksOneWayPassageButNotFullOnes()
+  {
+    // Arrange: Chain 1 - 2 with a one-way detour 2 -> 3 -> 2; the way back is full.
+    var graph = CreateLevel(
+      3, 1, 2,
+      new Passage(1, 2), new Passage(2, 3, OneWay: true), new Passage(3, 2, OneWay: true, Conditions: 3));
+    var state = CreateState(graph);
+
+    // Act: Lock the one-way entry with the flag set.
+    var placed = state.TryPlaceObstacle([1], null, out var solutionNode, allowOneWay: true);
+
+    // Assert: The entry is locked, its solution lies before it; the cap still applies.
+    Assert.True(placed);
+    Assert.InRange(solutionNode, 0, 1);
+    Assert.Single(graph.Edges[1].Conditions);
+    Assert.Throws<InvalidOperationException>(() => state.TryPlaceObstacle([2], null, out _, allowOneWay: true));
+  }
+
+  [Fact]
   public void TryPlaceObstacle_WithSameSeed_DerivesSameSolutionIds()
   {
     // Arrange: Two equal graphs and states.

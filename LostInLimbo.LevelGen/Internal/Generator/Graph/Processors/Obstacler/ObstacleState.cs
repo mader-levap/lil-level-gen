@@ -96,10 +96,14 @@ internal sealed class ObstacleState
   /// Places one obstacle: the same new condition on every given passage, and its solution in
   /// a node that is reachable without it.
   /// </summary>
-  /// <param name="lockEdges">Work indices of the passages to lock; all must be lockable.</param>
+  /// <param name="lockEdges">Work indices of the passages to lock; none may be at the condition cap.</param>
   /// <param name="excludedSolutionNodes">Nodes that must not receive the solution; null excludes nothing.</param>
   /// <param name="solutionNode">
   /// Work index of the node that received the solution, or <see cref="ObstacleWorkGraph.NoNode"/> on failure.
+  /// </param>
+  /// <param name="allowOneWay">
+  /// True to accept one-way passages (entries of a side pocket); otherwise they are rejected
+  /// like passages at the condition cap.
   /// </param>
   /// <returns>
   /// True when the obstacle was placed. False when no allowed node can hold the solution; the
@@ -108,13 +112,17 @@ internal sealed class ObstacleState
   /// <exception cref="ArgumentNullException"><paramref name="lockEdges"/> is null.</exception>
   /// <exception cref="ArgumentException"><paramref name="lockEdges"/> is empty.</exception>
   /// <exception cref="InvalidOperationException">A passage cannot take another condition.</exception>
-  public bool TryPlaceObstacle(IReadOnlyList<int> lockEdges, bool[]? excludedSolutionNodes, out int solutionNode)
+  public bool TryPlaceObstacle(
+    IReadOnlyList<int> lockEdges,
+    bool[]? excludedSolutionNodes,
+    out int solutionNode,
+    bool allowOneWay = false)
   {
     if (lockEdges is null) throw new ArgumentNullException(nameof(lockEdges));
     if (lockEdges.Count == 0) throw new ArgumentException("An obstacle must lock at least one passage.", nameof(lockEdges));
     foreach (var edge in lockEdges)
     {
-      if (!Work.IsLockable(edge))
+      if (!(allowOneWay ? Work.HasConditionRoom(edge) : Work.IsLockable(edge)))
         throw new InvalidOperationException($"Passage {Work.GetEdge(edge).Id} cannot take another condition.");
     }
 

@@ -26,10 +26,23 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// <item>there is not exactly one node with a Start POI and exactly one node with an Exit POI
 /// (missing, or spread over several nodes - not supported).</item>
 /// </list>
+/// <para>Two passes share the Complexity:</para>
+/// <list type="bullet">
+/// <item><b>Main pass</b> (<see cref="ObstaclePassMain"/>): obstacles between the start and the
+/// exit; skipped when both share a node. Secret passages that would bypass an obstacle are
+/// always locked with it.</item>
+/// <item><b>Side pass</b> (<see cref="ObstaclePassSide"/>): obstacles guarding dead ends
+/// (pockets) with a secret node, a goal or an optional goal.</item>
+/// </list>
 /// <para>
-/// Currently only the main pass runs (<see cref="ObstaclePassMain"/>): obstacles between the
-/// start and the exit, skipped when both share a node. Secret passages that would bypass an
-/// obstacle are always locked with it.
+/// <b>Budget split.</b> The side pass first lists its pockets. Without pockets the main pass
+/// gets everything; without a main pass the side pass does. Otherwise the side pass gets:
+/// above <see cref="CnfProcObstaclePlacerOpt.SmallComplexityMax"/> the part left by
+/// <see cref="CnfProcObstaclePlacerOpt.MainShare"/>; for a small Complexity one point with
+/// <see cref="CnfProcObstaclePlacerOpt.ChanceReserveSide"/>; for Complexity 1 that point with
+/// <see cref="CnfProcObstaclePlacerOpt.ChanceReserveSideOnly"/>. The side budget never exceeds
+/// the number of pockets, and that many pockets are protected: the main pass puts no solution
+/// into them. What the main pass could not spend falls to the side pass as well.
 /// </para>
 /// <para>
 /// No nodes or passages are added, so <see cref="LilNode.MaxEdges"/> caps are untouched.
@@ -86,6 +99,22 @@ internal sealed class ProcObstaclePlacer
   public int PlacedObstacles { get; private set; }
 
   /// <summary>
+  /// Number of obstacles the main pass placed in the last <see cref="Execute"/> call.
+  /// </summary>
+  public int PlacedMainObstacles { get; private set; }
+
+  /// <summary>
+  /// Number of obstacles the side pass placed in the last <see cref="Execute"/> call.
+  /// </summary>
+  public int PlacedSideObstacles { get; private set; }
+
+  /// <summary>
+  /// Number of obstacles reserved for the side pass by the budget split of the last
+  /// <see cref="Execute"/> call; also the number of protected pockets.
+  /// </summary>
+  public int ReservedSideBudget { get; private set; }
+
+  /// <summary>
   /// Places up to Complexity obstacles on the graph given to the constructor.
   /// </summary>
   /// <param name="cancellationToken">Token checked before every obstacle.</param>
@@ -97,6 +126,9 @@ internal sealed class ProcObstaclePlacer
   public void Execute(CancellationToken cancellationToken = default)
   {
     PlacedObstacles = 0;
+    PlacedMainObstacles = 0;
+    PlacedSideObstacles = 0;
+    ReservedSideBudget = 0;
     if (_complexity == 0) return; // Nothing to place.
     if (_graph.Nodes.Count < MinNodeCount || _graph.Edges.Count == 0) return; // Nothing to lock.
 
@@ -105,8 +137,49 @@ internal sealed class ProcObstaclePlacer
     if (state.Work.StartNode == ObstacleWorkGraph.NoNode || state.Work.ExitNode == ObstacleWorkGraph.NoNode)
       return; // Start or exit missing, or spread over several nodes.
 
-    // The main pass skips itself when start and exit share a node.
-    new ObstaclePassMain(state).Execute(_complexity, cancellationToken);
+    // The pockets are listed before any obstacle exists, so the budget can be planned on them.
+    var sidePass = new ObstaclePassSide(state);
+    var pocketCount = sidePass.Scan().Count;
+    var hasMainPass = state.Work.StartNode != state.Work.ExitNode;
+
+    ReservedSideBudget = hasMainPass ? SplitOffSideBudget(state, pocketCount) : 0;
+    if (hasMainPass)
+    {
+      var protectedNodes = sidePass.BuildNodeMask(ReservedSideBudget);
+      PlacedMainObstacles = new ObstaclePassMain(state, protectedNodes)
+        .Execute(_complexity - ReservedSideBudget, cancellationToken);
+    }
+
+    // Everything the main pass left, reserved or not.
+    PlacedSideObstacles = sidePass.Execute(_complexity - PlacedMainObstacles, cancellationToken);
     PlacedObstacles = state.ObstacleCount;
+  }
+
+  /// <summary>
+  /// Decides how much of the Complexity is kept back for the side pass; see the budget split
+  /// in the type remarks. Rolls only when a reserve is possible.
+  /// </summary>
+  /// <param name="state">Shared state; provides the random stream.</param>
+  /// <param name="pocketCount">Number of pockets the side pass listed.</param>
+  /// <returns>Side budget within [0, min(Complexity, <paramref name="pocketCount"/>)].</returns>
+  private int SplitOffSideBudget(ObstacleState state, int pocketCount)
+  {
+    if (pocketCount == 0) return 0; // Nothing to lock on the side.
+
+    int side;
+    if (_complexity > _options.SmallComplexityMax)
+    {
+      // Decimal keeps a share like 0.7 exact, so halves round up as written (5 * 0.7 -> 4).
+      var main = (int)Math.Round(_complexity * (decimal)_options.MainShare, MidpointRounding.AwayFromZero);
+      side = _complexity - main;
+    }
+    else
+    {
+      // Reserving the only point leaves the main pass nothing, hence its own, lower chance.
+      var chance = _complexity > 1 ? _options.ChanceReserveSide : _options.ChanceReserveSideOnly;
+      side = state.Random.NextBool(chance) ? 1 : 0;
+    }
+
+    return Math.Min(side, pocketCount);
   }
 }

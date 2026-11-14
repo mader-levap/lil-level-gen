@@ -677,8 +677,9 @@ public sealed class GraphBuilderSimpleTests
           foreach (var edge in graph.Edges)
           {
             Assert.True(edge.Conditions.Count <= MaxConditionsPerEdge, $"{label}: passage {edge.Id} is overloaded.");
-            // One-way passages are never locked; every condition names its own existing solution.
-            if (edge.Direction != EnPassageDirection.Bidirectional) Assert.Empty(edge.Conditions);
+            // A one-way passage is locked at most once (entry of a secret loop); every
+            // condition names its own existing solution.
+            if (edge.Direction != EnPassageDirection.Bidirectional) Assert.True(edge.Conditions.Count <= 1, label);
             var required = edge.Conditions.Select(condition => condition.RequiresPoi).ToList();
             Assert.All(required, id => Assert.True(solutionIds.Contains(id), label));
             Assert.Equal(required.Count, required.Distinct().Count());

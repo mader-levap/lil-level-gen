@@ -88,6 +88,19 @@ internal static class ObstaclerTestSupport
     return graph;
   }
 
+  /// <summary>First identifier used for goal POIs; the node number is added to it.</summary>
+  public const int FirstGoalPoiId = 600;
+
+  /// <summary>Puts a goal or optional goal POI into a node, making it a treasure node.</summary>
+  /// <param name="graph">Graph to change.</param>
+  /// <param name="node">Small integer identifier of the node.</param>
+  /// <param name="optional">True for an optional goal.</param>
+  public static void AddGoal(LilGraph graph, int node, bool optional = false)
+  {
+    var type = optional ? EnPoiType.OptionalGoal : EnPoiType.Goal;
+    graph.Nodes[node - 1].Pois.Add(GraphTestCreate.Poi(FirstGoalPoiId + node, type));
+  }
+
   /// <summary>Marks nodes of a graph as secret (replaces the node records).</summary>
   /// <param name="graph">Graph to change in place.</param>
   /// <param name="nodes">Numbers (one-based) of the nodes to mark.</param>
