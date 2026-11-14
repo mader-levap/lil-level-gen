@@ -27,8 +27,18 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <summary>Smallest drawn complexity (inclusive): no conditional passages; objectives still add challenge.</summary>
   private const int MinComplexity = 0;
 
-  /// <summary>Difficulty levels per additional allowed conditional passage.</summary>
-  private const int ComplexityDifficultyDivisor = 2;
+  // Connectivity and complexity bounds grow with sqrt(Size), scaled by
+  // (BaseFactor + DifficultyFactor * Difficulty / MaxDifficulty). See SqrtSizeBound.
+
+  /// <summary>Connectivity bound per sqrt(Size) at difficulty 0.</summary>
+  private const double ConnectivityBaseFactor = 1.0;
+  /// <summary>Connectivity bound per sqrt(Size) added at the highest difficulty.</summary>
+  private const double ConnectivityDifficultyFactor = 2.0;
+
+  /// <summary>Complexity bound per sqrt(Size) at difficulty 0.</summary>
+  private const double ComplexityBaseFactor = 0.5;
+  /// <summary>Complexity bound per sqrt(Size) added at the highest difficulty.</summary>
+  private const double ComplexityDifficultyFactor = 1.5;
 
   /// <summary>Smallest drawn amount of secret nodes (inclusive).</summary>
   private const int MinSecretAmount = 0;
@@ -98,27 +108,51 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   // Field resolvers.
 
   /// <summary>
-  /// Resolve connectivity of the graph (amount of extra relationships).
+  /// Resolve connectivity of the graph (amount of extra relationships), drawn uniformly from
+  /// <see cref="MinConnectivity"/> up to the inclusive bound
+  /// <c>ceil(sqrt(Size) * (1 + 2 * Difficulty / MaxDifficulty))</c>.
   /// </summary>
+  /// <remarks>
+  /// The bound grows with the square root of the size, so small graphs keep a usable range
+  /// while large graphs do not get flooded with extras (a linear bound cannot do both).
+  /// </remarks>
   /// <returns>Connectivity of the graph.</returns>
   private int ResolveConnectivity()
   {
-    // Need to calc amount of extra relationships depending on difficulty and size.
-    int from = MinConnectivity;
-    int to = _propMain.Difficulty + _propData.Size;
-    return _random.NextInt(from, to);
+    int max = SqrtSizeBound(ConnectivityBaseFactor, ConnectivityDifficultyFactor);
+    return _random.NextInt(MinConnectivity, max + 1);
   }
 
   /// <summary>
-  /// Resolve complexity of the graph (amount of conditional passages).
+  /// Resolve complexity of the graph (amount of conditional passages), drawn uniformly from
+  /// <see cref="MinComplexity"/> up to the inclusive bound
+  /// <c>ceil(sqrt(Size) * (0.5 + 1.5 * Difficulty / MaxDifficulty))</c>, capped at
+  /// <c>Size - 1</c> (a graph has no more cuts to guard).
   /// </summary>
+  /// <remarks>Scales with the square root of the size for the same reason as connectivity.</remarks>
   /// <returns>Complexity of the graph.</returns>
   private int ResolveComplexity()
   {
-    // Need to calc amount of conditional passages depending on difficulty and constrained by size.
-    int from = MinComplexity;
-    int to = Math.Min(_propData.Size, _propMain.Difficulty / ComplexityDifficultyDivisor + 1);
-    return _random.NextInt(from, to);
+    int max = Math.Min(
+      Math.Max(MinComplexity, _propData.Size - 1),
+      SqrtSizeBound(ComplexityBaseFactor, ComplexityDifficultyFactor));
+    return _random.NextInt(MinComplexity, max + 1);
+  }
+
+  /// <summary>
+  /// Computes <c>ceil(sqrt(Size) * (baseFactor + difficultyFactor * Difficulty / MaxDifficulty))</c>.
+  /// </summary>
+  /// <remarks>
+  /// Deterministic across platforms: <see cref="Math.Sqrt"/> is correctly rounded by IEEE 754
+  /// (unlike <see cref="Math.Pow"/>, which is why no other exponent is used).
+  /// </remarks>
+  /// <param name="baseFactor">Bound per sqrt(Size) at difficulty 0.</param>
+  /// <param name="difficultyFactor">Bound per sqrt(Size) added at the highest difficulty.</param>
+  /// <returns>Inclusive upper bound; at least 0.</returns>
+  private int SqrtSizeBound(double baseFactor, double difficultyFactor)
+  {
+    double difficultyShare = (double)_propMain.Difficulty / PropMain.MaxDifficulty;
+    return (int)Math.Ceiling(Math.Sqrt(_propData.Size) * (baseFactor + difficultyFactor * difficultyShare));
   }
 
   // Graph builder.

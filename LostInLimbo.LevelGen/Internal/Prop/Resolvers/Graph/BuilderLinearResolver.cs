@@ -67,7 +67,6 @@ internal sealed class BuilderLinearResolver(PropMain propMain, PropData propData
       MaxConditionPerRel = _random.NextInt(MaxConditionPerRelMin, MaxConditionPerRelMaxExclusive),
       MaxConditionDistance = _random.NextInt(MaxConditionDistanceMin, MaxConditionDistanceMaxExclusive),
       MaxSkipDistance = _random.NextInt(MaxSkipDistanceMin, MaxSkipDistanceMaxExclusive),
-      // Drawn last so the earlier draws keep their values.
       ChanceObstacleBypass = _random.NextFloat(ChanceObstacleBypassMin, ChanceObstacleBypassMaxExclusive),
     };
   }

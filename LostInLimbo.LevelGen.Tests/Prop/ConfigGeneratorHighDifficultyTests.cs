@@ -3,6 +3,7 @@ using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop;
+using LostInLimbo.LevelGen.Tests.Prop.Resolvers.Graph;
 
 namespace LostInLimbo.LevelGen.Tests.Prop;
 
@@ -101,10 +102,12 @@ public sealed class ConfigGeneratorHighDifficultyTests
     int sizeMax = Math.Min(difficulty + 2, CnfGraph.MaxSize);
     if (graph.Size < 2 || graph.Size > sizeMax)
       violations.Add($"Size {graph.Size} outside [2, {sizeMax}]");
-    if (graph.Connectivity < 0 || graph.Connectivity > difficulty + graph.Size - 1)
-      violations.Add($"Connectivity {graph.Connectivity} outside [0, {difficulty + graph.Size - 1}]");
-    if (graph.Complexity < 0 || graph.Complexity >= graph.Size)
-      violations.Add($"Complexity {graph.Complexity} outside [0, Size {graph.Size})");
+    var maxConnectivity = GraphResolverExpect.MaxConnectivity(graph.Size, difficulty);
+    if (graph.Connectivity < 0 || graph.Connectivity > maxConnectivity)
+      violations.Add($"Connectivity {graph.Connectivity} outside [0, {maxConnectivity}]");
+    var maxComplexity = GraphResolverExpect.MaxComplexity(graph.Size, difficulty);
+    if (graph.Complexity < 0 || graph.Complexity > maxComplexity)
+      violations.Add($"Complexity {graph.Complexity} outside [0, {maxComplexity}]");
     int goalMax = Math.Max(1, difficulty / 2);
     if (objectives.GoalAmount < 1 || objectives.GoalAmount > goalMax)
       violations.Add($"GoalAmount {objectives.GoalAmount} outside [1, {goalMax}]");

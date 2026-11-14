@@ -6,6 +6,7 @@ using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop;
 using LostInLimbo.LevelGen.Internal.Prop.Data;
 using LostInLimbo.LevelGen.Internal.Utils.Rng;
+using LostInLimbo.LevelGen.Tests.Prop.Resolvers.Graph;
 
 namespace LostInLimbo.LevelGen.Tests.Prop;
 
@@ -113,7 +114,7 @@ public sealed class ConfigGeneratorTests
       Assert.Equal(-8341167147440548823L, config.General.Seed);
       Assert.Equal(16.201443f, config.General.Degeneration);
       Assert.Equal(3, config.Graph.Size);
-      Assert.Equal(5, config.Graph.Connectivity);
+      Assert.Equal(2, config.Graph.Connectivity);
       Assert.Equal(1, config.Graph.Complexity);
       Assert.Equal(EnGraphBuilder.Linear, config.Graph.GraphBuilder.Builder);
       Assert.Equal(CnfGraphBuilderLinear.Default with
@@ -190,8 +191,8 @@ public sealed class ConfigGeneratorTests
       // difficulty-driven ranges with a builder pairing that satisfies validation.
       config.Validate();
       Assert.InRange(config.Graph.Size, 2, Math.Min(difficulty + 2, CnfGraph.MaxSize));
-      Assert.InRange(config.Graph.Connectivity, 0, difficulty + config.Graph.Size - 1);
-      Assert.InRange(config.Graph.Complexity, 0, Math.Min(config.Graph.Size, difficulty / 2 + 1) - 1);
+      Assert.InRange(config.Graph.Connectivity, 0, GraphResolverExpect.MaxConnectivity(config.Graph.Size, difficulty));
+      Assert.InRange(config.Graph.Complexity, 0, GraphResolverExpect.MaxComplexity(config.Graph.Size, difficulty));
       Assert.NotEqual(EnGraphBuilder.OneNode, config.Graph.GraphBuilder.Builder);
     }
   }
@@ -317,7 +318,7 @@ public sealed class ConfigGeneratorTests
     /// <summary>Pinned graph size for "mordor" at difficulty 3.</summary>
     private const int PinnedGraphSize = 2;
     /// <summary>Pinned graph connectivity for "mordor" at difficulty 3.</summary>
-    private const int PinnedConnectivity = 1;
+    private const int PinnedConnectivity = 2;
     /// <summary>Pinned graph complexity for "mordor" at difficulty 3.</summary>
     private const int PinnedComplexity = 1;
     /// <summary>Pinned graph builder for "mordor" at difficulty 3.</summary>

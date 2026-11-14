@@ -61,7 +61,7 @@ public sealed class GraphResolverTests
 
       // Assert: Every drawn field matches the pinned reference, including the builder
       // sub-config and the processor options drawn after it.
-      Assert.Equal(16, config.Connectivity);
+      Assert.Equal(0, config.Connectivity);
       Assert.Equal(2, config.Complexity);
       Assert.Equal(EnGraphBuilder.Simple, config.GraphBuilder.Builder);
       Assert.Equal(0.5926749f, config.GraphBuilder.CnfSimple!.ChokepointChance);
@@ -78,7 +78,7 @@ public sealed class GraphResolverTests
 
       // Assert: Every drawn field matches the pinned reference, including the builder
       // sub-config and the processor options drawn after it.
-      Assert.Equal(5, config.Connectivity);
+      Assert.Equal(1, config.Connectivity);
       Assert.Equal(1, config.Complexity);
       Assert.Equal(EnGraphBuilder.Linear, config.GraphBuilder.Builder);
       Assert.Equal(6, config.GraphBuilder.CnfLinear!.MaxEdges);
@@ -137,11 +137,87 @@ public sealed class GraphResolverTests
       // Assert: Every draw stays inside its half-open range for this difficulty and
       // resolved size, so the result always satisfies CnfGraph.Validate.
       Assert.InRange(config.Size, 2, difficulty + 2);
-      Assert.InRange(config.Connectivity, 0, difficulty + config.Size - 1);
-      Assert.InRange(config.Complexity, 0, Math.Min(config.Size, difficulty / 2 + 1) - 1);
+      Assert.InRange(config.Connectivity, 0, GraphResolverExpect.MaxConnectivity(config.Size, difficulty));
+      Assert.InRange(config.Complexity, 0, GraphResolverExpect.MaxComplexity(config.Size, difficulty));
       Assert.InRange(config.ProcOpts.NodeObjectives.GoalAmount, 1, Math.Max(1, difficulty / 2));
       Assert.InRange(config.ProcOpts.NodeObjectives.OptGoalAmount, 0, config.Size - 1);
       config.Validate();
+    }
+  }
+
+  /// <summary>
+  /// Tests that connectivity and complexity scale with the square root of the size: large
+  /// graphs stay moderate while small graphs keep a usable range.
+  /// </summary>
+  public sealed class ScalingTests
+  {
+    /// <summary>Number of seeds each scaling test sweeps.</summary>
+    private const int SeedCount = 200;
+
+    /// <summary>Resolves configurations for a size and difficulty over a seed sweep.</summary>
+    private static List<CnfGraph> ResolveMany(int size, int difficulty)
+    {
+      return Enumerable.Range(0, SeedCount)
+        .Select(seed => new GraphResolver(
+          new PropMain { TextSeed = "mordor", Difficulty = difficulty },
+          PropData.Default with { Seed = seed, Size = size }).Execute())
+        .ToList();
+    }
+
+    [Theory]
+    [InlineData(2, 0)]
+    [InlineData(3, 2)]
+    [InlineData(8, 10)]
+    [InlineData(30, 40)]
+    [InlineData(4, 100)]
+    [InlineData(100, 100)]
+    public void Execute_WithSizeAndDifficulty_ReachesButNeverExceedsSqrtBounds(int size, int difficulty)
+    {
+      // Act: Resolve many configurations for the same size and difficulty.
+      var configs = ResolveMany(size, difficulty);
+      var maxConnectivity = GraphResolverExpect.MaxConnectivity(size, difficulty);
+      var maxComplexity = GraphResolverExpect.MaxComplexity(size, difficulty);
+
+      // Assert: Every draw stays inside the inclusive bound, and the bound itself is drawn.
+      Assert.All(configs, config => Assert.InRange(config.Connectivity, 0, maxConnectivity));
+      Assert.All(configs, config => Assert.InRange(config.Complexity, 0, maxComplexity));
+      Assert.Contains(configs, config => config.Connectivity == maxConnectivity);
+      Assert.Contains(configs, config => config.Complexity == maxComplexity);
+    }
+
+    [Fact]
+    public void Execute_ForLargestGraphAtMaxDifficulty_StaysSublinear()
+    {
+      // Act: Resolve the biggest graph at the highest difficulty.
+      var configs = ResolveMany(100, PropMain.MaxDifficulty);
+
+      // Assert: Extras stay below a third of the node count and obstacles below a fifth -
+      // the old linear bounds allowed about two extras and half an obstacle per node.
+      Assert.All(configs, config => Assert.True(config.Connectivity <= 30, $"Connectivity {config.Connectivity}."));
+      Assert.All(configs, config => Assert.True(config.Complexity <= 20, $"Complexity {config.Complexity}."));
+    }
+
+    [Fact]
+    public void Execute_ForSmallGraphAtLowDifficulty_KeepsNonZeroValues()
+    {
+      // Act: Resolve a small graph at a low difficulty.
+      var configs = ResolveMany(5, 5);
+
+      // Assert: Small graphs still get some extras and obstacles, not just zeros.
+      Assert.Contains(configs, config => config.Connectivity >= 2);
+      Assert.Contains(configs, config => config.Complexity >= 1);
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void Execute_WithTinyGraphAtMaxDifficulty_CapsComplexityAtSizeMinusOne(int size)
+    {
+      // Act: Resolve tiny graphs where the square-root bound would exceed the cut count.
+      var configs = ResolveMany(size, PropMain.MaxDifficulty);
+
+      // Assert: There are only size - 1 cuts to guard.
+      Assert.All(configs, config => Assert.InRange(config.Complexity, 0, size - 1));
     }
   }
 

@@ -2,7 +2,7 @@ using System.Globalization;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop;
-using LostInLimbo.LevelGen.Internal.Prop.Data;
+using LostInLimbo.LevelGen.Tests.Prop.Resolvers.Graph;
 using Xunit.Abstractions;
 
 namespace LostInLimbo.LevelGen.Tests.Prop;
@@ -105,8 +105,8 @@ public sealed class ConfigGeneratorStressTests
       // Validate alone does not enforce.
       var graph = config.Graph;
       Assert.InRange(graph.Size, 2, difficulty + 2);
-      Assert.InRange(graph.Connectivity, 0, difficulty + graph.Size - 1);
-      Assert.InRange(graph.Complexity, 0, Math.Min(graph.Size, difficulty / 2 + 1) - 1);
+      Assert.InRange(graph.Connectivity, 0, GraphResolverExpect.MaxConnectivity(graph.Size, difficulty));
+      Assert.InRange(graph.Complexity, 0, GraphResolverExpect.MaxComplexity(graph.Size, difficulty));
       Assert.InRange(graph.ProcOpts.NodeObjectives.GoalAmount, 1, Math.Max(1, difficulty / 2));
       Assert.InRange(graph.ProcOpts.NodeObjectives.OptGoalAmount, 0, graph.Size - 1);
 
