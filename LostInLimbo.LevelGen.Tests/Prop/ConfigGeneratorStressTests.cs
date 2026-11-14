@@ -107,8 +107,9 @@ public sealed class ConfigGeneratorStressTests
       Assert.InRange(graph.Size, 2, difficulty + 2);
       Assert.InRange(graph.Connectivity, 0, GraphResolverExpect.MaxConnectivity(graph.Size, difficulty));
       Assert.InRange(graph.Complexity, 0, GraphResolverExpect.MaxComplexity(graph.Size, difficulty));
-      Assert.InRange(graph.ProcOpts.NodeObjectives.GoalAmount, 1, Math.Max(1, difficulty / 2));
-      Assert.InRange(graph.ProcOpts.NodeObjectives.OptGoalAmount, 0, graph.Size - 1);
+      Assert.InRange(graph.ProcOpts.RelSecrets.Amount, 0, GraphResolverExpect.MaxSecretAmount(graph.Size, difficulty));
+      Assert.InRange(graph.ProcOpts.NodeObjectives.GoalAmount, 1, GraphResolverExpect.MaxGoalAmount(graph.Size, difficulty));
+      Assert.InRange(graph.ProcOpts.NodeObjectives.OptGoalAmount, 0, GraphResolverExpect.MaxOptGoalAmount(graph.Size, difficulty));
 
       // Assert: OneNode stays excluded from random builder picking across all draws.
       Assert.NotEqual(EnGraphBuilder.OneNode, graph.GraphBuilder.Builder);

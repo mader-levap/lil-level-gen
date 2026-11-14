@@ -27,6 +27,33 @@ internal static class GraphResolverExpect
     return Math.Min(Math.Max(0, size - 1), SqrtSizeBound(size, difficulty, 0.5, 1.5));
   }
 
+  /// <summary>
+  /// Largest amount of secret nodes for a size and difficulty:
+  /// <c>ceil(sqrt(size) * (0.5 + 1.0 * t))</c>.
+  /// </summary>
+  public static int MaxSecretAmount(int size, int difficulty)
+  {
+    return SqrtSizeBound(size, difficulty, 0.5, 1.0);
+  }
+
+  /// <summary>
+  /// Largest amount of mandatory goals for a size and difficulty:
+  /// <c>ceil(sqrt(size) * (0.5 + 1.0 * t))</c>, at least 1.
+  /// </summary>
+  public static int MaxGoalAmount(int size, int difficulty)
+  {
+    return Math.Max(1, SqrtSizeBound(size, difficulty, 0.5, 1.0));
+  }
+
+  /// <summary>
+  /// Largest amount of optional goals for a size: <c>ceil(sqrt(size))</c>; difficulty has no
+  /// effect.
+  /// </summary>
+  public static int MaxOptGoalAmount(int size, int difficulty)
+  {
+    return SqrtSizeBound(size, difficulty, 1.0, 0.0);
+  }
+
   /// <summary>Square-root size bound scaled by difficulty.</summary>
   private static int SqrtSizeBound(int size, int difficulty, double baseFactor, double difficultyFactor)
   {

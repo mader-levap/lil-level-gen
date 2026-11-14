@@ -108,11 +108,15 @@ public sealed class ConfigGeneratorHighDifficultyTests
     var maxComplexity = GraphResolverExpect.MaxComplexity(graph.Size, difficulty);
     if (graph.Complexity < 0 || graph.Complexity > maxComplexity)
       violations.Add($"Complexity {graph.Complexity} outside [0, {maxComplexity}]");
-    int goalMax = Math.Max(1, difficulty / 2);
+    var maxSecretAmount = GraphResolverExpect.MaxSecretAmount(graph.Size, difficulty);
+    if (graph.ProcOpts.RelSecrets.Amount < 0 || graph.ProcOpts.RelSecrets.Amount > maxSecretAmount)
+      violations.Add($"RelSecrets.Amount {graph.ProcOpts.RelSecrets.Amount} outside [0, {maxSecretAmount}]");
+    var goalMax = GraphResolverExpect.MaxGoalAmount(graph.Size, difficulty);
     if (objectives.GoalAmount < 1 || objectives.GoalAmount > goalMax)
       violations.Add($"GoalAmount {objectives.GoalAmount} outside [1, {goalMax}]");
-    if (objectives.OptGoalAmount < 0 || objectives.OptGoalAmount >= graph.Size)
-      violations.Add($"OptGoalAmount {objectives.OptGoalAmount} outside [0, Size {graph.Size})");
+    var optGoalMax = GraphResolverExpect.MaxOptGoalAmount(graph.Size, difficulty);
+    if (objectives.OptGoalAmount < 0 || objectives.OptGoalAmount > optGoalMax)
+      violations.Add($"OptGoalAmount {objectives.OptGoalAmount} outside [0, {optGoalMax}]");
 
     // General section.
     float degeneration = config.General.Degeneration;

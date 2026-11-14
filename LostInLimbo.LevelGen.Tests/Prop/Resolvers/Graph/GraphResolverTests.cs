@@ -47,7 +47,7 @@ public sealed class GraphResolverTests
       Assert.Equal(2, config.Connectivity);
       Assert.Equal(1, config.Complexity);
       Assert.Equal(1, config.ProcOpts.NodeObjectives.GoalAmount);
-      Assert.Equal(0, config.ProcOpts.NodeObjectives.OptGoalAmount);
+      Assert.Equal(1, config.ProcOpts.NodeObjectives.OptGoalAmount);
       Assert.Equal(EnGraphBuilder.Linear, config.GraphBuilder.Builder);
       Assert.Equal(1, config.ProcOpts.RelSecrets.Amount);
       Assert.Equal(1, config.ProcOpts.NodeStyle.GroupCount);
@@ -67,7 +67,7 @@ public sealed class GraphResolverTests
       Assert.Equal(0.5926749f, config.GraphBuilder.CnfSimple!.ChokepointChance);
       Assert.Equal(2, config.GraphBuilder.CnfSimple.MaxExtraDegree);
       Assert.Equal(5, config.GraphBuilder.CnfSimple.MaxExtraDegreeStar);
-      AssertProcOpts(config, secretAmount: 4, goalAmount: 2, optGoalAmount: 4, groupCount: 6);
+      AssertProcOpts(config, secretAmount: 1, goalAmount: 1, optGoalAmount: 0, groupCount: 6);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public sealed class GraphResolverTests
       Assert.Equal(3, config.GraphBuilder.CnfLinear.MaxConditionPerRel);
       Assert.Equal(4, config.GraphBuilder.CnfLinear.MaxConditionDistance);
       Assert.Equal(2, config.GraphBuilder.CnfLinear.MaxSkipDistance);
-      AssertProcOpts(config, secretAmount: 1, goalAmount: 2, optGoalAmount: 11, groupCount: 6);
+      AssertProcOpts(config, secretAmount: 1, goalAmount: 2, optGoalAmount: 2, groupCount: 6);
     }
 
     /// <summary>Creates a resolver over a 12-node graph at difficulty 7 with many themes.</summary>
@@ -139,8 +139,9 @@ public sealed class GraphResolverTests
       Assert.InRange(config.Size, 2, difficulty + 2);
       Assert.InRange(config.Connectivity, 0, GraphResolverExpect.MaxConnectivity(config.Size, difficulty));
       Assert.InRange(config.Complexity, 0, GraphResolverExpect.MaxComplexity(config.Size, difficulty));
-      Assert.InRange(config.ProcOpts.NodeObjectives.GoalAmount, 1, Math.Max(1, difficulty / 2));
-      Assert.InRange(config.ProcOpts.NodeObjectives.OptGoalAmount, 0, config.Size - 1);
+      Assert.InRange(config.ProcOpts.RelSecrets.Amount, 0, GraphResolverExpect.MaxSecretAmount(config.Size, difficulty));
+      Assert.InRange(config.ProcOpts.NodeObjectives.GoalAmount, 1, GraphResolverExpect.MaxGoalAmount(config.Size, difficulty));
+      Assert.InRange(config.ProcOpts.NodeObjectives.OptGoalAmount, 0, GraphResolverExpect.MaxOptGoalAmount(config.Size, difficulty));
       config.Validate();
     }
   }
@@ -177,12 +178,21 @@ public sealed class GraphResolverTests
       var configs = ResolveMany(size, difficulty);
       var maxConnectivity = GraphResolverExpect.MaxConnectivity(size, difficulty);
       var maxComplexity = GraphResolverExpect.MaxComplexity(size, difficulty);
+      var maxSecretAmount = GraphResolverExpect.MaxSecretAmount(size, difficulty);
+      var maxGoalAmount = GraphResolverExpect.MaxGoalAmount(size, difficulty);
+      var maxOptGoalAmount = GraphResolverExpect.MaxOptGoalAmount(size, difficulty);
 
       // Assert: Every draw stays inside the inclusive bound, and the bound itself is drawn.
       Assert.All(configs, config => Assert.InRange(config.Connectivity, 0, maxConnectivity));
       Assert.All(configs, config => Assert.InRange(config.Complexity, 0, maxComplexity));
+      Assert.All(configs, config => Assert.InRange(config.ProcOpts.RelSecrets.Amount, 0, maxSecretAmount));
+      Assert.All(configs, config => Assert.InRange(config.ProcOpts.NodeObjectives.GoalAmount, 1, maxGoalAmount));
+      Assert.All(configs, config => Assert.InRange(config.ProcOpts.NodeObjectives.OptGoalAmount, 0, maxOptGoalAmount));
       Assert.Contains(configs, config => config.Connectivity == maxConnectivity);
       Assert.Contains(configs, config => config.Complexity == maxComplexity);
+      Assert.Contains(configs, config => config.ProcOpts.RelSecrets.Amount == maxSecretAmount);
+      Assert.Contains(configs, config => config.ProcOpts.NodeObjectives.GoalAmount == maxGoalAmount);
+      Assert.Contains(configs, config => config.ProcOpts.NodeObjectives.OptGoalAmount == maxOptGoalAmount);
     }
 
     [Fact]
@@ -191,10 +201,17 @@ public sealed class GraphResolverTests
       // Act: Resolve the biggest graph at the highest difficulty.
       var configs = ResolveMany(100, PropMain.MaxDifficulty);
 
-      // Assert: Extras stay below a third of the node count and obstacles below a fifth -
-      // the old linear bounds allowed about two extras and half an obstacle per node.
+      // Assert: Extras stay below a third of the node count, obstacles below a fifth and
+      // secrets and goals below a sixth, optional goals at a tenth - the old linear bounds
+      // allowed about two extras, half an obstacle, one secret and one optional goal per node.
       Assert.All(configs, config => Assert.True(config.Connectivity <= 30, $"Connectivity {config.Connectivity}."));
       Assert.All(configs, config => Assert.True(config.Complexity <= 20, $"Complexity {config.Complexity}."));
+      Assert.All(configs, config => Assert.True(
+        config.ProcOpts.RelSecrets.Amount <= 15, $"Secret amount {config.ProcOpts.RelSecrets.Amount}."));
+      Assert.All(configs, config => Assert.True(
+        config.ProcOpts.NodeObjectives.GoalAmount <= 15, $"Goal amount {config.ProcOpts.NodeObjectives.GoalAmount}."));
+      Assert.All(configs, config => Assert.True(
+        config.ProcOpts.NodeObjectives.OptGoalAmount <= 10, $"Optional goal amount {config.ProcOpts.NodeObjectives.OptGoalAmount}."));
     }
 
     [Fact]
@@ -203,9 +220,12 @@ public sealed class GraphResolverTests
       // Act: Resolve a small graph at a low difficulty.
       var configs = ResolveMany(5, 5);
 
-      // Assert: Small graphs still get some extras and obstacles, not just zeros.
+      // Assert: Small graphs still get some extras, obstacles and secrets, not just zeros.
       Assert.Contains(configs, config => config.Connectivity >= 2);
       Assert.Contains(configs, config => config.Complexity >= 1);
+      Assert.Contains(configs, config => config.ProcOpts.RelSecrets.Amount >= 1);
+      Assert.Contains(configs, config => config.ProcOpts.NodeObjectives.GoalAmount >= 2);
+      Assert.Contains(configs, config => config.ProcOpts.NodeObjectives.OptGoalAmount >= 2);
     }
 
     [Theory]
@@ -429,18 +449,30 @@ public sealed class GraphResolverTests
     }
 
     [Fact]
-    public void Execute_WithDifficultyNegativeTwo_ThrowsArgumentOutOfRangeException()
+    public void Execute_WithDifficultyNegativeTwo_StillProducesValidConfig()
     {
-      // Act/Assert: The size range inverts (from 2 to 1) and the draw is rejected.
-      Assert.Throws<ArgumentOutOfRangeException>(() => CreateResolver(42, -2).Execute());
+      // Act: Resolve slightly below the difficulty range; the square-root bounds only shrink
+      // a little and stay at or above their minimums, so no draw range inverts.
+      var config = CreateResolver(42, -2).Execute();
+
+      // Assert: The config still validates. Rejecting such a difficulty is the job of
+      // PropMain.Validate in the config generator, not of this resolver.
+      Assert.True(config.ProcOpts.NodeObjectives.GoalAmount >= 1);
+      config.Validate();
     }
 
     [Fact]
-    public void Execute_WithMaxDifficulty_ThrowsArgumentOutOfRangeException()
+    public void Execute_WithIntMaxDifficulty_BoundsDoNotWrapAround()
     {
-      // Act/Assert: int.MaxValue + 3 overflows the exclusive upper bound, so the draw
-      // is rejected before any invalid size can escape.
-      Assert.Throws<ArgumentOutOfRangeException>(() => CreateResolver(42, int.MaxValue).Execute());
+      // Act: Resolve far above PropMain.MaxDifficulty; the square-root bounds are computed
+      // in floating point, so no integer bound overflows into a negative range.
+      var config = CreateResolver(42, int.MaxValue).Execute();
+
+      // Assert: The draws stay non-negative. Rejecting such a difficulty is the job of
+      // PropMain.Validate in the config generator, not of this resolver.
+      Assert.True(config.Connectivity >= 0);
+      Assert.True(config.Complexity >= 0);
+      Assert.True(config.ProcOpts.RelSecrets.Amount >= 0);
     }
   }
 }

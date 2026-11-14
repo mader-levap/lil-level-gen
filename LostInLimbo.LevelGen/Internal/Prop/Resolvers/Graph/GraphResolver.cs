@@ -43,8 +43,10 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <summary>Smallest drawn amount of secret nodes (inclusive).</summary>
   private const int MinSecretAmount = 0;
 
-  /// <summary>Divisor applied to <c>Difficulty + Size</c> to get the largest drawn amount of secret nodes.</summary>
-  private const int SecretAmountDivisor = 2;
+  /// <summary>Secret amount bound per sqrt(Size) at difficulty 0 (see <see cref="SqrtSizeBound"/>).</summary>
+  private const double SecretAmountBaseFactor = 0.5;
+  /// <summary>Secret amount bound per sqrt(Size) added at the highest difficulty.</summary>
+  private const double SecretAmountDifficultyFactor = 1.0;
 
   /// <summary>Chance that a secret nests behind an earlier secret.</summary>
   private const float ChanceSecretInSecret = 0.1f;
@@ -55,11 +57,18 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <summary>Smallest drawn amount of mandatory goals (inclusive).</summary>
   private const int MinGoalAmount = 1;
 
-  /// <summary>Difficulty levels per additional allowed mandatory goal.</summary>
-  private const int GoalAmountDifficultyDivisor = 2;
+  /// <summary>Goal amount bound per sqrt(Size) at difficulty 0 (see <see cref="SqrtSizeBound"/>).</summary>
+  private const double GoalAmountBaseFactor = 0.5;
+  /// <summary>Goal amount bound per sqrt(Size) added at the highest difficulty.</summary>
+  private const double GoalAmountDifficultyFactor = 1.0;
 
   /// <summary>Smallest drawn amount of optional goals (inclusive).</summary>
   private const int MinOptGoalAmount = 0;
+
+  /// <summary>Optional goal amount bound per sqrt(Size) at difficulty 0.</summary>
+  private const double OptGoalAmountBaseFactor = 1.0;
+  /// <summary>Optional goal amount bound per sqrt(Size) added at the highest difficulty; 0 keeps it difficulty-independent.</summary>
+  private const double OptGoalAmountDifficultyFactor = 0.0;
 
   /// <summary>Group count when <see cref="PropMain.ManyThemes"/> is off: a single theme.</summary>
   private const int SingleThemeGroupCount = 1;
@@ -203,35 +212,39 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   // Processors.
 
   /// <summary>
-  /// Resolve secrets options.
+  /// Resolve secrets options. The amount is drawn uniformly from <see cref="MinSecretAmount"/>
+  /// up to the inclusive bound <c>ceil(sqrt(Size) * (0.5 + 1.0 * Difficulty / MaxDifficulty))</c>,
+  /// which grows with the square root of the size like connectivity and complexity.
   /// </summary>
   /// <returns>Secrets options.</returns>
   private CnfProcRelSecretsOpt ResolveSecrets()
   {
-    int amountFrom = MinSecretAmount;
-    int amountTo = (_propMain.Difficulty + _propData.Size) / SecretAmountDivisor + 1;
+    int amountMax = SqrtSizeBound(SecretAmountBaseFactor, SecretAmountDifficultyFactor);
 
     return CnfProcRelSecretsOpt.Default with
     {
-      Amount = _random.NextInt(amountFrom, amountTo),
+      Amount = _random.NextInt(MinSecretAmount, amountMax + 1),
       ChanceSecretInSecret = ChanceSecretInSecret,
       ChanceTwoPassages = ChanceTwoPassages,
     };
   }
 
   /// <summary>
-  /// Resolve objectives options.
+  /// Resolve objectives options. Both amounts grow with the square root of the size, drawn
+  /// uniformly up to an inclusive bound: mandatory goals from <see cref="MinGoalAmount"/> to
+  /// <c>ceil(sqrt(Size) * (0.5 + 1.0 * Difficulty / MaxDifficulty))</c> (at least one), optional
+  /// goals from <see cref="MinOptGoalAmount"/> to <c>ceil(sqrt(Size))</c>.
   /// </summary>
   /// <returns>Objectives options.</returns>
   private CnfProcNodeObjectivesOpt ResolveObjectives()
   {
-    int from = MinGoalAmount;
-    int to = _propMain.Difficulty / GoalAmountDifficultyDivisor + 1;
+    int goalMax = Math.Max(MinGoalAmount, SqrtSizeBound(GoalAmountBaseFactor, GoalAmountDifficultyFactor));
+    int optGoalMax = SqrtSizeBound(OptGoalAmountBaseFactor, OptGoalAmountDifficultyFactor);
 
     return CnfProcNodeObjectivesOpt.Default with
     {
-      GoalAmount = _random.NextInt(from, to),
-      OptGoalAmount = _random.NextInt(MinOptGoalAmount, _propData.Size),
+      GoalAmount = _random.NextInt(MinGoalAmount, goalMax + 1),
+      OptGoalAmount = _random.NextInt(MinOptGoalAmount, optGoalMax + 1),
     };
   }
 

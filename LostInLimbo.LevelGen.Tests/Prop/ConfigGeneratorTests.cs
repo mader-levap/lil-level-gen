@@ -121,7 +121,7 @@ public sealed class ConfigGeneratorTests
       {
         MaxEdges = 5, MaxExtraDegree = 2, MaxConditionPerRel = 2, MaxConditionDistance = 2, MaxSkipDistance = 1, ChanceObstacleBypass = 0.0075154635f,
       }, config.Graph.GraphBuilder.CnfLinear);
-      Assert.Equal(3, config.Graph.ProcOpts.RelSecrets.Amount);
+      Assert.Equal(1, config.Graph.ProcOpts.RelSecrets.Amount);
       Assert.Equal(1, config.Graph.ProcOpts.NodeObjectives.GoalAmount);
       Assert.Equal(1, config.Graph.ProcOpts.NodeObjectives.OptGoalAmount);
       Assert.Equal(1, config.Graph.ProcOpts.NodeStyle.GroupCount);
@@ -193,6 +193,9 @@ public sealed class ConfigGeneratorTests
       Assert.InRange(config.Graph.Size, 2, Math.Min(difficulty + 2, CnfGraph.MaxSize));
       Assert.InRange(config.Graph.Connectivity, 0, GraphResolverExpect.MaxConnectivity(config.Graph.Size, difficulty));
       Assert.InRange(config.Graph.Complexity, 0, GraphResolverExpect.MaxComplexity(config.Graph.Size, difficulty));
+      Assert.InRange(config.Graph.ProcOpts.RelSecrets.Amount, 0, GraphResolverExpect.MaxSecretAmount(config.Graph.Size, difficulty));
+      Assert.InRange(config.Graph.ProcOpts.NodeObjectives.GoalAmount, 1, GraphResolverExpect.MaxGoalAmount(config.Graph.Size, difficulty));
+      Assert.InRange(config.Graph.ProcOpts.NodeObjectives.OptGoalAmount, 0, GraphResolverExpect.MaxOptGoalAmount(config.Graph.Size, difficulty));
       Assert.NotEqual(EnGraphBuilder.OneNode, config.Graph.GraphBuilder.Builder);
     }
   }
@@ -333,7 +336,7 @@ public sealed class ConfigGeneratorTests
     /// <summary>Pinned mandatory goal amount for "mordor" at difficulty 3.</summary>
     private const int PinnedGoalAmount = 1;
     /// <summary>Pinned optional goal amount for "mordor" at difficulty 3.</summary>
-    private const int PinnedOptGoalAmount = 0;
+    private const int PinnedOptGoalAmount = 2;
     /// <summary>Pinned style group count for "mordor" at difficulty 3.</summary>
     private const int PinnedGroupCount = 1;
 
