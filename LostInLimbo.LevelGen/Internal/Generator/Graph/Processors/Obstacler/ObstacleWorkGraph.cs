@@ -401,26 +401,12 @@ internal sealed class ObstacleWorkGraph
     var found = NoNode;
     for (var node = 0; node < _nodes.Length; node++)
     {
-      if (!HasPoi(_nodes[node], type)) continue;
+      if (!_nodes[node].HasPoi(type)) continue;
       if (found != NoNode) return NoNode; // Several nodes: unsupported.
       found = node;
     }
 
     return found;
-  }
-
-  /// <summary>Checks whether a node holds at least one POI of the given type.</summary>
-  /// <param name="node">Node to check.</param>
-  /// <param name="type">POI type to look for.</param>
-  /// <returns>True when such a POI exists.</returns>
-  private static bool HasPoi(LilNode node, EnPoiType type)
-  {
-    foreach (var poi in node.Pois)
-    {
-      if (poi.Type == type) return true;
-    }
-
-    return false;
   }
 
   #endregion

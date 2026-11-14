@@ -4,6 +4,7 @@ using System.Threading;
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Data.Status;
+using LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Validator;
 
@@ -186,11 +187,8 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     {
       if (!node.Secret) continue;
 
-      foreach (var poi in node.Pois)
-      {
-        if (poi.Type == EnPoiType.Goal)
-          return LilResult.Fail($"Goal POI {poi.Id} is in secret node {node.Id}.");
-      }
+      var goal = node.FindPoi(EnPoiType.Goal);
+      if (goal != null) return LilResult.Fail($"Goal POI {goal.Id} is in secret node {node.Id}.");
     }
 
     return null; // Success: No secret contain obligatory goal.
@@ -412,12 +410,9 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
         // A goal unreachable either way is an unreachable region, not a stranded one.
         if (!_flooded.Contains(node.Id)) continue;
 
-        foreach (var poi in node.Pois)
-        {
-          if (poi.Type == EnPoiType.Goal)
-            return LilResult.Fail(
-              $"Goal POI {poi.Id} is stranded behind one-way passage {edge.Id}.");
-        }
+        var goal = node.FindPoi(EnPoiType.Goal);
+        if (goal != null)
+          return LilResult.Fail($"Goal POI {goal.Id} is stranded behind one-way passage {edge.Id}.");
       }
     }
 
@@ -621,12 +616,10 @@ internal sealed class GraphValidator(LilGraph? graph, CnfValidGraphOpt options)
     {
       if (!farSide.Contains(node.Id)) continue;
 
-      foreach (var poi in node.Pois)
-      {
-        if (poi.Type == EnPoiType.Goal)
-          return LilResult.Fail(
-            $"Goal POI {poi.Id} is trapped behind one-way passage {edge.Id} (far side cannot reach the Exit).");
-      }
+      var goal = node.FindPoi(EnPoiType.Goal);
+      if (goal != null)
+        return LilResult.Fail(
+          $"Goal POI {goal.Id} is trapped behind one-way passage {edge.Id} (far side cannot reach the Exit).");
     }
 
     foreach (var node in _graph.Nodes)

@@ -163,12 +163,7 @@ internal sealed class ProcNodeObjectives
   /// <see cref="EnPoiType.OptionalGoal"/> POI.</returns>
   private static bool HasGoalPoi(LilNode node)
   {
-    foreach (var poi in node.Pois)
-    {
-      if (poi.Type is EnPoiType.Goal or EnPoiType.OptionalGoal) return true;
-    }
-
-    return false;
+    return node.HasPoi(EnPoiType.Goal) || node.HasPoi(EnPoiType.OptionalGoal);
   }
 
   /// <summary>
