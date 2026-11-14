@@ -106,6 +106,7 @@ internal static class WorldBinaryWriter
 
     WriteReach(writer, Require(node.Reach, "LilNode.Reach"));
     WriteGuidList(writer, Require(node.OpenReach, "LilNode.OpenReach"));
+    writer.Write(node.BuildOrder);
   }
 
   /// <summary>Writes the reach map with entries sorted by key; each list keeps its order.</summary>

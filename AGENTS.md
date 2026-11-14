@@ -12,6 +12,9 @@ Its primary consumers are:
 
 The library generates **data only**. It does not create game-engine objects, meshes, scenes, or UI.
 
+Note about versioning: we are early in development, so breaking changes in data (props, config, LilWorld serialization etc)
+do not matter - nothing was released yet and won't be released for long time. Version stays same for now.
+
 ## Non-negotiable architecture rules
 
 - Keep this project **engine-neutral**.

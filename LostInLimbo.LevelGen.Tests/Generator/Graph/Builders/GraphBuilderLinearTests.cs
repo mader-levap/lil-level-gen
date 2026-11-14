@@ -572,6 +572,28 @@ public sealed class GraphBuilderLinearTests
     }
   }
 
+  /// <summary>Tests for the debug <see cref="LilNode.BuildOrder"/> numbering.</summary>
+  public sealed class BuildOrderTests
+  {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(8)]
+    [InlineData(50)]
+    public void Build_BuildOrder_MatchesChainOrder(int size)
+    {
+      // Act: Build a chain with extras, obstacles and the default secret node.
+      var (result, graph) = GraphTestSupport.Build(
+        EnGraphBuilder.Linear, new CnfGraph { Size = size, Connectivity = 3, Complexity = 3 });
+
+      // Assert: Chain nodes are numbered in chain order, which is their position in the node
+      // list; the appended secret continues the sequence.
+      Assert.True(result.Success);
+      for (var index = 0; index < graph.Nodes.Count; index++)
+        Assert.Equal(index, graph.Nodes[index].BuildOrder);
+    }
+  }
+
   /// <summary>Tests for reproducibility of the generated graph.</summary>
   public sealed class DeterminismTests
   {

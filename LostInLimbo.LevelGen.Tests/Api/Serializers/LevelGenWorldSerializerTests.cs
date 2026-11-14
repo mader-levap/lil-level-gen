@@ -7,6 +7,7 @@ using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Data.Result.Stats;
 using LostInLimbo.LevelGen.Internal.Generator.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Prepass;
+using LostInLimbo.LevelGen.Internal.Serialization;
 
 namespace LostInLimbo.LevelGen.Tests.Api.Serializers;
 
@@ -76,6 +77,7 @@ public sealed class LevelGenWorldSerializerTests
       RelSize = 1,
       MaxEdges = 4,
       Secret = true,
+      BuildOrder = 7,
       Pois = [new LilPoi { Id = poiKey, Type = EnPoiType.Solution, Name = "key" }],
     });
     world.Graph.Edges.Add(new LilEdge
@@ -120,6 +122,7 @@ public sealed class LevelGenWorldSerializerTests
       Assert.Equal(left.RelSize, right.RelSize);
       Assert.Equal(left.MaxEdges, right.MaxEdges);
       Assert.Equal(left.Secret, right.Secret);
+      Assert.Equal(left.BuildOrder, right.BuildOrder);
       Assert.Equal(left.Style, right.Style);
       Assert.Equal(left.Pois, right.Pois);
       Assert.Equal(left.OpenReach, right.OpenReach);
@@ -277,19 +280,20 @@ public sealed class LevelGenWorldSerializerTests
       // Act: Save the hand-built world.
       var hex = Convert.ToHexString(Save(CreateTinyWorld()));
 
-      // Assert: The bytes match the pinned format version 1, so the format cannot change
+      // Assert: The bytes match the pinned format version 2, so the format cannot change
       // without a deliberate test update (and a format version bump).
       Assert.Equal(PinnedTinyWorldHex, hex);
     }
 
-    /// <summary>Pinned bytes of <see cref="CreateTinyWorld"/> in format version 1.</summary>
+    /// <summary>Pinned bytes of <see cref="CreateTinyWorld"/> in format version 2.</summary>
     private const string PinnedTinyWorldHex =
-      "4C494C5701000101000000010208000000030000000000000003FB000000020000000000000000000000000000000000" +
+      "4C494C570200010100000001020800000003000000000000000303010000020000000000000000000000000000000000" +
       "000A02000000FFFFFFFF0001026731010000000000000000000000000000000000000100000100000000000000000000" +
       "000000000000000001010000000000000000000000000000000000000A01000000000000000000000000000000000000" +
-      "0A0000000000000000000000000000000B01000000040000000100010000000000000000000000000000000000000204" +
-      "01036B6579000000000000000001000000000000000000000000000000000000E1000000000000000000000000000000" +
-      "0A0000000000000000000000000000000B010100010000000000000000000000000000000000000002040000000000";
+      "0A000000000000000000000000000000000000000B010000000400000001000100000000000000000000000000000000" +
+      "0000020401036B657900000000000000000700000001000000000000000000000000000000000000E100000000000000" +
+      "00000000000000000A0000000000000000000000000000000B0101000100000000000000000000000000000000000000" +
+      "02040000000000";
   }
 
   /// <summary>Tests of the stream contract.</summary>
@@ -407,7 +411,7 @@ public sealed class LevelGenWorldSerializerTests
     public void Read_WithOtherFormatVersion_ThrowsInvalidDataException()
     {
       // Act/Assert: Only the library's own version is accepted.
-      AssertCorruptionRejected(data => data[VersionOffset] = 2);
+      AssertCorruptionRejected(data => data[VersionOffset] = WorldBinaryFormat.FormatVersion + 1);
     }
 
     [Fact]

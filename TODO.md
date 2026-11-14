@@ -3,4 +3,4 @@ Current tasks:
   At larger sizes it becomes tangled mess, but I doubt we can do anything about that.
 - GraphBuilderLinear on larger scale stops being that linear. Rethink.
 - Some generations spawn way too many goals and optional goals.
-- Node size setting may be a little too mild. Rethink.
+- Node size setting may be a little too mild (too small differences between nodes). Rethink.

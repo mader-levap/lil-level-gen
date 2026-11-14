@@ -161,6 +161,22 @@ public sealed class ProcRelSecretsTests
     }
 
     [Fact]
+    public void Execute_WithAmountThree_NumbersSecretsAfterExistingNodes()
+    {
+      // Arrange: A chain graph of four nodes and options that allow nesting.
+      var graph = CreateStartExitChainGraph(4);
+      var options = CnfProcRelSecretsOpt.Default with { Amount = 3, ChanceSecretInSecret = 0.5f };
+
+      // Act: Add three secrets.
+      new ProcRelSecrets(graph, options, Seed).Execute();
+
+      // Assert: Secrets continue the build order after the four existing nodes, in the
+      // order they were appended.
+      var secrets = graph.Nodes.Where(node => node.Secret).ToList();
+      Assert.Equal([4, 5, 6], secrets.Select(secret => secret.BuildOrder));
+    }
+
+    [Fact]
     public void Execute_OverManySeeds_KeepsSecretGraphsBeatable()
     {
       for (var seed = 0; seed < StatisticalSeedCount; seed++)

@@ -105,6 +105,8 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// <summary>
   /// Creates the linear skeleton: every node links to its next node, from the first up to the
   /// last one. Uses exactly <c>size - 1</c> relationships - the minimum for a connected graph.
+  /// Nodes join in index order, so the <see cref="LilNode.BuildOrder"/> set by
+  /// <see cref="AGraphBuilder.CreateNodes"/> holds.
   /// </summary>
   /// <param name="size">Total number of nodes, from <c>CnfGraph.Size</c>.</param>
   /// <param name="nodeIds">Node identifiers in chain order.</param>
@@ -286,7 +288,7 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
       Id = DeriveEdgeId(from, to, passage),
       From = nodeIds[from],
       To = nodeIds[to],
-      Chokepoint = true,
+      Chokepoint = true, // all relationships in linear builders are chokepoints
     });
   }
 

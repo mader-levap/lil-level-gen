@@ -153,7 +153,9 @@ internal sealed class ProcRelSecrets
         Id = nodeId,
         RelSize = NodeRelSize,
         MaxEdges = _options.MaxEdges,
-        Secret = true });
+        Secret = true,
+        BuildOrder = _graph.Nodes.Count, // Secrets continue the build order after existing nodes.
+      });
       _graph.Edges.Add(new LilEdge
       {
         Id = DeriveEdgeId(ordinal),

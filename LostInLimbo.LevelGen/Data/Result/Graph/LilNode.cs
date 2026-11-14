@@ -26,6 +26,8 @@ namespace LostInLimbo.LevelGen.Data.Result.Graph;
 /// </remarks>
 public sealed record LilNode
 {
+  #region Basic
+
   /// <summary>
   /// Unique identifier of this node. Assigned by the generator; must not be <see cref="Guid.Empty"/>.
   /// </summary>
@@ -47,7 +49,11 @@ public sealed record LilNode
   /// Points of interest contained in this place. May be empty (plain pass-through place).
   /// A node can contain multiple POIs, e.g. two keys in the same room.
   /// </summary>
-  public List<LilPoi> Pois { get; init; } = new();
+  public List<LilPoi> Pois { get; init; } = [];
+
+  #endregion
+
+  #region Reach
 
   /// <summary>
   /// <para>
@@ -67,7 +73,7 @@ public sealed record LilNode
   /// the same data; the order carries no other meaning. Never <see langword="null"/>.
   /// </para>
   /// </summary>
-  public Dictionary<Guid, List<Guid>> Reach { get; init; } = new();
+  public Dictionary<Guid, List<Guid>> Reach { get; init; } = [];
 
   /// <summary>
   /// <para>
@@ -81,5 +87,18 @@ public sealed record LilNode
   /// but not the other way round. Never <see langword="null"/>.
   /// </para>
   /// </summary>
-  public List<Guid> OpenReach { get; init; } = new();
+  public List<Guid> OpenReach { get; init; } = [];
+
+  #endregion
+
+  #region Debug
+
+  /// <summary>
+  /// Zero-based order in which the node was built. Graph builder nodes come first,
+  /// numbered in the order they joined the skeleton; nodes added later (secrets) continue the
+  /// sequence. Carries no gameplay meaning.
+  /// </summary>
+  public int BuildOrder { get; init; } = 0;
+
+  #endregion
 }

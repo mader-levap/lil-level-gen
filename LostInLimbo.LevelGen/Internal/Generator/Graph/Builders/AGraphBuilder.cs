@@ -127,6 +127,11 @@ internal abstract class AGraphBuilder
   /// (graph sub-seed, <see cref="SaltNode"/>, node index as sub-channel) and
   /// <see cref="InitialNodeRelSize"/>. Consumes no RNG draws.
   /// </summary>
+  /// <remarks>
+  /// <see cref="LilNode.BuildOrder"/> is set to the node index. That is correct only for
+  /// builders whose skeleton joins nodes in index order; a builder that joins them in another
+  /// order must overwrite the value itself.
+  /// </remarks>
   /// <param name="size">Number of nodes to create.</param>
   /// <param name="maxEdges">Hard relationship cap of every node (<see cref="LilNode.MaxEdges"/>).</param>
   /// <returns>Node identifiers in index order; node <c>i</c> is <c>Graph.Nodes[i]</c>.</returns>
@@ -145,6 +150,7 @@ internal abstract class AGraphBuilder
         Id = id,
         RelSize = InitialNodeRelSize,
         MaxEdges = maxEdges,
+        BuildOrder = index,
       });
     }
 

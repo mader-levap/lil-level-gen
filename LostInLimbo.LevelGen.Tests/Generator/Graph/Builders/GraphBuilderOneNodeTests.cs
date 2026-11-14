@@ -42,6 +42,16 @@ public sealed class GraphBuilderOneNodeTests
   }
 
   [Fact]
+  public void Build_BuildOrder_IsZero()
+  {
+    // Act: Build with default configuration.
+    var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.OneNode);
+
+    // Assert: The only node is the first one built.
+    Assert.Equal(0, Assert.Single(graph.Nodes).BuildOrder);
+  }
+
+  [Fact]
   public void Build_WithSameSeed_ProducesIdenticalIdentifiers()
   {
     // Arrange: Two builds with the same graph sub-seed.

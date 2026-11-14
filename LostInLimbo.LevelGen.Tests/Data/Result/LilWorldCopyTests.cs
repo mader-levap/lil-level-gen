@@ -47,6 +47,7 @@ public sealed class LilWorldCopyTests
             RelSize = NodeRelSize,
             MaxEdges = NodeMaxEdges,
             Secret = true,
+            BuildOrder = 1,
             Pois = [new LilPoi { Id = keyPoiId, Type = EnPoiType.Solution, Name = "Key" }],
             OpenReach = [startPoiId],
           },
@@ -133,6 +134,7 @@ public sealed class LilWorldCopyTests
       Assert.Equal(expected.RelSize, actual.RelSize);
       Assert.Equal(expected.MaxEdges, actual.MaxEdges);
       Assert.Equal(expected.Secret, actual.Secret);
+      Assert.Equal(expected.BuildOrder, actual.BuildOrder);
       Assert.Equal(expected.Style.Group, actual.Style.Group);
       Assert.Equal(expected.Pois.Count, actual.Pois.Count);
       Assert.Equal(expected.Pois[0].Id, actual.Pois[0].Id);

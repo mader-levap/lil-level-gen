@@ -422,6 +422,60 @@ public sealed class GraphBuilderSimpleTests
     }
   }
 
+  /// <summary>Tests for the debug <see cref="LilNode.BuildOrder"/> numbering.</summary>
+  public sealed class BuildOrderTests
+  {
+    /// <summary>Number of seeds checked; enough to hit every skeleton scenario.</summary>
+    private const int SeedCount = 30;
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(8)]
+    [InlineData(50)]
+    public void Build_BuildOrder_MatchesNodeIndex(int size)
+    {
+      for (var seed = 0; seed < SeedCount; seed++)
+      {
+        // Act: Build a graph with extras and the default secret node.
+        var (result, graph) = GraphTestSupport.Build(
+          EnGraphBuilder.Simple, new CnfGraph { Size = size, Connectivity = 3 }, seed);
+
+        // Assert: Every node - builder nodes first, the appended secret last - is numbered
+        // by its position in the node list.
+        Assert.True(result.Success);
+        for (var index = 0; index < graph.Nodes.Count; index++)
+          Assert.Equal(index, graph.Nodes[index].BuildOrder);
+      }
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(8)]
+    [InlineData(50)]
+    public void Build_BuildOrder_EveryNonRootNodeHasEarlierNeighbor(int size)
+    {
+      for (var seed = 0; seed < SeedCount; seed++)
+      {
+        // Act: Build a minimal skeleton only, so every edge is a skeleton edge.
+        var (_, graph) = GraphTestSupport.Build(
+          EnGraphBuilder.Simple, new CnfGraph { Size = size, ProcOpts = GraphTestSupport.NoSecrets }, seed);
+
+        // Assert: Each node but the root is linked to a node built before it - so the build
+        // order really is the order nodes joined the skeleton.
+        var orderById = graph.Nodes.ToDictionary(node => node.Id, node => node.BuildOrder);
+        foreach (var node in graph.Nodes.Where(node => node.BuildOrder > 0))
+        {
+          var hasEarlierNeighbor = graph.Edges.Any(edge =>
+            (edge.From == node.Id && orderById[edge.To] < node.BuildOrder) ||
+            (edge.To == node.Id && orderById[edge.From] < node.BuildOrder));
+          Assert.True(hasEarlierNeighbor, $"Node {node.BuildOrder} has no earlier neighbor (seed {seed}).");
+        }
+      }
+    }
+  }
+
   /// <summary>Tests for reproducibility of the generated graph.</summary>
   public sealed class DeterminismTests
   {

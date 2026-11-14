@@ -158,6 +158,7 @@ internal static class WorldBinaryReader
     }
 
     var reach = ReadReach(reader);
+    var openReach = ReadGuidList(reader, "open reach");
     return new LilNode
     {
       Id = id,
@@ -167,7 +168,8 @@ internal static class WorldBinaryReader
       Style = new LilStyle { Group = group },
       Pois = pois,
       Reach = reach,
-      OpenReach = ReadGuidList(reader, "open reach"),
+      OpenReach = openReach,
+      BuildOrder = reader.ReadInt32(),
     };
   }
 

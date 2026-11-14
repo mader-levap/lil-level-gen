@@ -6,11 +6,12 @@ using LostInLimbo.LevelGen.Internal.Utils.Rng;
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
 /// <summary>
-/// Builds the simplest possible level graph: a single node containing both the start and
-/// the exit POI, with no edges, conditions or obstacles. The player can beeline from start
-/// to exit immediately. Useful for tests, debug and special scenarios.
+/// Builds the simplest possible level graph that is still beatable and passes validation:
+/// a single node containing both the start and the exit POI, with no edges, conditions or
+/// obstacles. The player can beeline from start to exit immediately.
 /// </summary>
 /// <remarks>
+/// <para>Useful for tests, debug and special scenarios.</para>
 /// <para>This is the only builder that always creates the same graph shape regardless of graph
 /// config; those settings are deliberately ignored and no randomness is involved.</para>
 /// <para>The node identifier uses the <see cref="AGraphBuilder.SaltNode"/> role salt directly
@@ -31,6 +32,7 @@ internal sealed class GraphBuilderOneNode : AGraphBuilder
       Id = IdDerivation.Derive(PrepData.SeedGraph, SaltNode),
       RelSize = NodeRelSize,
       MaxEdges = 0,
+      BuildOrder = 0,
     });
     PlaceStartAndExit(0, 0);
 

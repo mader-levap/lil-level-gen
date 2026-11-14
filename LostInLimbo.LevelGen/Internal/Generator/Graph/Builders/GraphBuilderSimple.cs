@@ -108,6 +108,11 @@ internal sealed class GraphBuilderSimple(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// <see cref="CnfGraphBuilderSimple.MaxExtraDegreeStar"/>, a new central takes over so no node exceeds the skeleton
   /// cap. Uses exactly <c>size - 1</c> relationships - the minimum for a connected graph.
   /// </summary>
+  /// <remarks>
+  /// Nodes join the skeleton in index order: node <c>i</c> always attaches to a node with a
+  /// lower index (its chain predecessor or an already attached central), so the
+  /// <see cref="LilNode.BuildOrder"/> set by <see cref="AGraphBuilder.CreateNodes"/> holds.
+  /// </remarks>
   /// <param name="size">Total number of nodes, from <c>CnfGraph.Size</c>.</param>
   /// <param name="nodeIds">Node identifiers in index order.</param>
   /// <param name="degrees">Per-node relationship count, updated in place.</param>
