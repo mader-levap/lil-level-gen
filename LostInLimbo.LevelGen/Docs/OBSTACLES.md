@@ -4,7 +4,7 @@ General processor that puts obstacles (conditions on edges) and solutions (POIs 
 arbitrary graph, softlock-free. First user: `GraphBuilderSimple` (end of `RunProcessorsShaping()`).
 `GraphBuilderLinear` keeps its own chain-based obstacle pass.
 
-Status: **phases 1-5 done** (config, cut machinery, main pass, wired into `GraphBuilderSimple`, side pass with budget split). Next: phase 6. Phases are in section 6.
+Status: **phases 1-6 done** (config, cut machinery, main pass, wired into `GraphBuilderSimple`, side pass with budget split, bypasses). Next: phase 7 (tuning). Phases are in section 6.
 
 Decisions taken:
 - Chokepoints: cut search *prefers* chokepoint passages; a locked non-chokepoint passage keeps its flag.
@@ -80,6 +80,11 @@ Extra conservatism for the solution flood (stronger than the validator):
 - **Dead end / leaf** (solution weights, side pass) means all passages lead to one other node,
   counted by distinct neighbour, not by edge count.
 
+- **Secret bypass** (main pass only): after the solution is placed, one roll per secret passage
+  of the cut with `ChanceSecretBypass` (default 0.25), in Id order; on a hit that passage loses
+  the new condition. Not rolled when the cut holds secret passages only - something must stay
+  locked. Never used by the side pass: opening the entry of a pocket would unlock the pocket.
+  Rolled before the ordinary bypass.
 - **Ordinary bypass** (main pass only): after the solution is placed, one roll per obstacle with
   `ChanceBypass` (default 0.01). On a hit, one ordinary passage of the cut is left without the
   condition - a locked shortcut with an open way around. Rules:
@@ -87,7 +92,8 @@ Extra conservatism for the solution flood (stronger than the validator):
     ordinary passage always stays locked;
   - a passage with a parallel passage in the same cut is never the one left open (an open door
     next to a locked one between the same two nodes would make the obstacle meaningless);
-  - the open passage is picked by seeded roll among the eligible ones, in Id order;
+  - the open passage is picked by seeded roll among the eligible ones, in Id order; the chance
+    roll itself is only made when an eligible passage exists;
   - rolled after solution placement, so the solution stays on the start side of the cut.
   Never used by the side pass: all passages of a pocket join one node pair.
 
@@ -211,6 +217,8 @@ No-op when: `Complexity == 0`; fewer than two nodes; not exactly one start node 
   its solution. Safe (more open passages never hurt), but such a level is easier than its
   Complexity suggests. At 0.01 it is too rare for seed sweeps; tests force it with chance 1.
 - **Secret bypass** intentionally breaks "mandatory" for that obstacle; tests of the property use chance 0 for both bypasses.
+  A bypassed obstacle keeps its place in the required-node list: later obstacles may still guard
+  its solution, although the player can now walk around it.
 - **`ChanceIgnoreConditionals` of `ProcRelSecrets`** has no effect in Simple (no conditions exist
   yet when secrets are made); `ChanceSecretBypass` takes over that role.
 - **Goal in a main-locked region or side pocket** makes that obstacle mandatory; harmless.

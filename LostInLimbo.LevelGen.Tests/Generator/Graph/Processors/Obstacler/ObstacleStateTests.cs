@@ -181,6 +181,42 @@ public sealed class ObstacleStateTests
   }
 
   [Fact]
+  public void ReopenPassage_RemovesOnlyTheConditionOfTheLastObstacle()
+  {
+    // Arrange: Cycle 1 - 2 - 3 - 4 - 1 with an older obstacle on passage 1 and a new one on 1 and 2.
+    var graph = CreateLevel(4, 1, 3, new Passage(1, 2), new Passage(2, 3), new Passage(3, 4), new Passage(4, 1));
+    var state = CreateState(graph);
+    Assert.True(state.TryPlaceObstacle([1], null, out _));
+    var older = graph.Edges[1].Conditions[0];
+    Assert.True(state.TryPlaceObstacle([1, 2], null, out _));
+
+    // Act: Reopen passage 1 for the last obstacle.
+    state.ReopenPassage(1);
+
+    // Assert: The older condition stays, the last obstacle still locks passage 2.
+    Assert.Equal([older], graph.Edges[1].Conditions);
+    Assert.Single(graph.Edges[2].Conditions);
+    Assert.Equal(2, state.ObstacleCount);
+    GraphTestAssert.AssertBeatable(graph);
+  }
+
+  [Fact]
+  public void ReopenPassage_WithoutMatchingObstacle_Throws()
+  {
+    // Arrange: A fresh state, then one obstacle on passage 2.
+    var graph = CreateLevel(4, 1, 4, Chain(4));
+    var state = CreateState(graph);
+
+    // Act/Assert: Nothing to reopen before the first obstacle.
+    Assert.Throws<InvalidOperationException>(() => state.ReopenPassage(0));
+
+    // Act/Assert: A passage the last obstacle does not lock is rejected; nothing changes.
+    Assert.True(state.TryPlaceObstacle([2], null, out _));
+    Assert.Throws<InvalidOperationException>(() => state.ReopenPassage(0));
+    Assert.Single(graph.Edges[2].Conditions);
+  }
+
+  [Fact]
   public void TryPlaceObstacle_WithSameSeed_DerivesSameSolutionIds()
   {
     // Arrange: Two equal graphs and states.

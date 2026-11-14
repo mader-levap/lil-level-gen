@@ -41,6 +41,8 @@ internal sealed class ObstacleState
   private readonly GraphFlood _flood;
   /// <summary>Every solution POI in the graph; what the flood may pick up.</summary>
   private readonly HashSet<Guid> _solutionIds = [];
+  /// <summary>Solution of the most recently placed obstacle; empty before the first one.</summary>
+  private Guid _lastSolutionId = Guid.Empty;
 
   /// <summary>
   /// Prepares the shared state for one run of the obstacle placer.
@@ -147,8 +149,33 @@ internal sealed class ObstacleState
 
     Work.GetNode(solutionNode).Pois.Add(new LilPoi { Id = solutionId, Type = EnPoiType.Solution });
     _solutionIds.Add(solutionId);
+    _lastSolutionId = solutionId;
     ObstacleCount++;
     return true;
+  }
+
+  /// <summary>
+  /// Takes the condition of the most recently placed obstacle off one of its passages again:
+  /// a bypass, a deliberately open way around that obstacle.
+  /// </summary>
+  /// <remarks>
+  /// Always safe: opening a passage can only add ways through the graph. The caller keeps the
+  /// obstacle meaningful by leaving at least one of its passages locked.
+  /// </remarks>
+  /// <param name="edge">Work index of a passage locked by the most recent obstacle.</param>
+  /// <exception cref="InvalidOperationException">
+  /// No obstacle was placed yet, or the passage does not carry the condition of the most recent one.
+  /// </exception>
+  public void ReopenPassage(int edge)
+  {
+    if (ObstacleCount == 0) throw new InvalidOperationException("No obstacle was placed yet.");
+
+    var conditions = Work.GetEdge(edge).Conditions;
+    var index = conditions.FindIndex(condition => condition.RequiresPoi == _lastSolutionId);
+    if (index < 0)
+      throw new InvalidOperationException($"Passage {Work.GetEdge(edge).Id} is not locked by the most recent obstacle.");
+
+    conditions.RemoveAt(index);
   }
 
   /// <summary>

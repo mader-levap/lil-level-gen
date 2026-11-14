@@ -95,15 +95,17 @@ public sealed record CnfProcObstaclePlacerOpt
   // Bypasses.
 
   /// <summary>
-  /// Per obstacle and secret passage it would lock: chance that the secret passage stays
-  /// open, a deliberate shortcut past the obstacle.
+  /// Main pass, per obstacle and secret passage it would lock: chance that the secret passage
+  /// stays open, a deliberate shortcut past the obstacle. Not used when the obstacle locks
+  /// secret passages only, and never by the side pass.
   /// <para>Must be a finite value within [0, 1].</para>
   /// </summary>
   public float ChanceSecretBypass { get; init; } = 0.25f;
 
   /// <summary>
   /// Main pass, per obstacle locking at least two ordinary passages: chance that one of them
-  /// stays open, so the obstacle becomes a locked shortcut with an open way around.
+  /// stays open, so the obstacle becomes a locked shortcut with an open way around. A passage
+  /// with a parallel passage locked by the same obstacle is never the open one.
   /// <para>Must be a finite value within [0, 1].</para>
   /// </summary>
   public float ChanceBypass { get; init; } = 0.01f;

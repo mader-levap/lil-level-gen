@@ -31,6 +31,13 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// option. With no cut at all the pass ends early.</item>
 /// </list>
 /// <para>
+/// <b>Bypasses.</b> After the solution is placed, some passages of the cut may be opened again
+/// (<see cref="ApplyBypasses"/>): each secret passage with
+/// <see cref="CnfProcObstaclePlacerOpt.ChanceSecretBypass"/>, and - one roll per obstacle with
+/// <see cref="CnfProcObstaclePlacerOpt.ChanceBypass"/> - one ordinary passage. At least one
+/// ordinary passage always stays locked. A bypassed obstacle is no longer needed for the exit.
+/// </para>
+/// <para>
 /// Start and exit next to each other need no special case: every cut for the exit contains the
 /// direct passage, so after the first obstacle it can only be stacked, which is rare; later
 /// obstacles mostly lock away earlier solutions.
@@ -92,6 +99,7 @@ internal sealed class ObstaclePassMain
       if (!_state.TryPlaceObstacle(cut.LockEdges, _protectedNodes, out var solutionNode)) break;
 
       placed++;
+      ApplyBypasses(cut);
       if (solutionNode == start)
       {
         // A solution in the start node cannot be locked away.
@@ -174,6 +182,79 @@ internal sealed class ObstaclePassMain
 
     return leastStacked;
   }
+
+  #region Bypasses
+
+  /// <summary>Smallest number of ordinary passages in a cut that allows an ordinary bypass.</summary>
+  private const int MinOrdinaryWidthForBypass = 2;
+
+  /// <summary>
+  /// Opens some passages of the obstacle just placed; see the bypass paragraph of the type remarks.
+  /// </summary>
+  /// <remarks>
+  /// Runs after the solution is placed, so the solution was chosen with the whole cut locked
+  /// and stays on the start side. A cut of secret passages only gets no bypass: something
+  /// must stay locked.
+  /// </remarks>
+  /// <param name="cut">Cut of the obstacle placed last; all its passages carry the new condition.</param>
+  private void ApplyBypasses(CutCandidate cut)
+  {
+    if (cut.OrdinaryWidth == 0) return;
+
+    var work = _state.Work;
+    var options = _state.Options;
+
+    // Secret bypass: one roll per secret passage, in passage index order.
+    foreach (var edge in cut.LockEdges)
+    {
+      if (work.GetEdge(edge).Secret && _state.Random.NextBool(options.ChanceSecretBypass)) _state.ReopenPassage(edge);
+    }
+
+    // Ordinary bypass: one roll per obstacle, and only when another ordinary passage stays locked.
+    if (cut.OrdinaryWidth < MinOrdinaryWidthForBypass) return;
+
+    var eligible = FindOrdinaryBypassCandidates(cut);
+    if (eligible.Count == 0) return;
+    if (!_state.Random.NextBool(options.ChanceBypass)) return;
+
+    _state.ReopenPassage(eligible[_state.Random.NextInt(eligible.Count)]);
+  }
+
+  /// <summary>
+  /// Lists the ordinary passages of a cut that may be left open: those without a parallel
+  /// passage in the same cut. An open door right next to a locked one between the same two
+  /// nodes would make the obstacle meaningless.
+  /// </summary>
+  /// <param name="cut">Cut to inspect.</param>
+  /// <returns>Work indices of the eligible passages, in passage index order.</returns>
+  private List<int> FindOrdinaryBypassCandidates(CutCandidate cut)
+  {
+    var work = _state.Work;
+    var eligible = new List<int>();
+    foreach (var edge in cut.LockEdges)
+    {
+      if (work.GetEdge(edge).Secret) continue;
+
+      var hasTwin = false;
+      foreach (var other in cut.LockEdges)
+      {
+        if (other == edge) continue;
+        var sameWay = work.EdgeFrom(other) == work.EdgeFrom(edge) && work.EdgeTo(other) == work.EdgeTo(edge);
+        var opposite = work.EdgeFrom(other) == work.EdgeTo(edge) && work.EdgeTo(other) == work.EdgeFrom(edge);
+        if (sameWay || opposite)
+        {
+          hasTwin = true;
+          break;
+        }
+      }
+
+      if (!hasTwin) eligible.Add(edge);
+    }
+
+    return eligible;
+  }
+
+  #endregion
 
   /// <summary>
   /// Picks among the cheapest candidates; several equally cheap ones are decided by roll.

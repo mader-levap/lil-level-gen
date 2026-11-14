@@ -30,9 +30,11 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// <list type="bullet">
 /// <item><b>Main pass</b> (<see cref="ObstaclePassMain"/>): obstacles between the start and the
 /// exit; skipped when both share a node. Secret passages that would bypass an obstacle are
-/// always locked with it.</item>
+/// locked with it, except for rare deliberate bypasses
+/// (<see cref="CnfProcObstaclePlacerOpt.ChanceSecretBypass"/>,
+/// <see cref="CnfProcObstaclePlacerOpt.ChanceBypass"/>).</item>
 /// <item><b>Side pass</b> (<see cref="ObstaclePassSide"/>): obstacles guarding dead ends
-/// (pockets) with a secret node, a goal or an optional goal.</item>
+/// (pockets) with a secret node, a goal or an optional goal. Never bypassed.</item>
 /// </list>
 /// <para>
 /// <b>Budget split.</b> The side pass first lists its pockets. Without pockets the main pass

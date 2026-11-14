@@ -18,6 +18,10 @@ public sealed class ProcObstaclePlacerTests
   /// <summary>Number of seeds used by the sweep tests.</summary>
   private const int SweepSeeds = 40;
 
+  /// <summary>Default options without bypasses: every passage of a cut stays locked.</summary>
+  private static readonly CnfProcObstaclePlacerOpt NoBypass =
+    CnfProcObstaclePlacerOpt.Default with { ChanceSecretBypass = 0f, ChanceBypass = 0f };
+
   /// <summary>Runs the placer on a graph.</summary>
   /// <param name="graph">Graph to change in place.</param>
   /// <param name="complexity">Largest number of obstacles.</param>
@@ -463,9 +467,9 @@ public sealed class ProcObstaclePlacerTests
         {
           // Arrange/Act: A fresh graph with a generous Complexity.
           var graph = create();
-          var placer = Run(graph, 5, seed);
+          var placer = Run(graph, 5, seed, NoBypass);
 
-          // Assert: No obstacle of the main pass can be skipped.
+          // Assert: Without bypasses, no obstacle of the main pass can be skipped.
           AssertMainSolutionsMandatoryForExit(graph, placer, $"{name}, seed {seed}");
         }
       }
@@ -513,7 +517,7 @@ public sealed class ProcObstaclePlacerTests
       {
         // Arrange/Act: Cycle of six nodes, start opposite the exit.
         var graph = Shapes()[1].Create();
-        Run(graph, 2, seed);
+        Run(graph, 2, seed, NoBypass);
 
         // Assert: Both ways round must carry the same solution.
         Assert.NotEmpty(SolutionIds(graph));
@@ -642,8 +646,8 @@ public sealed class ProcObstaclePlacerTests
           new Passage(4, 3, Secret: true));
         MarkSecret(graph, 4);
 
-        // Act: One obstacle.
-        var placer = Run(graph, 1, seed);
+        // Act: One obstacle, bypasses off.
+        var placer = Run(graph, 1, seed, NoBypass);
 
         // Assert: The secret way into the exit carries the same solution, so the obstacle
         // cannot be bypassed.
@@ -846,6 +850,189 @@ public sealed class ProcObstaclePlacerTests
 
       // Assert: In some runs the leaf was locked by the side pass, from the unspent budget.
       Assert.True(sideUsedLeftover);
+    }
+  }
+
+  /// <summary>Tests the deliberate open ways around obstacles: secret and ordinary bypasses.</summary>
+  public sealed class BypassTests
+  {
+    /// <summary>Options where every possible secret bypass happens and no ordinary one.</summary>
+    private static readonly CnfProcObstaclePlacerOpt SecretBypassAlways =
+      CnfProcObstaclePlacerOpt.Default with { ChanceSecretBypass = 1f, ChanceBypass = 0f };
+
+    /// <summary>Options where every possible ordinary bypass happens and no secret one.</summary>
+    private static readonly CnfProcObstaclePlacerOpt BypassAlways =
+      CnfProcObstaclePlacerOpt.Default with { ChanceSecretBypass = 0f, ChanceBypass = 1f };
+
+    [Fact]
+    public void Execute_WithSecretBypassAlways_LeavesSecretPassagesOpen()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: Chain 1 - 2 - 3 plus secret node 4 bridging start and exit.
+        var graph = CreateLevel(
+          4, 1, 3,
+          new Passage(1, 2),
+          new Passage(2, 3),
+          new Passage(1, 4, Secret: true),
+          new Passage(4, 3, Secret: true));
+        MarkSecret(graph, 4);
+
+        // Act: One obstacle.
+        var placer = Run(graph, 1, seed, SecretBypassAlways);
+
+        // Assert: One ordinary passage is locked; the secret route stays an open shortcut.
+        Assert.Equal(1, placer.PlacedObstacles);
+        Assert.Equal(1, CountConditions(graph));
+        Assert.Empty(graph.Edges[2].Conditions);
+        Assert.Empty(graph.Edges[3].Conditions);
+        AssertInvariants(graph, placer, 1, SecretBypassAlways, $"seed {seed}");
+      }
+    }
+
+    [Fact]
+    public void Execute_WithSecretBypassNever_LocksSecretPassages()
+    {
+      // Arrange: The same level; bypasses off.
+      var graph = CreateLevel(
+        4, 1, 3,
+        new Passage(1, 2),
+        new Passage(2, 3),
+        new Passage(1, 4, Secret: true),
+        new Passage(4, 3, Secret: true));
+      MarkSecret(graph, 4);
+
+      // Act: One obstacle.
+      Run(graph, 1, 42, NoBypass);
+
+      // Assert: An ordinary and a secret passage carry the condition.
+      Assert.Equal(2, CountConditions(graph));
+    }
+
+    [Fact]
+    public void Execute_WithOnlySecretPassagesInCut_KeepsThemLocked()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: The exit can only be reached through a secret passage.
+        var graph = CreateLevel(3, 1, 3, new Passage(1, 2), new Passage(2, 3, Secret: true));
+
+        // Act: One obstacle with every secret bypass wanted.
+        var placer = Run(graph, 1, seed, SecretBypassAlways);
+
+        // Assert: Whatever was locked stays locked - an obstacle never ends up locking nothing.
+        AssertInvariants(graph, placer, 1, SecretBypassAlways, $"seed {seed}");
+        Assert.Equal(placer.PlacedObstacles, CountConditions(graph));
+      }
+    }
+
+    [Fact]
+    public void Execute_WithBypassAlways_LeavesOnePassageOfWideCutOpen()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: Cycle of six nodes, start opposite the exit: every cut has two passages.
+        var graph = Shapes()[1].Create();
+
+        // Act: One obstacle.
+        var placer = Run(graph, 1, seed, BypassAlways);
+
+        // Assert: Only one of the two ways round is locked.
+        var solution = Assert.Single(SolutionIds(graph));
+        Assert.Single(EdgesRequiring(graph, solution));
+        AssertInvariants(graph, placer, 1, BypassAlways, $"seed {seed}");
+      }
+    }
+
+    [Fact]
+    public void Execute_WithBypassAlways_NeverOpensSinglePassageCut()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: Chain of six nodes: every cut is one passage.
+        var graph = CreateLevel(6, 1, 6, Chain(6));
+
+        // Act: Three obstacles.
+        var placer = Run(graph, 3, seed, BypassAlways);
+
+        // Assert: Every obstacle still locks its passage.
+        Assert.Equal(3, placer.PlacedObstacles);
+        foreach (var solutionId in SolutionIds(graph)) Assert.Single(EdgesRequiring(graph, solutionId));
+      }
+    }
+
+    [Fact]
+    public void Execute_WithBypassAlways_NeverOpensParallelPassage()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: Start and exit joined by two parallel passages and nothing else.
+        var twins = CreateLevel(2, 1, 2, new Passage(1, 2), new Passage(2, 1));
+
+        // Arrange: The same pair plus a detour over node 3 (edges 2 and 3).
+        var withDetour = CreateLevel(
+          3, 1, 2,
+          new Passage(1, 2), new Passage(2, 1), new Passage(1, 3), new Passage(3, 2));
+
+        // Act: One obstacle each.
+        Run(twins, 1, seed, BypassAlways);
+        Run(withDetour, 1, seed, BypassAlways);
+
+        // Assert: Parallel passages stay locked together; with a detour, the detour is the open way.
+        Assert.Single(twins.Edges[0].Conditions);
+        Assert.Single(twins.Edges[1].Conditions);
+        Assert.Single(withDetour.Edges[0].Conditions);
+        Assert.Single(withDetour.Edges[1].Conditions);
+        Assert.Empty(withDetour.Edges[2].Conditions);
+        Assert.Empty(withDetour.Edges[3].Conditions);
+        GraphTestAssert.AssertBeatable(withDetour, $"seed {seed}");
+      }
+    }
+
+    [Fact]
+    public void Execute_WithBypassesAlways_NeverOpensSidePockets()
+    {
+      // Arrange: Start and exit share node 1; a secret leaf 3 and a goal leaf 4 behind parallel passages.
+      var options = CnfProcObstaclePlacerOpt.Default with { ChanceSecretBypass = 1f, ChanceBypass = 1f };
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        var graph = CreateLevel(
+          5, 1, 1,
+          new Passage(1, 2), new Passage(2, 3, Secret: true), new Passage(2, 4), new Passage(4, 2), new Passage(2, 5));
+        MarkSecret(graph, 3);
+        AddGoal(graph, 4);
+
+        // Act: Only the side pass can run.
+        var placer = Run(graph, 4, seed, options);
+
+        // Assert: Both pockets are fully locked.
+        Assert.Equal(2, placer.PlacedSideObstacles);
+        Assert.Single(graph.Edges[1].Conditions);
+        Assert.Single(graph.Edges[2].Conditions);
+        Assert.Single(graph.Edges[3].Conditions);
+      }
+    }
+
+    [Fact]
+    public void Execute_WithBypassesAlways_KeepsEveryInvariant()
+    {
+      // Arrange: Every bypass that can happen does.
+      var options = CnfProcObstaclePlacerOpt.Default with { ChanceSecretBypass = 1f, ChanceBypass = 1f };
+      foreach (var (name, create) in Shapes())
+      {
+        for (var complexity = 1; complexity <= 6; complexity++)
+        {
+          for (var seed = 0; seed < SweepSeeds; seed++)
+          {
+            // Act: A fresh graph per case.
+            var graph = create();
+            var placer = Run(graph, complexity, seed, options);
+
+            // Assert: Still beatable, every solution still locks something.
+            AssertInvariants(graph, placer, complexity, options, $"{name}, complexity {complexity}, seed {seed}");
+          }
+        }
+      }
     }
   }
 }
