@@ -4,7 +4,7 @@ General processor that puts obstacles (conditions on edges) and solutions (POIs 
 arbitrary graph, softlock-free. First user: `GraphBuilderSimple` (end of `RunProcessorsShaping()`).
 `GraphBuilderLinear` keeps its own chain-based obstacle pass.
 
-Status: **planned, not implemented.** Work is split into phases, see section 6.
+Status: **phase 1 done** (config section, resolver default, `GraphFlood` edge filter). Next: phase 2. Phases are in section 6.
 
 Decisions taken:
 - Chokepoints: cut search *prefers* chokepoint passages; a locked non-chokepoint passage keeps its flag.

@@ -24,6 +24,9 @@ public sealed record CnfProcOpt
   /// <summary>Options of the objective-POIs processor.</summary>
   public CnfProcNodeObjectivesOpt NodeObjectives { get; init; } = CnfProcNodeObjectivesOpt.Default;
 
+  /// <summary>Options of the obstacle-placer processor. Ignored by builders that do not run it.</summary>
+  public CnfProcObstaclePlacerOpt ObstaclePlacer { get; init; } = CnfProcObstaclePlacerOpt.Default;
+
   /// <summary>Options of the relative-size processor.</summary>
   public CnfProcNodeRelSizeOpt NodeRelSize { get; init; } = CnfProcNodeRelSizeOpt.Default;
 
@@ -44,6 +47,8 @@ public sealed record CnfProcOpt
       throw new ArgumentException("RelSecrets config must not be null.", nameof(RelSecrets));
     if (NodeObjectives is null)
       throw new ArgumentException("NodeObjectives config must not be null.", nameof(NodeObjectives));
+    if (ObstaclePlacer is null)
+      throw new ArgumentException("ObstaclePlacer config must not be null.", nameof(ObstaclePlacer));
     if (NodeRelSize is null)
       throw new ArgumentException("NodeRelSize config must not be null.", nameof(NodeRelSize));
     if (NodeStyle is null)
@@ -51,6 +56,7 @@ public sealed record CnfProcOpt
 
     RelSecrets.Validate();
     NodeObjectives.Validate();
+    ObstaclePlacer.Validate();
     NodeRelSize.Validate();
     NodeStyle.Validate();
   }

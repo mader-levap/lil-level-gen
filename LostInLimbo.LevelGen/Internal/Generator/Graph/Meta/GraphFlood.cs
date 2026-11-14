@@ -16,6 +16,10 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
 /// two nodes share an identifier, the first one wins.
 /// </para>
 /// <para>
+/// An optional edge filter narrows the flood to a subset of the passages (for example
+/// non-secret, two-way ones); passages it rejects do not exist for this instance.
+/// </para>
+/// <para>
 /// The node index and adjacency are built once per instance, so several floods over the same
 /// graph share them. The graph is only read, never modified. Deterministic: results are sets
 /// that do not depend on node or edge order.
@@ -33,8 +37,12 @@ internal sealed class GraphFlood
   /// Indexes the nodes and passages of <paramref name="graph"/>.
   /// </summary>
   /// <param name="graph">Graph to flood; read only.</param>
+  /// <param name="edgeFilter">
+  /// Decides per passage whether the flood may use it (true) or must ignore it (false);
+  /// null keeps every passage. Evaluated once per passage, at construction, in list order.
+  /// </param>
   /// <exception cref="ArgumentNullException"><paramref name="graph"/> is <see langword="null"/>.</exception>
-  public GraphFlood(LilGraph graph)
+  public GraphFlood(LilGraph graph, Func<LilEdge, bool>? edgeFilter = null)
   {
     if (graph is null) throw new ArgumentNullException(nameof(graph));
 
@@ -49,6 +57,7 @@ internal sealed class GraphFlood
     {
       if (edge.From == edge.To) continue;
       if (!_nodeById.ContainsKey(edge.From) || !_nodeById.ContainsKey(edge.To)) continue;
+      if (edgeFilter != null && !edgeFilter(edge)) continue;
 
       // The forward direction From -> To is always allowed, backward only when bidirectional.
       AddIncident(edge.From, edge);

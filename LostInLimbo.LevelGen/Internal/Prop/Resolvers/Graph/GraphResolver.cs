@@ -204,6 +204,7 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     {
       RelSecrets = ResolveSecrets(),
       NodeObjectives = ResolveObjectives(),
+      ObstaclePlacer = CnfProcObstaclePlacerOpt.Default, // No difficulty scaling yet.
       NodeRelSize = ResolveRelSize(),
       NodeStyle = ResolveStyle(),
     };

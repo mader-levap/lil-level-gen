@@ -21,6 +21,7 @@ public sealed class CnfProcOptsTests
     [Theory]
     [InlineData(nameof(CnfProcOpt.RelSecrets))]
     [InlineData(nameof(CnfProcOpt.NodeObjectives))]
+    [InlineData(nameof(CnfProcOpt.ObstaclePlacer))]
     [InlineData(nameof(CnfProcOpt.NodeRelSize))]
     [InlineData(nameof(CnfProcOpt.NodeStyle))]
     public void Validate_WithNullSection_ThrowsArgumentExceptionNamingSection(string section)
@@ -30,6 +31,7 @@ public sealed class CnfProcOptsTests
       {
         nameof(CnfProcOpt.RelSecrets) => CnfProcOpt.Default with { RelSecrets = null! },
         nameof(CnfProcOpt.NodeObjectives) => CnfProcOpt.Default with { NodeObjectives = null! },
+        nameof(CnfProcOpt.ObstaclePlacer) => CnfProcOpt.Default with { ObstaclePlacer = null! },
         nameof(CnfProcOpt.NodeRelSize) => CnfProcOpt.Default with { NodeRelSize = null! },
         _ => CnfProcOpt.Default with { NodeStyle = null! },
       };
@@ -248,6 +250,128 @@ public sealed class CnfProcOptsTests
 
       // Assert: Zero is allowed and disables the processor.
       opts.Validate();
+    }
+
+    [Fact]
+    public void ObstaclePlacer_WithDefaultInstance_DoesNotThrow()
+    {
+      // Arrange/Act: The default instance carries the documented defaults.
+      var opts = CnfProcObstaclePlacerOpt.Default;
+      opts.Validate();
+
+      // Assert: Defaults match the values documented in OBSTACLES.md.
+      Assert.Equal(3, opts.MaxConditionsPerEdge);
+      Assert.Equal(4, opts.MaxEdgesPerObstacle);
+      Assert.Equal(0.7f, opts.MainShare);
+      Assert.Equal(3, opts.SmallComplexityMax);
+      Assert.Equal(0.75f, opts.ChanceReserveSide);
+      Assert.Equal(0.2f, opts.ChanceReserveSideOnly);
+      Assert.Equal(0.4f, opts.ChanceNestSolution);
+      Assert.Equal(0.3f, opts.ChanceStack);
+      Assert.Equal(0.25f, opts.ChanceSecretBypass);
+      Assert.Equal(0.01f, opts.ChanceBypass);
+    }
+
+    [Fact]
+    public void ObstaclePlacer_WithBoundaryValues_DoesNotThrow()
+    {
+      // Arrange: Config with every value at an allowed boundary.
+      var opts = new CnfProcObstaclePlacerOpt
+      {
+        MaxConditionsPerEdge = 1,
+        MaxEdgesPerObstacle = 1,
+        SmallComplexityMax = 0,
+        MainShare = 0f,
+        ChanceReserveSide = 1f,
+        ChanceReserveSideOnly = 0f,
+        ChanceNestSolution = 1f,
+        ChanceStack = 0f,
+        ChanceSecretBypass = 1f,
+        ChanceBypass = 0f,
+      };
+
+      // Act/Assert: Smallest limits and both ends of the unit interval are allowed.
+      opts.Validate();
+    }
+
+    [Theory]
+    [InlineData(nameof(CnfProcObstaclePlacerOpt.MaxConditionsPerEdge), 0)]
+    [InlineData(nameof(CnfProcObstaclePlacerOpt.MaxConditionsPerEdge), -2)]
+    [InlineData(nameof(CnfProcObstaclePlacerOpt.MaxEdgesPerObstacle), 0)]
+    [InlineData(nameof(CnfProcObstaclePlacerOpt.MaxEdgesPerObstacle), -2)]
+    [InlineData(nameof(CnfProcObstaclePlacerOpt.SmallComplexityMax), -1)]
+    public void ObstaclePlacer_WithLimitBelowMinimum_ThrowsArgumentOutOfRangeException(string property, int value)
+    {
+      // Arrange: Config with one forbidden limit.
+      var opts = property switch
+      {
+        nameof(CnfProcObstaclePlacerOpt.MaxConditionsPerEdge) => new CnfProcObstaclePlacerOpt { MaxConditionsPerEdge = value },
+        nameof(CnfProcObstaclePlacerOpt.MaxEdgesPerObstacle) => new CnfProcObstaclePlacerOpt { MaxEdgesPerObstacle = value },
+        _ => new CnfProcObstaclePlacerOpt { SmallComplexityMax = value },
+      };
+
+      // Act/Assert: The out-of-range value is rejected naming the offending property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
+      Assert.Equal(property, exception.ParamName);
+    }
+
+    /// <summary>Every share/chance property of the obstacle placer paired with forbidden values.</summary>
+    public static TheoryData<string, float> ObstaclePlacerBadChances()
+    {
+      string[] properties =
+      [
+        nameof(CnfProcObstaclePlacerOpt.MainShare),
+        nameof(CnfProcObstaclePlacerOpt.ChanceReserveSide),
+        nameof(CnfProcObstaclePlacerOpt.ChanceReserveSideOnly),
+        nameof(CnfProcObstaclePlacerOpt.ChanceNestSolution),
+        nameof(CnfProcObstaclePlacerOpt.ChanceStack),
+        nameof(CnfProcObstaclePlacerOpt.ChanceSecretBypass),
+        nameof(CnfProcObstaclePlacerOpt.ChanceBypass),
+      ];
+      float[] values = [-0.1f, 1.1f, float.NaN, float.PositiveInfinity];
+
+      var data = new TheoryData<string, float>();
+      foreach (var property in properties)
+      {
+        foreach (var value in values) data.Add(property, value);
+      }
+
+      return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(ObstaclePlacerBadChances))]
+    public void ObstaclePlacer_WithChanceOutsideUnitInterval_ThrowsArgumentOutOfRangeException(string property, float chance)
+    {
+      // Arrange: Config with one forbidden share or chance.
+      var opts = property switch
+      {
+        nameof(CnfProcObstaclePlacerOpt.MainShare) => new CnfProcObstaclePlacerOpt { MainShare = chance },
+        nameof(CnfProcObstaclePlacerOpt.ChanceReserveSide) => new CnfProcObstaclePlacerOpt { ChanceReserveSide = chance },
+        nameof(CnfProcObstaclePlacerOpt.ChanceReserveSideOnly) => new CnfProcObstaclePlacerOpt { ChanceReserveSideOnly = chance },
+        nameof(CnfProcObstaclePlacerOpt.ChanceNestSolution) => new CnfProcObstaclePlacerOpt { ChanceNestSolution = chance },
+        nameof(CnfProcObstaclePlacerOpt.ChanceStack) => new CnfProcObstaclePlacerOpt { ChanceStack = chance },
+        nameof(CnfProcObstaclePlacerOpt.ChanceSecretBypass) => new CnfProcObstaclePlacerOpt { ChanceSecretBypass = chance },
+        _ => new CnfProcObstaclePlacerOpt { ChanceBypass = chance },
+      };
+
+      // Act/Assert: The out-of-range value is rejected naming the offending property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
+      Assert.Equal(property, exception.ParamName);
+    }
+
+    [Fact]
+    public void ProcOpts_WithInvalidObstaclePlacerValue_ThrowsNamingNestedProperty()
+    {
+      // Arrange: Proc options whose obstacle-placer section violates its own invariants.
+      var procOpts = CnfProcOpt.Default with
+      {
+        ObstaclePlacer = new CnfProcObstaclePlacerOpt { MaxConditionsPerEdge = 0 },
+      };
+
+      // Act/Assert: Validation cascades into the section and names the nested property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => procOpts.Validate());
+      Assert.Equal("MaxConditionsPerEdge", exception.ParamName);
     }
 
     [Fact]

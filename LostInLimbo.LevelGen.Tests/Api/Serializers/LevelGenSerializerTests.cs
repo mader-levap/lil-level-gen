@@ -451,6 +451,7 @@ public sealed class LevelGenSerializerTests
           CnfProcRelSecretsOpt.Default.ChanceSecretInSecret,
           config.Graph.ProcOpts.RelSecrets.ChanceSecretInSecret);
         Assert.Equal(CnfProcNodeObjectivesOpt.Default, config.Graph.ProcOpts.NodeObjectives);
+        Assert.Equal(CnfProcObstaclePlacerOpt.Default, config.Graph.ProcOpts.ObstaclePlacer);
         Assert.Equal(CnfProcNodeRelSizeOpt.Default, config.Graph.ProcOpts.NodeRelSize);
         Assert.Equal(CnfProcNodeStyleOpt.Default, config.Graph.ProcOpts.NodeStyle);
       }

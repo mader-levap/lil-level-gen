@@ -1,4 +1,5 @@
 using LostInLimbo.LevelGen.Data.Config.Graph;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Internal.Prop.Data;
@@ -51,6 +52,8 @@ public sealed class GraphResolverTests
       Assert.Equal(EnGraphBuilder.Linear, config.GraphBuilder.Builder);
       Assert.Equal(1, config.ProcOpts.RelSecrets.Amount);
       Assert.Equal(1, config.ProcOpts.NodeStyle.GroupCount);
+      // The obstacle placer has no difficulty scaling yet: always its defaults.
+      Assert.Equal(CnfProcObstaclePlacerOpt.Default, config.ProcOpts.ObstaclePlacer);
     }
 
     [Fact]
