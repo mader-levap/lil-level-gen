@@ -64,6 +64,22 @@ public sealed class SweepReportTests
   }
 
   [Fact]
+  public void BuildOptions_CustomOutputRoot_OmittedFromReproduceCommandOnly()
+  {
+    // Arrange: Sweep typed with a custom output root.
+    var options = new SweepOptions { Runs = 100, OutputRoot = "C:\\results" };
+
+    // Act: Build the options file.
+    var text = SweepReport.BuildOptions(options, "--runs 100 --out C:\\results", "lib.dll");
+
+    // Assert: Reproduce command has no --out; typed command line and table still show it.
+    var reproduce = text.Split('\n').Single(line => line.StartsWith("dotnet run ", StringComparison.Ordinal));
+    Assert.DoesNotContain("--out", reproduce);
+    Assert.Contains("- Command line as typed: `--runs 100 --out C:\\results`", text);
+    Assert.Contains("| Output root | C:\\results |", text);
+  }
+
+  [Fact]
   public void ErrorKind_ReplacesDigits()
   {
     // Act: Group a numbered message.

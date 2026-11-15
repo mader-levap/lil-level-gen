@@ -81,9 +81,10 @@ internal static class SweepReport
 
   /// <summary>
   /// Builds the Markdown options file: a full command that reproduces the result (every option
-  /// explicit, defaults included), the command line as typed, and the effective option values.
+  /// explicit, defaults included, except <c>--out</c>: where results go does not affect them),
+  /// the command line as typed, and the effective option values.
   /// </summary>
-  /// <param name="options">Effective options; pass a resolved <see cref="SweepOptions.OutputRoot"/> to have it listed.</param>
+  /// <param name="options">Effective options; pass a resolved <see cref="SweepOptions.OutputRoot"/> to have it listed in the table.</param>
   /// <param name="commandLine">Command line as typed.</param>
   /// <param name="assemblyLocation">Path of the library assembly that generated the levels.</param>
   /// <returns>Options as Markdown.</returns>
@@ -95,7 +96,8 @@ internal static class SweepReport
     text.AppendLine("# Seed sweep options").AppendLine();
     text.AppendLine("Reproduce (from the repository root):").AppendLine();
     text.AppendLine("```bash");
-    text.AppendLine($"{SweepOptionsParser.RunCommand} {SweepOptionsParser.JoinArguments(SweepOptionsParser.ToArguments(options))}");
+    var reproduce = SweepOptionsParser.ToArguments(options with { OutputRoot = null });
+    text.AppendLine($"{SweepOptionsParser.RunCommand} {SweepOptionsParser.JoinArguments(reproduce)}");
     text.AppendLine("```").AppendLine();
     text.AppendLine($"- Command line as typed: `{(commandLine.Length == 0 ? "(defaults)" : commandLine)}`");
     text.AppendLine($"- LevelGen assembly: `{assemblyLocation}`").AppendLine();
