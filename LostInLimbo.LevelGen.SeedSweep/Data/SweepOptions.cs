@@ -22,6 +22,17 @@ internal sealed record SweepOptions
   public const int DefaultDeterminismEvery = 25;
   /// <summary>Default per-run timeout in seconds.</summary>
   public const int DefaultTimeoutSeconds = 20;
+  /// <summary>
+  /// Default number of untimed warm-up runs: one full difficulty cycle with many themes off
+  /// and one with it on, which covers the code paths of both graph builders.
+  /// </summary>
+  public const int DefaultWarmupRuns = 2 * (PropMain.MaxDifficulty + 1);
+
+  /// <summary>
+  /// Untimed runs generated before measuring, so measured runs see JIT-compiled code; 0 disables.
+  /// Warm-up runs use their own seeds and are not part of the results.
+  /// </summary>
+  public int WarmupRuns { get; init; } = DefaultWarmupRuns;
 
   /// <summary>Command to execute.</summary>
   public EnSweepCommand Command { get; init; } = EnSweepCommand.Sweep;

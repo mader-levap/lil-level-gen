@@ -2,6 +2,7 @@ using System.Diagnostics;
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Api.Serializers;
 using LostInLimbo.LevelGen.Data.Config;
+using LostInLimbo.LevelGen.Data.Prop;
 using LostInLimbo.LevelGen.Data.Result;
 using LostInLimbo.LevelGen.Data.Result.Stats;
 using LostInLimbo.LevelGen.Data.Status;
@@ -20,20 +21,24 @@ internal static class SweepRunner
 {
   /// <summary>Poll interval of the session status loop, in milliseconds.</summary>
   private const int PollIntervalMs = 1;
+  /// <summary>Text seed prefix of warm-up runs; distinct from any sweep prefix default.</summary>
+  public const string WarmupSeedPrefix = "warmup";
 
   /// <summary>
-  /// Runs all runs of a sweep in parallel.
+  /// Runs all runs of a sweep in parallel, after <see cref="SweepOptions.WarmupRuns"/> untimed
+  /// warm-up runs (see <see cref="WarmUp"/>).
   /// </summary>
   /// <param name="options">Sweep options.</param>
   /// <param name="progress">Called with the number of finished runs after each run; may be null.</param>
   /// <param name="cancellationToken">Stops scheduling new runs.</param>
-  /// <returns>Records sorted by run index.</returns>
+  /// <returns>Measured records sorted by run index, plus the warm-up records.</returns>
   /// <exception cref="OperationCanceledException">Cancelled.</exception>
-  public static IReadOnlyList<RunRecord> RunAll(
+  public static SweepResult RunAll(
     SweepOptions options, Action<int>? progress = null, CancellationToken cancellationToken = default)
   {
     if (options is null) throw new ArgumentNullException(nameof(options));
 
+    var warmup = WarmUp(options.WarmupRuns, TimeSpan.FromSeconds(options.TimeoutSeconds), cancellationToken);
     var records = new RunRecord[options.Runs];
     var finished = 0;
     var parallel = new ParallelOptions
@@ -48,6 +53,37 @@ internal static class SweepRunner
       records[i] = Run(spec, ShouldCheckDeterminism(spec.Index, options), TimeSpan.FromSeconds(options.TimeoutSeconds));
       progress?.Invoke(Interlocked.Increment(ref finished));
     });
+
+    return new SweepResult(records, warmup);
+  }
+
+  /// <summary>
+  /// Generates <paramref name="runs"/> untimed levels sequentially on the calling thread, so the
+  /// JIT compiles the generator's code paths before anything is measured.
+  /// </summary>
+  /// <remarks>
+  /// Independent of sweep options: run <c>i</c> uses difficulty <c>i % 21</c>, many themes on
+  /// for odd difficulty cycles and text seed <c>"warmup-i"</c>, covering both graph builders
+  /// across all difficulties. Never the same levels as sweep runs.
+  /// </remarks>
+  /// <param name="runs">Number of warm-up runs; 0 does nothing.</param>
+  /// <param name="timeout">Per-run timeout.</param>
+  /// <param name="cancellationToken">Checked before every run.</param>
+  /// <returns>Records of the warm-up runs, for the report summary.</returns>
+  /// <exception cref="ArgumentOutOfRangeException"><paramref name="runs"/> is negative.</exception>
+  /// <exception cref="OperationCanceledException">Cancelled.</exception>
+  public static IReadOnlyList<RunRecord> WarmUp(int runs, TimeSpan timeout, CancellationToken cancellationToken = default)
+  {
+    if (runs < 0) throw new ArgumentOutOfRangeException(nameof(runs), runs, "Warm-up run count must not be negative.");
+
+    var span = PropMain.MaxDifficulty + 1;
+    var records = new List<RunRecord>(runs);
+    for (var i = 0; i < runs; i++)
+    {
+      cancellationToken.ThrowIfCancellationRequested();
+      var spec = new RunSpec(i, i % span, i / span % 2 == 1, $"{WarmupSeedPrefix}-{i}");
+      records.Add(Run(spec, checkDeterminism: false, timeout));
+    }
 
     return records;
   }

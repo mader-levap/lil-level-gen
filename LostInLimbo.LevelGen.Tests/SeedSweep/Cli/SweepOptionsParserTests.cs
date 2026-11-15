@@ -23,6 +23,7 @@ public sealed class SweepOptionsParserTests
       Assert.Equal(SweepOptions.DefaultRuns, result.Options.Runs);
       Assert.Equal(0, result.Options.DifficultyMin);
       Assert.Equal(PropMain.MaxDifficulty, result.Options.DifficultyMax);
+      Assert.Equal(42, result.Options.WarmupRuns);
     }
 
     [Fact]
@@ -32,7 +33,7 @@ public sealed class SweepOptionsParserTests
       string[] args =
       [
         "--runs", "50", "--difficulty", "3-7", "--many-themes", "on", "--seed-prefix", "x",
-        "--start-index", "100", "--determinism-every", "0", "--parallel", "2", "--timeout-seconds", "5", "--out", "dir",
+        "--start-index", "100", "--determinism-every", "0", "--parallel", "2", "--timeout-seconds", "5", "--warmup", "5", "--out", "dir",
       ];
 
       // Act: Parse.
@@ -50,6 +51,7 @@ public sealed class SweepOptionsParserTests
       Assert.Equal(0, options.DeterminismEvery);
       Assert.Equal(2, options.Parallelism);
       Assert.Equal(5, options.TimeoutSeconds);
+      Assert.Equal(5, options.WarmupRuns);
       Assert.Equal("dir", options.OutputRoot);
     }
 
@@ -115,7 +117,7 @@ public sealed class SweepOptionsParserTests
 
       // Assert: Defaults spelled out, no output root when none is set.
       Assert.Equal(
-        "--runs 10000 --difficulty 0-20 --many-themes both --seed-prefix sweep --start-index 0 --determinism-every 25 --parallel 0 --timeout-seconds 20",
+        "--runs 10000 --difficulty 0-20 --many-themes both --seed-prefix sweep --start-index 0 --determinism-every 25 --parallel 0 --timeout-seconds 20 --warmup 42",
         SweepOptionsParser.JoinArguments(args));
     }
 
@@ -126,7 +128,7 @@ public sealed class SweepOptionsParserTests
       var options = new SweepOptions
       {
         Runs = 50, DifficultyMin = 3, DifficultyMax = 7, ManyThemes = EnManyThemesMode.Off, SeedPrefix = "x",
-        StartIndex = 100, DeterminismEvery = 0, Parallelism = 2, TimeoutSeconds = 5, OutputRoot = "my dir",
+        StartIndex = 100, DeterminismEvery = 0, Parallelism = 2, TimeoutSeconds = 5, WarmupRuns = 7, OutputRoot = "my dir",
       };
 
       // Act: Round trip.
@@ -148,7 +150,7 @@ public sealed class SweepOptionsParserTests
       var parsed = SweepOptionsParser.Parse(args);
 
       // Assert: Dump command first, indices and difficulty preserved.
-      Assert.Equal("dump 924 967 --difficulty 5 --many-themes both --seed-prefix sweep --timeout-seconds 20", SweepOptionsParser.JoinArguments(args));
+      Assert.Equal("dump 924 967 --difficulty 5 --many-themes both --seed-prefix sweep --timeout-seconds 20 --warmup 42", SweepOptionsParser.JoinArguments(args));
       Assert.True(parsed.Success, string.Join("; ", parsed.Errors));
       Assert.Equal([924, 967], parsed.Options.DumpIndices);
     }
@@ -201,6 +203,7 @@ public sealed class SweepOptionsParserTests
     [InlineData("--determinism-every", "-1")]
     [InlineData("--parallel", "-1")]
     [InlineData("--timeout-seconds", "0")]
+    [InlineData("--warmup", "-1")]
     [InlineData("--seed-prefix", " ")]
     [InlineData("--unknown", "1")]
     [InlineData("--text-seed", "148")]

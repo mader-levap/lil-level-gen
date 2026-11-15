@@ -7,7 +7,7 @@ namespace LostInLimbo.LevelGen.Tests.SeedSweep.Export;
 /// <summary>Tests <see cref="SweepReport"/>: Markdown report, CSV, options file and error grouping.</summary>
 public sealed class SweepReportTests
 {
-  /// <summary>Tiny sweep: three runs at difficulty 5, no determinism reruns.</summary>
+  /// <summary>Tiny sweep: three runs at difficulty 5, no determinism reruns, two warm-up runs.</summary>
   private static readonly SweepOptions TinySweep = new()
   {
     Runs = 3,
@@ -15,17 +15,18 @@ public sealed class SweepReportTests
     DifficultyMax = 5,
     DeterminismEvery = 0,
     Parallelism = 1,
+    WarmupRuns = 2,
   };
 
   [Fact]
   public void BuildReportAndCsv_TinySweep_ContainSectionsAndRows()
   {
     // Arrange: Tiny sweep results.
-    var records = SweepRunner.RunAll(TinySweep);
+    var result = SweepRunner.RunAll(TinySweep);
 
     // Act: Build both outputs.
-    var report = SweepReport.BuildReport(records, TimeSpan.FromSeconds(1), "--runs 3");
-    var csv = SweepReport.BuildCsv(records);
+    var report = SweepReport.BuildReport(result, TimeSpan.FromSeconds(1), "--runs 3");
+    var csv = SweepReport.BuildCsv(result.Records);
 
     // Assert: Report sections present, CSV has a header plus one row per run.
     Assert.StartsWith("# Seed sweep report", report);
@@ -42,6 +43,7 @@ public sealed class SweepReportTests
     Assert.Contains("## Timing", report);
     Assert.Contains("| Generation |", report);
     Assert.Contains("Slowest runs (generation time):", report);
+    Assert.Contains("Measured after 2 untimed warm-up runs", report);
   }
 
   [Fact]
@@ -58,6 +60,7 @@ public sealed class SweepReportTests
     Assert.Contains("dotnet run --project LostInLimbo.LevelGen.SeedSweep -c Release -- dump 924 967 --difficulty 0-20", text);
     Assert.Contains("- Command line as typed: `dump 924 967`", text);
     Assert.Contains("| Dump indices | 924 967 |", text);
+    Assert.Contains("| Warm-up runs | 42 |", text);
   }
 
   [Fact]

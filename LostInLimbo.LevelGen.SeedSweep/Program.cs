@@ -61,22 +61,26 @@ internal static class Program
     Console.WriteLine($"Output: {folder}");
     Console.WriteLine($"Runs: {options.Runs}, parallelism {options.EffectiveParallelism}");
 
+    if (options.WarmupRuns > 0) Console.WriteLine($"Warming up ({options.WarmupRuns} untimed runs)...");
+
+    // The sweep's wall time includes the warm-up; per-run timings do not.
     var stopwatch = Stopwatch.StartNew();
-    var records = SweepRunner.RunAll(options, finished =>
+    var result = SweepRunner.RunAll(options, finished =>
     {
       if (finished % ProgressEvery == 0 || finished == options.Runs) Console.WriteLine($"  {finished}/{options.Runs}");
     });
     stopwatch.Stop();
 
-    var report = SweepReport.BuildReport(records, stopwatch.Elapsed, commandLine);
+    var report = SweepReport.BuildReport(result, stopwatch.Elapsed, commandLine);
     File.WriteAllText(Path.Combine(folder, "report.md"), report);
-    File.WriteAllText(Path.Combine(folder, "runs.csv"), SweepReport.BuildCsv(records));
+    File.WriteAllText(Path.Combine(folder, "runs.csv"), SweepReport.BuildCsv(result.Records));
     File.WriteAllText(Path.Combine(folder, "options.md"), SweepReport.BuildOptions(options, commandLine, typeof(LevelGenConfig).Assembly.Location));
 
     Console.WriteLine();
     Console.WriteLine(report);
     Console.WriteLine($"Results written to {folder}");
-    return records.Any(r => r.Issues.Count > 0) ? ExitErrors : ExitOk;
+    var anyErrors = result.Records.Concat(result.WarmupRecords).Any(r => r.Issues.Count > 0);
+    return anyErrors ? ExitErrors : ExitOk;
   }
 
   /// <summary>Dumps the selected runs to the console and to dump-*.md.</summary>
@@ -86,8 +90,12 @@ internal static class Program
       ? [RunSpec.ForTextSeed(options)]
       : options.DumpIndices.Select(i => RunSpec.ForIndex(i, options)).ToList();
 
+    // Warm up so the generation time shown for the dumped runs excludes JIT compilation.
+    var warmup = SweepRunner.WarmUp(options.WarmupRuns, TimeSpan.FromSeconds(options.TimeoutSeconds));
     var text = new StringBuilder();
-    var hasErrors = false;
+    var hasErrors = warmup.Any(r => r.Issues.Count > 0);
+    foreach (var failed in warmup.Where(r => r.Issues.Count > 0))
+      Console.Error.WriteLine($"warm-up run {failed.Label} {failed.Seed}: {string.Join("; ", failed.Issues)}");
     foreach (var spec in specs)
     {
       var (record, config, world) = SweepRunner.RunDetailed(spec, checkDeterminism: false, TimeSpan.FromSeconds(options.TimeoutSeconds));

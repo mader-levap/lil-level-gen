@@ -32,6 +32,7 @@ internal static class SweepOptionsParser
       --determinism-every N    Generate every Nth run twice and compare; 0 disables (default 25).
       --parallel N             Degree of parallelism; 0 = processor count (default 0).
       --timeout-seconds N      Per-run timeout (default 20).
+      --warmup N               Untimed warm-up runs before measuring; 0 disables (default 42).
       --out DIR                Output root (default <project>/TestResults).
       --text-seed S            dump only: dump this text seed instead of run indices.
       --help                   Show this text.
@@ -100,7 +101,7 @@ internal static class SweepOptionsParser
   /// </summary>
   /// <remarks>
   /// A sweep lists all sweep options. A dump lists its indices or text seed plus the options
-  /// that shape a dumped run (difficulty, themes, seed prefix, timeout, output root).
+  /// that shape a dumped run (difficulty, themes, seed prefix, timeout, warm-up, output root).
   /// <see cref="SweepOptions.OutputRoot"/> is included only when set.
   /// </remarks>
   /// <param name="options">Options to write out.</param>
@@ -137,7 +138,7 @@ internal static class SweepOptionsParser
       ]);
     }
 
-    args.AddRange(["--timeout-seconds", Invariant(options.TimeoutSeconds)]);
+    args.AddRange(["--timeout-seconds", Invariant(options.TimeoutSeconds), "--warmup", Invariant(options.WarmupRuns)]);
     if (options.OutputRoot is not null) args.AddRange(["--out", options.OutputRoot]);
     return args;
   }
@@ -178,6 +179,8 @@ internal static class SweepOptionsParser
         return WithInt(options, name, value, errors, (o, v) => o with { DeterminismEvery = v });
       case "--parallel":
         return WithInt(options, name, value, errors, (o, v) => o with { Parallelism = v });
+      case "--warmup":
+        return WithInt(options, name, value, errors, (o, v) => o with { WarmupRuns = v });
       case "--timeout-seconds":
         return WithInt(options, name, value, errors, (o, v) => o with { TimeoutSeconds = v });
       case "--seed-prefix":
@@ -243,6 +246,7 @@ internal static class SweepOptionsParser
     if (options.DeterminismEvery < 0) errors.Add("--determinism-every must not be negative.");
     if (options.Parallelism < 0) errors.Add("--parallel must not be negative.");
     if (options.TimeoutSeconds < 1) errors.Add("--timeout-seconds must be at least 1.");
+    if (options.WarmupRuns < 0) errors.Add("--warmup must not be negative.");
     if (string.IsNullOrWhiteSpace(options.SeedPrefix)) errors.Add("--seed-prefix must not be empty.");
     if (options.DifficultyMin < 0 || options.DifficultyMax > PropMain.MaxDifficulty || options.DifficultyMin > options.DifficultyMax)
       errors.Add($"--difficulty must be within 0-{PropMain.MaxDifficulty}, low end first.");

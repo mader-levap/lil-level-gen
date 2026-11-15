@@ -30,23 +30,25 @@ internal static class SweepReport
   /// <summary>
   /// Builds the Markdown report.
   /// </summary>
-  /// <param name="records">Records sorted by index.</param>
+  /// <param name="result">Measured records (sorted by index) and warm-up records.</param>
   /// <param name="elapsed">Wall time of the whole sweep.</param>
   /// <param name="commandLine">Command line, printed in the header.</param>
   /// <returns>Report as Markdown.</returns>
-  public static string BuildReport(IReadOnlyList<RunRecord> records, TimeSpan elapsed, string commandLine)
+  public static string BuildReport(SweepResult result, TimeSpan elapsed, string commandLine)
   {
-    if (records is null) throw new ArgumentNullException(nameof(records));
+    if (result is null) throw new ArgumentNullException(nameof(result));
 
+    var records = result.Records;
     var text = new StringBuilder();
     var ok = records.Where(r => r.Generated).ToList();
     AppendHeader(text, records, elapsed, commandLine);
     AppendErrors(text, records);
+    AppendWarmupErrors(text, result.WarmupRecords);
     AppendDifficultyTable(text, ok);
     AppendSuspicious(text, ok);
     AppendBuilders(text, ok);
     AppendConnectivityBands(text, ok);
-    AppendTiming(text, ok);
+    AppendTiming(text, ok, result.WarmupRecords);
     return text.ToString();
   }
 
@@ -107,6 +109,7 @@ internal static class SweepReport
     TableRow(text, "Determinism every", options.DeterminismEvery.ToString(Invariant));
     TableRow(text, "Parallelism", options.EffectiveParallelism.ToString(Invariant));
     TableRow(text, "Timeout (s)", options.TimeoutSeconds.ToString(Invariant));
+    TableRow(text, "Warm-up runs", options.WarmupRuns.ToString(Invariant));
     TableRow(text, "Output root", options.OutputRoot ?? "(default)");
     if (options.Command == EnSweepCommand.Dump)
     {
@@ -158,6 +161,17 @@ internal static class SweepReport
       var examples = group.Take(ExampleCount).Select(x => $"{x.Run.Label} {x.Run.Seed}");
       TableRow(text, group.Count().ToString(Invariant), $"`{group.Key}`", string.Join("; ", examples));
     }
+  }
+
+  /// <summary>Warm-up runs with errors: not counted with the sweep, but never silently dropped.</summary>
+  private static void AppendWarmupErrors(StringBuilder text, IReadOnlyList<RunRecord> warmup)
+  {
+    var failed = warmup.Where(r => r.Issues.Count > 0).ToList();
+    if (failed.Count == 0) return;
+
+    text.AppendLine().AppendLine($"Warm-up runs with errors (not counted above): {failed.Count}.").AppendLine();
+    foreach (var record in failed.Take(ExampleCount))
+      text.AppendLine($"- {record.Label} `{record.Seed}`: {string.Join("; ", record.Issues)}");
   }
 
   /// <summary>Means per difficulty.</summary>
@@ -303,7 +317,7 @@ internal static class SweepReport
   }
 
   /// <summary>Distribution of generation and wall time, and the slowest runs.</summary>
-  private static void AppendTiming(StringBuilder text, List<RunRecord> ok)
+  private static void AppendTiming(StringBuilder text, List<RunRecord> ok, IReadOnlyList<RunRecord> warmup)
   {
     Heading(text, "Timing");
     if (ok.Count == 0)
@@ -312,7 +326,11 @@ internal static class SweepReport
       return;
     }
 
-    text.AppendLine("Generation time is measured by the library (`GenerationStatus.Elapsed`). Wall time includes the harness'")
+    var warmupNote = warmup.Count == 0
+      ? "Measured without warm-up (first runs include JIT compilation)."
+      : $"Measured after {warmup.Count} untimed warm-up runs (builders: {Counts(warmup, r => r.Builder)}); tiered JIT is off in the harness.";
+    text.AppendLine(warmupNote)
+      .AppendLine("Generation time is measured by the library (`GenerationStatus.Elapsed`). Wall time includes the harness'")
       .AppendLine("status polling and rounds up to the OS timer tick. Parallel runs share the CPU; use `--parallel 1` for clean numbers.")
       .AppendLine();
     TableHeader(text, "Time (ms)", "Mean", "Median", "p99", "Max");
