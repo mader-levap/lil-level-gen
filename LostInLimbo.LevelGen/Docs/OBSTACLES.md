@@ -99,9 +99,14 @@ Extra conservatism for the solution flood (stronger than the validator):
 
 Property: with both bypass chances 0, every edge between `A` and `B` requires `k`, so `k` is unavoidable for `T`.
 
-### 4.2 Main pass (start -> exit)
+### 4.2 Main pass (start -> exit, or start -> goals)
 
-Skipped when start and exit share a node (the side pass then gets all Complexity).
+Targets (`ObstacleWorkGraph.MainTargets`): the exit. When start and exit share a node, the level
+is "fetch the goals and come back", so the nodes holding `Goal` POIs (start node excluded) take
+the role of the exit; with no such node, the `OptionalGoal` nodes do. With several goal targets a
+random one is the primary target of each obstacle. Skipped only when no target exists (the side
+pass then gets all Complexity). Without this, a shared start/exit node on a cycle (no pocket)
+silently dropped all Complexity.
 
 Budget split, decided once before the pass:
 - **Normal** (`Complexity > SmallComplexityMax`): main gets `round(Complexity * MainShare)`, side the rest.

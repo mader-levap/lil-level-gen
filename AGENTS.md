@@ -144,6 +144,7 @@ Other rules:
 - If possible and practical, create a test first for new behavior, run it (should fail), then implement behavior.
 - Comment tests. Use the Arrange/Act/Assert convention, for example `// Assert: Value is correct.`
 - For test files with many tests, group them logically into test suites.
+- No regression tests for full pipeline (these would fail every time some new feature change resulting graph). Make graph by hand instead.
 
 ### Error handling
 

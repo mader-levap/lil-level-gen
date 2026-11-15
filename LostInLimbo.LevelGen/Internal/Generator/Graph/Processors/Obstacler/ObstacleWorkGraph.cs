@@ -128,6 +128,7 @@ internal sealed class ObstacleWorkGraph
 
     StartNode = FindSingleNodeWithPoi(EnPoiType.Start);
     ExitNode = FindSingleNodeWithPoi(EnPoiType.Exit);
+    MainTargets = FindMainTargets();
   }
 
   #endregion
@@ -151,6 +152,20 @@ internal sealed class ObstacleWorkGraph
   /// no node or more than one node holds one. Captured at construction.
   /// </summary>
   public int ExitNode { get; }
+
+  /// <summary>
+  /// Nodes the main pass cuts off the start, in ascending work index. Captured at construction.
+  /// </summary>
+  /// <remarks>
+  /// <list type="bullet">
+  /// <item>Start and exit in different nodes: the exit node only.</item>
+  /// <item>Start and exit in one node: every node with a <see cref="EnPoiType.Goal"/> POI except
+  /// the start node; when there is none, every node with an <see cref="EnPoiType.OptionalGoal"/>
+  /// POI except the start node. The level is "fetch the goals and come back".</item>
+  /// <item>Start or exit missing or spread over several nodes: empty.</item>
+  /// </list>
+  /// </remarks>
+  public IReadOnlyList<int> MainTargets { get; }
 
   /// <summary>Gets a node.</summary>
   /// <param name="node">Work index of the node.</param>
@@ -453,6 +468,36 @@ internal sealed class ObstacleWorkGraph
       if (!_nodes[node].HasPoi(type)) continue;
       if (found != NoNode) return NoNode; // Several nodes: unsupported.
       found = node;
+    }
+
+    return found;
+  }
+
+  /// <summary>
+  /// Computes <see cref="MainTargets"/>; requires <see cref="StartNode"/> and
+  /// <see cref="ExitNode"/> to be set.
+  /// </summary>
+  /// <returns>Target work indices in ascending order; empty when the main pass has nothing to do.</returns>
+  private List<int> FindMainTargets()
+  {
+    if (StartNode == NoNode || ExitNode == NoNode) return [];
+    if (StartNode != ExitNode) return [ExitNode];
+
+    var goals = FindNodesWithPoiExceptStart(EnPoiType.Goal);
+    return goals.Count > 0 ? goals : FindNodesWithPoiExceptStart(EnPoiType.OptionalGoal);
+  }
+
+  /// <summary>
+  /// Lists every node holding a POI of the given type, except the start node.
+  /// </summary>
+  /// <param name="type">POI type to look for.</param>
+  /// <returns>Work indices in ascending order; empty when none qualify.</returns>
+  private List<int> FindNodesWithPoiExceptStart(EnPoiType type)
+  {
+    var found = new List<int>();
+    for (var node = 0; node < _nodes.Length; node++)
+    {
+      if (node != StartNode && _nodes[node].HasPoi(type)) found.Add(node);
     }
 
     return found;

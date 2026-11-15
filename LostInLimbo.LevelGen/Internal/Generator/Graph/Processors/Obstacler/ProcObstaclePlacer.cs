@@ -29,9 +29,10 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// <para>Two passes share the Complexity:</para>
 /// <list type="bullet">
 /// <item><b>Main pass</b> (<see cref="ObstaclePassMain"/>): obstacles between the start and the
-/// exit; skipped when both share a node. Secret passages that would bypass an obstacle are
-/// locked with it, except for rare deliberate bypasses
-/// (<see cref="CnfProcObstaclePlacerOpt.ChanceSecretBypass"/>,
+/// exit. When both share a node, the goal nodes take the role of the exit (optional goals when
+/// every goal is in the start node); without any such node the pass is skipped.
+/// Secret passages that would bypass an obstacle are locked with it, except for rare deliberate
+/// bypasses (<see cref="CnfProcObstaclePlacerOpt.ChanceSecretBypass"/>,
 /// <see cref="CnfProcObstaclePlacerOpt.ChanceBypass"/>). Ends early when only stacking is
 /// left and <see cref="CnfProcObstaclePlacerOpt.MaxStackLoad"/> forbids it.</item>
 /// <item><b>Side pass</b> (<see cref="ObstaclePassSide"/>): obstacles guarding dead ends
@@ -143,7 +144,7 @@ internal sealed class ProcObstaclePlacer
     // The pockets are listed before any obstacle exists, so the budget can be planned on them.
     var sidePass = new ObstaclePassSide(state);
     var pocketCount = sidePass.Scan().Count;
-    var hasMainPass = state.Work.StartNode != state.Work.ExitNode;
+    var hasMainPass = state.Work.MainTargets.Count > 0; // Exit, or goals when start and exit share a node.
 
     ReservedSideBudget = hasMainPass ? SplitOffSideBudget(state, pocketCount) : 0;
     if (hasMainPass)

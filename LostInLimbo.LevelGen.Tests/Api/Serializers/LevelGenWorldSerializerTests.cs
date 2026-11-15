@@ -173,21 +173,23 @@ public sealed class LevelGenWorldSerializerTests
     }
 
     [Fact]
-    public void Read_OfWrittenGeneratedWorlds_CoversBothBuilders()
+    public void Read_OfWrittenGeneratedWorlds_CoversOpenAndConditionalGraphs()
     {
-      // Arrange: Generated worlds across a seed sweep.
-      var builders = new HashSet<string>();
+      // Arrange: Generated worlds across a seed sweep. Every difficulty above 0 asks for at
+      // least one obstacle, so difficulty 0 (Complexity 0 or 1) supplies the open graphs.
+      var kinds = new HashSet<string>();
       for (var seed = 0; seed < 32; seed++)
       {
-        var world = GenerateWorld($"sweep-{seed}", 5);
-        builders.Add(world.Graph.Edges.Any(edge => edge.Conditions.Count > 0) ? "conditional" : "open");
+        var difficulty = seed % 2 == 0 ? 0 : 5;
+        var world = GenerateWorld($"sweep-{seed}", difficulty);
+        kinds.Add(world.Graph.Edges.Any(edge => edge.Conditions.Count > 0) ? "conditional" : "open");
 
-        // Act/Assert: Every world round-trips, conditional (Linear) and open (Simple) graphs alike.
+        // Act/Assert: Every world round-trips, conditional and open graphs alike.
         AssertSameWorld(world, Load(Save(world)));
       }
 
       // Assert: The sweep covered graphs with and without conditions.
-      Assert.Equal(2, builders.Count);
+      Assert.Equal(2, kinds.Count);
     }
 
     [Fact]

@@ -6,21 +6,25 @@ using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 
 /// <summary>
-/// Main pass of the obstacle placer: obstacles between the start and the exit.
+/// Main pass of the obstacle placer: obstacles between the start and the exit - or, when both
+/// share a node, between the start and the goals.
 /// </summary>
 /// <remarks>
 /// <para>
 /// The pass keeps a list of <b>required nodes</b> - nodes the player must visit to finish:
-/// first only the exit, later also every node holding a solution placed by this pass. Each
-/// obstacle cuts one required node off from the start, so every obstacle of this pass is
-/// needed to reach the exit: either directly, or because it guards the solution of another one.
+/// first only the <b>primary targets</b> (<see cref="ObstacleWorkGraph.MainTargets"/>: the exit,
+/// or the goal nodes when start and exit share a node), later also every node holding a
+/// solution placed by this pass. Each obstacle cuts one required node off from the start, so
+/// every obstacle of this pass is needed to finish: either directly, or because it guards the
+/// solution of another one.
 /// </para>
 /// <para>Per obstacle:</para>
 /// <list type="number">
-/// <item><b>Target order.</b> The exit comes first for the first obstacle. Afterwards the node
-/// of the most recent solution comes first with
-/// <see cref="CnfProcObstaclePlacerOpt.ChanceNestSolution"/> (a solution behind another
-/// obstacle), otherwise the exit. The other required nodes follow in shuffled order.</item>
+/// <item><b>Target order.</b> A primary target comes first for the first obstacle (with several
+/// goal targets, a random one per obstacle). Afterwards the node of the most recent solution
+/// comes first with <see cref="CnfProcObstaclePlacerOpt.ChanceNestSolution"/> (a solution behind
+/// another obstacle), otherwise a primary target. The other required nodes follow in shuffled
+/// order.</item>
 /// <item><b>Cut per target.</b> The cheapest candidate cut is taken, ties broken by roll. A
 /// fresh cut (no passage of it carries a condition) is accepted at once. A stacking cut is
 /// accepted with chance <c>ChanceStack ^ c</c>, where <c>c</c> is the highest condition count
@@ -47,7 +51,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// <para>
 /// Start and exit next to each other need no special case: every cut for the exit contains the
 /// direct passage, so after the first obstacle it can only be stacked, which is rare; later
-/// obstacles mostly lock away earlier solutions.
+/// obstacles mostly lock away earlier solutions. Start and exit in one node need no special case
+/// either: the goal nodes simply take the role of the exit.
 /// </para>
 /// <para>Deterministic for the same generator state.</para>
 /// </remarks>
@@ -61,7 +66,7 @@ internal sealed class ObstaclePassMain
   /// <summary>
   /// Prepares the pass.
   /// </summary>
-  /// <param name="state">Shared state; its graph must have a single start node and a single exit node.</param>
+  /// <param name="state">Shared state; without main targets (see <see cref="ObstacleWorkGraph.MainTargets"/>) the pass places nothing.</param>
   /// <param name="protectedNodes">
   /// Flag per node work index: nodes that must not receive a solution of this pass - the
   /// pockets reserved for the side pass. Null protects nothing.
@@ -88,10 +93,10 @@ internal sealed class ObstaclePassMain
   {
     var work = _state.Work;
     var start = work.StartNode;
-    var exit = work.ExitNode;
-    if (start == ObstacleWorkGraph.NoNode || exit == ObstacleWorkGraph.NoNode || start == exit) return 0;
+    var primaries = work.MainTargets;
+    if (primaries.Count == 0) return 0; // No exit apart from the start, and no goal to fetch.
 
-    var required = new List<int> { exit };
+    var required = new List<int>(primaries);
     var lastSolutionNode = ObstacleWorkGraph.NoNode;
     var placed = 0;
 
@@ -99,7 +104,7 @@ internal sealed class ObstaclePassMain
     {
       cancellationToken.ThrowIfCancellationRequested();
 
-      var targets = OrderTargets(required, exit, lastSolutionNode, isFirst: placed == 0);
+      var targets = OrderTargets(required, PickPrimary(primaries), lastSolutionNode, isFirst: placed == 0);
       var cut = ChooseCut(start, targets);
       if (cut is null) break; // Nothing left to lock.
 
@@ -123,19 +128,33 @@ internal sealed class ObstaclePassMain
   }
 
   /// <summary>
+  /// Picks the primary target of the next obstacle among <see cref="ObstacleWorkGraph.MainTargets"/>.
+  /// </summary>
+  /// <remarks>
+  /// A single primary (the exit) draws nothing, so graphs with separate start and exit keep
+  /// their random stream; several primaries (goals) are picked uniformly per obstacle.
+  /// </remarks>
+  /// <param name="primaries">Main targets; not empty.</param>
+  /// <returns>Work index of the primary target.</returns>
+  private int PickPrimary(IReadOnlyList<int> primaries)
+  {
+    return primaries.Count == 1 ? primaries[0] : primaries[_state.Random.NextInt(primaries.Count)];
+  }
+
+  /// <summary>
   /// Orders the required nodes for the next obstacle; see step 1 of the type remarks.
   /// </summary>
-  /// <param name="required">Required nodes; always contains the exit.</param>
-  /// <param name="exit">Work index of the exit node.</param>
+  /// <param name="required">Required nodes; always contains every main target.</param>
+  /// <param name="primary">Work index of the primary target: the exit, or a goal node.</param>
   /// <param name="lastSolutionNode">Node of the most recent solution, or <see cref="ObstacleWorkGraph.NoNode"/>.</param>
   /// <param name="isFirst">True for the first obstacle of the pass.</param>
   /// <returns>Every required node once, most wanted first.</returns>
-  private List<int> OrderTargets(List<int> required, int exit, int lastSolutionNode, bool isFirst)
+  private List<int> OrderTargets(List<int> required, int primary, int lastSolutionNode, bool isFirst)
   {
-    var favourite = exit;
+    var favourite = primary;
     if (!isFirst
         && lastSolutionNode != ObstacleWorkGraph.NoNode
-        && lastSolutionNode != exit
+        && lastSolutionNode != primary
         && _state.Random.NextBool(_state.Options.ChanceNestSolution))
     {
       favourite = lastSolutionNode;

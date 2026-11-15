@@ -342,7 +342,8 @@ public sealed class ProcObstaclePlacerTests
       // Arrange: Start and exit share node 2 of a chain.
       var graph = CreateLevel(4, 2, 2, Chain(4));
 
-      // Act/Assert: The main pass is skipped, and without a treasure the side pass has nothing to guard.
+      // Act/Assert: Without goals the main pass has no target, and without a treasure the side
+      // pass has nothing to guard.
       AssertUntouched(graph, Run(graph, 3, 42));
     }
 
@@ -359,6 +360,85 @@ public sealed class ProcObstaclePlacerTests
       Assert.Throws<OperationCanceledException>(() => placer.Execute(source.Token));
       Assert.Empty(SolutionIds(graph));
       Assert.Equal(0, CountConditions(graph));
+    }
+  }
+
+  /// <summary>
+  /// Tests start and exit in one node: the main pass then cuts goal nodes off the start
+  /// instead of the exit.
+  /// </summary>
+  public sealed class SharedStartExitTests
+  {
+    /// <summary>Tells whether a node is reachable from the start without any solution.</summary>
+    private static bool IsReachableWithoutSolutions(LilGraph graph, int node)
+    {
+      var reachable = LostInLimbo.LevelGen.Api.LevelGraphReach.GetReachableNodes(graph, GraphTestCreate.Id(StartPoiId), []);
+      return reachable.Contains(GraphTestCreate.Id(node));
+    }
+
+    [Fact]
+    public void Execute_WithStartAndExitInSameNodeOnTriangle_LocksAGoal()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: The shape of the reported level - a triangle without pockets; start, exit
+        // and an optional goal in node 3, goals in nodes 1 and 2.
+        var graph = CreateLevel(3, 3, 3, new Passage(1, 2), new Passage(1, 3), new Passage(2, 3));
+        AddGoal(graph, 1);
+        AddGoal(graph, 2);
+        AddGoal(graph, 3, optional: true);
+
+        // Act: Complexity 1, no bypasses, so every lock stays closed.
+        var placer = Run(graph, 1, seed, NoBypass);
+
+        // Assert: The one obstacle is placed by the main pass and locks a goal away.
+        var context = $"seed {seed}";
+        Assert.Equal(1, placer.PlacedObstacles);
+        Assert.Equal(1, placer.PlacedMainObstacles);
+        Assert.False(IsReachableWithoutSolutions(graph, 1) && IsReachableWithoutSolutions(graph, 2), context);
+        AssertInvariants(graph, placer, 1, NoBypass, context);
+      }
+    }
+
+    [Fact]
+    public void Execute_WithStartAndExitInSameNodeOnCycle_LocksTheGoal()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: A 4-cycle with start and exit in node 1 and the goal opposite, in node 3.
+        var graph = CreateLevel(4, 1, 1, new Passage(1, 2), new Passage(2, 3), new Passage(3, 4), new Passage(4, 1));
+        AddGoal(graph, 3);
+
+        // Act: Complexity 2, no bypasses, so every lock stays closed.
+        var placer = Run(graph, 2, seed, NoBypass);
+
+        // Assert: The goal needs at least one solution; everything stays beatable.
+        var context = $"seed {seed}";
+        Assert.True(placer.PlacedMainObstacles >= 1, context);
+        Assert.False(IsReachableWithoutSolutions(graph, 3), context);
+        AssertInvariants(graph, placer, 2, NoBypass, context);
+      }
+    }
+
+    [Fact]
+    public void Execute_WithStartAndExitInSameNodeAndGoalOnStart_LocksTheOptionalGoal()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: A triangle; start, exit and the only goal in node 3, an optional goal in node 1.
+        var graph = CreateLevel(3, 3, 3, new Passage(1, 2), new Passage(1, 3), new Passage(2, 3));
+        AddGoal(graph, 3);
+        AddGoal(graph, 1, optional: true);
+
+        // Act: Complexity 1, no bypasses, so every lock stays closed.
+        var placer = Run(graph, 1, seed, NoBypass);
+
+        // Assert: The optional goal is the fallback target and ends up locked.
+        var context = $"seed {seed}";
+        Assert.Equal(1, placer.PlacedMainObstacles);
+        Assert.False(IsReachableWithoutSolutions(graph, 1), context);
+        AssertInvariants(graph, placer, 1, NoBypass, context);
+      }
     }
   }
 
@@ -844,11 +924,12 @@ public sealed class ProcObstaclePlacerTests
     }
 
     [Fact]
-    public void Execute_WithStartAndExitInSameNode_GivesEverythingToTheSidePass()
+    public void Execute_WithStartAndExitInSameNode_SplitsBudgetBetweenMainAndSidePass()
     {
       for (var seed = 0; seed < SweepSeeds; seed++)
       {
-        // Arrange: Start and exit share node 1; goal leaves as before.
+        // Arrange: Start and exit share node 1; goal leaves as before, so the goals are both
+        // main targets and pocket treasures.
         var passages = new List<Passage>(Chain(6)) { new(2, 7), new(3, 8), new(4, 9) };
         var graph = CreateLevel(9, 1, 1, [.. passages]);
         AddGoal(graph, 7);
@@ -858,9 +939,10 @@ public sealed class ProcObstaclePlacerTests
         // Act: More Complexity than pockets.
         var placer = Run(graph, 5, seed);
 
-        // Assert: Only side obstacles, one per pocket.
-        Assert.Equal(0, placer.PlacedMainObstacles);
-        Assert.Equal(PocketCount, placer.PlacedSideObstacles);
+        // Assert: The main pass now has goal targets and places obstacles; the side pass never
+        // exceeds the pocket count.
+        Assert.True(placer.PlacedMainObstacles >= 1, $"seed {seed}");
+        Assert.True(placer.PlacedSideObstacles <= PocketCount, $"seed {seed}");
         AssertInvariants(graph, placer, 5, CnfProcObstaclePlacerOpt.Default, $"seed {seed}");
       }
     }
@@ -1032,15 +1114,15 @@ public sealed class ProcObstaclePlacerTests
     [Fact]
     public void Execute_WithBypassesAlways_NeverOpensSidePockets()
     {
-      // Arrange: Start and exit share node 1; a secret leaf 3 and a goal leaf 4 behind parallel passages.
+      // Arrange: Start and exit share node 1; a secret leaf 3 and a secret leaf 4 behind
+      // parallel ordinary passages. No goals, so the main pass has no target.
       var options = CnfProcObstaclePlacerOpt.Default with { ChanceSecretBypass = 1f, ChanceBypass = 1f };
       for (var seed = 0; seed < SweepSeeds; seed++)
       {
         var graph = CreateLevel(
           5, 1, 1,
           new Passage(1, 2), new Passage(2, 3, Secret: true), new Passage(2, 4), new Passage(4, 2), new Passage(2, 5));
-        MarkSecret(graph, 3);
-        AddGoal(graph, 4);
+        MarkSecret(graph, 3, 4);
 
         // Act: Only the side pass can run.
         var placer = Run(graph, 4, seed, options);

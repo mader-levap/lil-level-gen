@@ -194,6 +194,85 @@ public sealed class ObstacleWorkGraphTests
     }
   }
 
+  /// <summary>Tests the main-pass targets derived from start, exit and goals.</summary>
+  public sealed class MainTargetTests
+  {
+    [Fact]
+    public void MainTargets_WithSeparateStartAndExit_IsTheExitOnly()
+    {
+      // Arrange: Start in node 1, exit in node 3, a goal in node 2.
+      var graph = CreateLevel(3, 1, 3, Chain(3));
+      AddGoal(graph, 2);
+
+      // Act: Index it.
+      var work = new ObstacleWorkGraph(graph, CnfProcObstaclePlacerOpt.Default);
+
+      // Assert: The exit is the only target; goals do not matter here.
+      Assert.Equal([2], work.MainTargets);
+    }
+
+    [Fact]
+    public void MainTargets_WithSharedStartAndExit_AreTheGoalNodesExceptStart()
+    {
+      // Arrange: Start and exit share node 2; goals in nodes 4, 1 and the start node itself;
+      // an optional goal in node 3 is ignored while mandatory goals exist.
+      var graph = CreateLevel(4, 2, 2, Chain(4));
+      AddGoal(graph, 4);
+      AddGoal(graph, 1);
+      AddGoal(graph, 2);
+      AddGoal(graph, 3, optional: true);
+
+      // Act: Index it.
+      var work = new ObstacleWorkGraph(graph, CnfProcObstaclePlacerOpt.Default);
+
+      // Assert: Goal nodes off the start node, in ascending work index.
+      Assert.Equal([0, 3], work.MainTargets);
+    }
+
+    [Fact]
+    public void MainTargets_WithSharedStartAndExitAndGoalOnlyOnStart_FallsBackToOptionalGoals()
+    {
+      // Arrange: Start, exit and the only goal share node 1; optional goals in nodes 3 and 1.
+      var graph = CreateLevel(3, 1, 1, Chain(3));
+      AddGoal(graph, 1);
+      AddGoal(graph, 3, optional: true);
+
+      // Act: Index it.
+      var work = new ObstacleWorkGraph(graph, CnfProcObstaclePlacerOpt.Default);
+
+      // Assert: The optional goal off the start node becomes the target.
+      Assert.Equal([2], work.MainTargets);
+    }
+
+    [Fact]
+    public void MainTargets_WithSharedStartAndExitAndNoGoals_IsEmpty()
+    {
+      // Arrange: Start and exit share node 1, no goals anywhere.
+      var graph = CreateLevel(3, 1, 1, Chain(3));
+
+      // Act: Index it.
+      var work = new ObstacleWorkGraph(graph, CnfProcObstaclePlacerOpt.Default);
+
+      // Assert: Nothing to target.
+      Assert.Empty(work.MainTargets);
+    }
+
+    [Fact]
+    public void MainTargets_WithMissingExit_IsEmpty()
+    {
+      // Arrange: A start and a goal, but no exit.
+      var graph = CreateGraph(3, Chain(3));
+      graph.Nodes[0].Pois.Add(GraphTestCreate.Poi(StartPoiId, EnPoiType.Start));
+      AddGoal(graph, 3);
+
+      // Act: Index it.
+      var work = new ObstacleWorkGraph(graph, CnfProcObstaclePlacerOpt.Default);
+
+      // Assert: Unsupported layout - no targets.
+      Assert.Empty(work.MainTargets);
+    }
+  }
+
   /// <summary>Tests the hop ball around a node.</summary>
   public sealed class BallTests
   {
