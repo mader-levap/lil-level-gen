@@ -104,7 +104,8 @@ public sealed class ConfigGeneratorStressTests
       // Assert: Graph values stay inside the resolver's difficulty-driven ranges, which
       // Validate alone does not enforce.
       var graph = config.Graph;
-      Assert.InRange(graph.Size, 2, difficulty + 2);
+      var (sizeMin, sizeMax) = ConfigGenerator.ResolveSizeRange(difficulty);
+      Assert.InRange(graph.Size, sizeMin, sizeMax);
       Assert.InRange(graph.Connectivity, 0, GraphResolverExpect.MaxConnectivity(graph.Size, difficulty));
       Assert.InRange(graph.Complexity, 0, GraphResolverExpect.MaxComplexity(graph.Size, difficulty));
       Assert.InRange(graph.ProcOpts.RelSecrets.Amount, 0, GraphResolverExpect.MaxSecretAmount(graph.Size, difficulty));

@@ -113,7 +113,7 @@ public sealed class ConfigGeneratorTests
       // cannot silently change without breaking reproducibility of generated configs.
       Assert.Equal(-8341167147440548823L, config.General.Seed);
       Assert.Equal(16.201443f, config.General.Degeneration);
-      Assert.Equal(3, config.Graph.Size);
+      Assert.Equal(6, config.Graph.Size);
       Assert.Equal(2, config.Graph.Connectivity);
       Assert.Equal(1, config.Graph.Complexity);
       Assert.Equal(EnGraphBuilder.Linear, config.Graph.GraphBuilder.Builder);
@@ -122,8 +122,8 @@ public sealed class ConfigGeneratorTests
         MaxEdges = 5, MaxExtraDegree = 2, MaxConditionPerRel = 2, MaxConditionDistance = 2, MaxSkipDistance = 1, ChanceObstacleBypass = 0.0075154635f,
       }, config.Graph.GraphBuilder.CnfLinear);
       Assert.Equal(1, config.Graph.ProcOpts.RelSecrets.Amount);
-      Assert.Equal(1, config.Graph.ProcOpts.NodeObjectives.GoalAmount);
-      Assert.Equal(1, config.Graph.ProcOpts.NodeObjectives.OptGoalAmount);
+      Assert.Equal(2, config.Graph.ProcOpts.NodeObjectives.GoalAmount);
+      Assert.Equal(0, config.Graph.ProcOpts.NodeObjectives.OptGoalAmount);
       Assert.Equal(1, config.Graph.ProcOpts.NodeStyle.GroupCount);
     }
 
@@ -178,10 +178,9 @@ public sealed class ConfigGeneratorTests
     [InlineData(1)]
     [InlineData(3)]
     [InlineData(7)]
+    [InlineData(10)]
+    [InlineData(19)]
     [InlineData(20)]
-    [InlineData(50)]
-    [InlineData(99)]
-    [InlineData(100)]
     public void Execute_WithDifficulty_OutputValidatesAndGraphStaysInRange(int difficulty)
     {
       // Act: Generate for a difficulty step.
@@ -190,13 +189,93 @@ public sealed class ConfigGeneratorTests
       // Assert: The configuration validates and the graph stays inside the resolver's
       // difficulty-driven ranges with a builder pairing that satisfies validation.
       config.Validate();
-      Assert.InRange(config.Graph.Size, 2, Math.Min(difficulty + 2, CnfGraph.MaxSize));
+      var (sizeMin, sizeMax) = ConfigGenerator.ResolveSizeRange(difficulty);
+      Assert.InRange(config.Graph.Size, sizeMin, sizeMax);
       Assert.InRange(config.Graph.Connectivity, 0, GraphResolverExpect.MaxConnectivity(config.Graph.Size, difficulty));
       Assert.InRange(config.Graph.Complexity, 0, GraphResolverExpect.MaxComplexity(config.Graph.Size, difficulty));
       Assert.InRange(config.Graph.ProcOpts.RelSecrets.Amount, 0, GraphResolverExpect.MaxSecretAmount(config.Graph.Size, difficulty));
       Assert.InRange(config.Graph.ProcOpts.NodeObjectives.GoalAmount, 1, GraphResolverExpect.MaxGoalAmount(config.Graph.Size, difficulty));
       Assert.InRange(config.Graph.ProcOpts.NodeObjectives.OptGoalAmount, 0, GraphResolverExpect.MaxOptGoalAmount(config.Graph.Size, difficulty));
       Assert.NotEqual(EnGraphBuilder.OneNode, config.Graph.GraphBuilder.Builder);
+    }
+  }
+
+  /// <summary>
+  /// Tests how difficulty maps to the graph size range: a slowly stepping lower bound and a
+  /// shifted square-root upper bound, both inclusive.
+  /// </summary>
+  public sealed class SizeRangeTests
+  {
+    /// <summary>Number of seeds the size sweep draws per difficulty.</summary>
+    private const int SeedCount = 400;
+
+    [Theory]
+    [InlineData(0, 2, 2)]
+    [InlineData(1, 2, 4)]
+    [InlineData(3, 3, 8)]
+    [InlineData(4, 3, 9)]
+    [InlineData(10, 5, 15)]
+    [InlineData(20, 8, 23)]
+    public void ResolveSizeRange_WithDefaults_MatchesPinnedTable(int difficulty, int expectedMin, int expectedMax)
+    {
+      // Act: Resolve the inclusive size range for a difficulty.
+      var (min, max) = ConfigGenerator.ResolveSizeRange(difficulty);
+
+      // Assert: Bounds match the pinned table for the default growth constants.
+      Assert.Equal(expectedMin, min);
+      Assert.Equal(expectedMax, max);
+    }
+
+    [Fact]
+    public void ResolveSizeRange_AcrossDifficulty_IsMonotonicAndOrdered()
+    {
+      // Arrange: Range at difficulty 0 as the starting point.
+      var previous = ConfigGenerator.ResolveSizeRange(0);
+
+      for (int difficulty = 0; difficulty <= PropMain.MaxDifficulty; difficulty++)
+      {
+        // Act: Resolve the range for the next difficulty.
+        var current = ConfigGenerator.ResolveSizeRange(difficulty);
+
+        // Assert: Bounds are ordered, inside graph limits, and never shrink with difficulty.
+        Assert.True(current.Min <= current.Max, $"Difficulty {difficulty}: min {current.Min} > max {current.Max}.");
+        Assert.True(current.Min >= 2, $"Difficulty {difficulty}: min {current.Min} below 2.");
+        Assert.True(current.Max <= CnfGraph.MaxSize, $"Difficulty {difficulty}: max {current.Max} above MaxSize.");
+        Assert.True(current.Min >= previous.Min, $"Difficulty {difficulty}: min shrank.");
+        Assert.True(current.Max >= previous.Max, $"Difficulty {difficulty}: max shrank.");
+        previous = current;
+      }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(4)]
+    [InlineData(10)]
+    [InlineData(20)]
+    public void Execute_WithSeedSweep_SizeStaysInsideAndReachesBounds(int difficulty)
+    {
+      // Arrange: Expected inclusive range for this difficulty.
+      var (min, max) = ConfigGenerator.ResolveSizeRange(difficulty);
+
+      // Act: Generate many configurations across seeds.
+      var sizes = Enumerable.Range(0, SeedCount)
+        .Select(seed => CreateGenerator(seed, difficulty).Execute().Graph.Size)
+        .ToList();
+
+      // Assert: Every size is inside the range and both bounds are actually drawn.
+      Assert.All(sizes, size => Assert.InRange(size, min, max));
+      Assert.Contains(min, sizes);
+      Assert.Contains(max, sizes);
+    }
+
+    [Fact]
+    public void Execute_AtZeroDifficulty_SizeIsMinimum()
+    {
+      // Act: Generate at the easiest difficulty.
+      var config = CreateGenerator(42, 0).Execute();
+
+      // Assert: The range collapses to the minimum graph size.
+      Assert.Equal(2, config.Graph.Size);
     }
   }
 
@@ -319,11 +398,11 @@ public sealed class ConfigGeneratorTests
     /// <summary>Pinned degeneration for "mordor" at difficulty 3.</summary>
     private const float PinnedDegeneration = 49.082054f;
     /// <summary>Pinned graph size for "mordor" at difficulty 3.</summary>
-    private const int PinnedGraphSize = 2;
+    private const int PinnedGraphSize = 7;
     /// <summary>Pinned graph connectivity for "mordor" at difficulty 3.</summary>
-    private const int PinnedConnectivity = 2;
+    private const int PinnedConnectivity = 1;
     /// <summary>Pinned graph complexity for "mordor" at difficulty 3.</summary>
-    private const int PinnedComplexity = 1;
+    private const int PinnedComplexity = 0;
     /// <summary>Pinned graph builder for "mordor" at difficulty 3.</summary>
     private const EnGraphBuilder PinnedBuilder = EnGraphBuilder.Linear;
     /// <summary>Pinned Linear builder options for "mordor" at difficulty 3.</summary>
@@ -336,7 +415,7 @@ public sealed class ConfigGeneratorTests
     /// <summary>Pinned mandatory goal amount for "mordor" at difficulty 3.</summary>
     private const int PinnedGoalAmount = 1;
     /// <summary>Pinned optional goal amount for "mordor" at difficulty 3.</summary>
-    private const int PinnedOptGoalAmount = 2;
+    private const int PinnedOptGoalAmount = 0;
     /// <summary>Pinned style group count for "mordor" at difficulty 3.</summary>
     private const int PinnedGroupCount = 1;
 

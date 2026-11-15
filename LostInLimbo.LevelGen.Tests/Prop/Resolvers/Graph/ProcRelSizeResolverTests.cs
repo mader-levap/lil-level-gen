@@ -200,9 +200,9 @@ public sealed class ProcRelSizeResolverTests
   {
     [Theory]
     [InlineData("mordor", 3)]
-    [InlineData("gondor", 30)]
-    [InlineData("rohan", 70)]
-    [InlineData("shire", 100)]
+    [InlineData("gondor", 8)]
+    [InlineData("rohan", 14)]
+    [InlineData("shire", 20)]
     public void Generate_WithResolvedOptions_AssignsOnlyConfiguredSizes(string textSeed, int difficulty)
     {
       // Arrange: Resolve a full configuration.

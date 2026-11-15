@@ -30,10 +30,18 @@ internal sealed class ConfigGenerator
   private const int MinGraphSize = 2;
 
   /// <summary>
-  /// Offset added to <see cref="PropMain.Difficulty"/> to get the exclusive upper bound of the
-  /// graph size draw: size is drawn from <c>[MinGraphSize, Difficulty + offset)</c>.
+  /// Number of difficulty steps per +1 of the lower size bound:
+  /// <c>min = MinGraphSize + Difficulty / step</c> (integer division). Higher value = slower growth.
   /// </summary>
-  private const int GraphSizeDifficultyOffset = 3;
+  private const int SizeMinDifficultyStep = 3;
+
+  /// <summary>
+  /// Scale of the upper size bound curve:
+  /// <c>max = MinGraphSize + floor(factor * (sqrt(Difficulty + 1) - 1))</c>.
+  /// The shifted square root starts almost linear (no jump from difficulty 0 to 1) and flattens
+  /// at high difficulties. Higher value = faster growth.
+  /// </summary>
+  private const double SizeMaxSqrtFactor = 6.0;
 
   /// <summary>Property dataset.</summary>
   private readonly PropMain _propMain;
@@ -121,14 +129,32 @@ internal sealed class ConfigGenerator
   }
 
   /// <summary>
-  /// Resolve size of the graph.
+  /// Resolve size of the graph: uniform draw from <see cref="ResolveSizeRange"/>.
   /// </summary>
   /// <returns>Size of the graph.</returns>
   private int ResolveSize()
   {
-    int from = MinGraphSize;
-    int to = _propMain.Difficulty + GraphSizeDifficultyOffset;
-    return _random.NextInt(from, to);
+    var (min, max) = ResolveSizeRange(_propMain.Difficulty);
+    return _random.NextInt(min, max + 1);
+  }
+
+  /// <summary>
+  /// Computes the graph size range for a difficulty. Pure and deterministic.
+  /// </summary>
+  /// <remarks>
+  /// Lower bound steps up slowly (<see cref="SizeMinDifficultyStep"/>), upper bound follows a
+  /// shifted square root (<see cref="SizeMaxSqrtFactor"/>). Both bounds are clamped to
+  /// <c>[MinGraphSize, CnfGraph.MaxSize]</c> and the upper bound never drops below the lower one.
+  /// </remarks>
+  /// <param name="difficulty">Difficulty, expected in <c>[0, PropMain.MaxDifficulty]</c>.</param>
+  /// <returns>Inclusive minimum and maximum graph size.</returns>
+  internal static (int Min, int Max) ResolveSizeRange(int difficulty)
+  {
+    int clampedDifficulty = Math.Max(0, difficulty);
+    int min = Math.Min(CnfGraph.MaxSize, MinGraphSize + clampedDifficulty / SizeMinDifficultyStep);
+    double curve = SizeMaxSqrtFactor * (Math.Sqrt(clampedDifficulty + 1.0) - 1.0);
+    int max = (int)Math.Min(CnfGraph.MaxSize, MinGraphSize + Math.Floor(curve));
+    return (min, Math.Max(min, max));
   }
 
   // ///////////////////////////////////////////////////////////////////////////

@@ -1,1 +1,1 @@
-- Check grouping, it probably needs sqrt too.
+- Difficulty resolves size differently

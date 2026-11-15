@@ -266,10 +266,10 @@ public sealed class LevelGraphReachTests
     [Theory]
     [InlineData(3, 1)]
     [InlineData(3, 2)]
-    [InlineData(25, 3)]
-    [InlineData(25, 4)]
-    [InlineData(100, 5)]
-    [InlineData(100, 6)]
+    [InlineData(10, 3)]
+    [InlineData(10, 4)]
+    [InlineData(20, 5)]
+    [InlineData(20, 6)]
     public void GetReachableNodes_WithNoKeys_MatchesOpenReach(int difficulty, long seed)
     {
       // Arrange: A generated graph and its start.
@@ -287,10 +287,10 @@ public sealed class LevelGraphReachTests
     [Theory]
     [InlineData(3, 1)]
     [InlineData(3, 2)]
-    [InlineData(25, 3)]
-    [InlineData(25, 4)]
-    [InlineData(100, 5)]
-    [InlineData(100, 6)]
+    [InlineData(10, 3)]
+    [InlineData(10, 4)]
+    [InlineData(20, 5)]
+    [InlineData(20, 6)]
     public void GetReachableNodes_WithAllSolutions_MatchesReachEntries(int difficulty, long seed)
     {
       // Arrange: A generated graph, its start and every solution in it.

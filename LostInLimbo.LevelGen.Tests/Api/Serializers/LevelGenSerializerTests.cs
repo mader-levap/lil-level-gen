@@ -518,7 +518,7 @@ public sealed class LevelGenSerializerTests
           var props = PropMain.Default with
           {
             TextSeed = "abc",
-            Difficulty = 42,
+            Difficulty = 15,
             ManyThemes = true,
           };
 
@@ -607,8 +607,8 @@ public sealed class LevelGenSerializerTests
         [Fact]
         public void Deserialize_WithDifficultyAboveMax_ThrowsNamingDifficulty()
         {
-          // Arrange: Well-formed JSON asking for difficulty above the allowed maximum.
-          var json = "{ \"difficulty\": 101 }";
+          // Arrange: Well-formed JSON asking for difficulty one above the allowed maximum.
+          var json = $"{{ \"difficulty\": {PropMain.MaxDifficulty + 1} }}";
 
           // Act/Assert: Validation runs on the deserialized result and names the offending property.
           var exception = Assert.Throws<ArgumentOutOfRangeException>(

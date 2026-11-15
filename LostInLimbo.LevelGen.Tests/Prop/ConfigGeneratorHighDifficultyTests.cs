@@ -99,9 +99,9 @@ public sealed class ConfigGeneratorHighDifficultyTests
       violations.Add($"RelSecrets.Amount {graph.ProcOpts.RelSecrets.Amount} > MaxAmount {CnfProcRelSecretsOpt.MaxAmount}");
 
     // Relational invariants of the resolvers, valid across the whole difficulty range.
-    int sizeMax = Math.Min(difficulty + 2, CnfGraph.MaxSize);
-    if (graph.Size < 2 || graph.Size > sizeMax)
-      violations.Add($"Size {graph.Size} outside [2, {sizeMax}]");
+    var (sizeMin, sizeMax) = ConfigGenerator.ResolveSizeRange(difficulty);
+    if (graph.Size < sizeMin || graph.Size > sizeMax)
+      violations.Add($"Size {graph.Size} outside [{sizeMin}, {sizeMax}]");
     var maxConnectivity = GraphResolverExpect.MaxConnectivity(graph.Size, difficulty);
     if (graph.Connectivity < 0 || graph.Connectivity > maxConnectivity)
       violations.Add($"Connectivity {graph.Connectivity} outside [0, {maxConnectivity}]");

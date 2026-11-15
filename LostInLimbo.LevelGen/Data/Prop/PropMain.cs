@@ -21,7 +21,7 @@ namespace LostInLimbo.LevelGen.Data.Prop;
 public sealed record PropMain
 {
   /// <summary>Maximum allowed difficulty.</summary>
-  public const int MaxDifficulty = 100;
+  public const int MaxDifficulty = 20;
 
   // Defaults.
 
@@ -47,7 +47,8 @@ public sealed record PropMain
   /// Difficulty. In game these would be descriptive texts like "easy" or "hard", but here we represent it as number. Smallest is 0.
   /// </summary>
   /// <remarks>
-  /// While allowed max difficulty is 100, actual usage focuses on first few numbers, like 0 being easiest, 1 less easy, 2 harder, 3 even harder etc.
+  /// Allowed range is 0 (easiest) to <see cref="MaxDifficulty"/> (hardest). Difficulty drives graph size range and
+  /// the share of difficulty-scaled graph values (<c>Difficulty / MaxDifficulty</c>).
   /// </remarks>
   public int Difficulty { get; init; } = 0;
 

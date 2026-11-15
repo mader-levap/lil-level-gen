@@ -61,10 +61,8 @@ public sealed class GraphPipelineHighDifficultyTests
   [InlineData(0)]
   [InlineData(5)]
   [InlineData(10)]
-  [InlineData(25)]
-  [InlineData(50)]
-  [InlineData(75)]
-  [InlineData(100)]
+  [InlineData(15)]
+  [InlineData(20)]
   public void Execute_WithSeedSweepAtDifficulty_ProducesValidGraphsInTime(int difficulty)
   {
     // Arrange: Violation buffer and timing samples for this difficulty.

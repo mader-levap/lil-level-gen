@@ -64,13 +64,13 @@ public sealed class GraphResolverTests
 
       // Assert: Every drawn field matches the pinned reference, including the builder
       // sub-config and the processor options drawn after it.
-      Assert.Equal(0, config.Connectivity);
-      Assert.Equal(2, config.Complexity);
+      Assert.Equal(1, config.Connectivity);
+      Assert.Equal(4, config.Complexity);
       Assert.Equal(EnGraphBuilder.Simple, config.GraphBuilder.Builder);
       Assert.Equal(0.5926749f, config.GraphBuilder.CnfSimple!.ChokepointChance);
       Assert.Equal(2, config.GraphBuilder.CnfSimple.MaxExtraDegree);
       Assert.Equal(5, config.GraphBuilder.CnfSimple.MaxExtraDegreeStar);
-      AssertProcOpts(config, secretAmount: 1, goalAmount: 1, optGoalAmount: 0, groupCount: 2);
+      AssertProcOpts(config, secretAmount: 2, goalAmount: 2, optGoalAmount: 0, groupCount: 2);
     }
 
     [Fact]
@@ -82,14 +82,14 @@ public sealed class GraphResolverTests
       // Assert: Every drawn field matches the pinned reference, including the builder
       // sub-config and the processor options drawn after it.
       Assert.Equal(1, config.Connectivity);
-      Assert.Equal(1, config.Complexity);
+      Assert.Equal(4, config.Complexity);
       Assert.Equal(EnGraphBuilder.Linear, config.GraphBuilder.Builder);
       Assert.Equal(6, config.GraphBuilder.CnfLinear!.MaxEdges);
       Assert.Equal(3, config.GraphBuilder.CnfLinear.MaxExtraDegree);
       Assert.Equal(3, config.GraphBuilder.CnfLinear.MaxConditionPerRel);
       Assert.Equal(4, config.GraphBuilder.CnfLinear.MaxConditionDistance);
       Assert.Equal(2, config.GraphBuilder.CnfLinear.MaxSkipDistance);
-      AssertProcOpts(config, secretAmount: 1, goalAmount: 2, optGoalAmount: 2, groupCount: 2);
+      AssertProcOpts(config, secretAmount: 3, goalAmount: 2, optGoalAmount: 2, groupCount: 2);
     }
 
     /// <summary>Creates a resolver over a 12-node graph at difficulty 7 with many themes.</summary>
@@ -137,9 +137,9 @@ public sealed class GraphResolverTests
       // Act: Resolve graph configuration for a difficulty step.
       var config = CreateResolver(7, difficulty).Execute();
 
-      // Assert: Every draw stays inside its half-open range for this difficulty and
+      // Assert: Size is echoed from PropData and every draw stays inside its range for this difficulty and
       // resolved size, so the result always satisfies CnfGraph.Validate.
-      Assert.InRange(config.Size, 2, difficulty + 2);
+      Assert.Equal(2, config.Size);
       Assert.InRange(config.Connectivity, 0, GraphResolverExpect.MaxConnectivity(config.Size, difficulty));
       Assert.InRange(config.Complexity, 0, GraphResolverExpect.MaxComplexity(config.Size, difficulty));
       Assert.InRange(config.ProcOpts.RelSecrets.Amount, 0, GraphResolverExpect.MaxSecretAmount(config.Size, difficulty));
@@ -172,9 +172,9 @@ public sealed class GraphResolverTests
     [InlineData(2, 0)]
     [InlineData(3, 2)]
     [InlineData(8, 10)]
-    [InlineData(30, 40)]
-    [InlineData(4, 100)]
-    [InlineData(100, 100)]
+    [InlineData(30, 15)]
+    [InlineData(4, 20)]
+    [InlineData(100, 20)]
     public void Execute_WithSizeAndDifficulty_ReachesButNeverExceedsSqrtBounds(int size, int difficulty)
     {
       // Act: Resolve many configurations for the same size and difficulty.
@@ -478,8 +478,8 @@ public sealed class GraphResolverTests
     [Fact]
     public void Execute_WithDifficultyNegativeOne_ReturnsMinimumSize()
     {
-      // Act: Resolve with the only negative difficulty that keeps NextInt bounds valid
-      // (2 .. Difficulty + 3 collapses to equal bounds of 2).
+      // Act: Resolve with a negative difficulty; size comes fixed from PropData (2), so only
+      // the square-root bounds react to the difficulty.
       var config = CreateResolver(42, -1).Execute();
 
       // Assert: The size draw collapses to its fixed minimum and the config still validates.
