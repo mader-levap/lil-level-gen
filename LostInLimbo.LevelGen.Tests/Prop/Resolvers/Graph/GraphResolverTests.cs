@@ -70,7 +70,7 @@ public sealed class GraphResolverTests
       Assert.Equal(0.5926749f, config.GraphBuilder.CnfSimple!.ChokepointChance);
       Assert.Equal(2, config.GraphBuilder.CnfSimple.MaxExtraDegree);
       Assert.Equal(5, config.GraphBuilder.CnfSimple.MaxExtraDegreeStar);
-      AssertProcOpts(config, secretAmount: 1, goalAmount: 1, optGoalAmount: 0, groupCount: 6);
+      AssertProcOpts(config, secretAmount: 1, goalAmount: 1, optGoalAmount: 0, groupCount: 2);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class GraphResolverTests
       Assert.Equal(3, config.GraphBuilder.CnfLinear.MaxConditionPerRel);
       Assert.Equal(4, config.GraphBuilder.CnfLinear.MaxConditionDistance);
       Assert.Equal(2, config.GraphBuilder.CnfLinear.MaxSkipDistance);
-      AssertProcOpts(config, secretAmount: 1, goalAmount: 2, optGoalAmount: 2, groupCount: 6);
+      AssertProcOpts(config, secretAmount: 1, goalAmount: 2, optGoalAmount: 2, groupCount: 2);
     }
 
     /// <summary>Creates a resolver over a 12-node graph at difficulty 7 with many themes.</summary>
@@ -381,17 +381,53 @@ public sealed class GraphResolverTests
     [InlineData(3)]
     [InlineData(5)]
     [InlineData(10)]
+    [InlineData(12)]
+    [InlineData(30)]
+    [InlineData(100)]
     public void Execute_ManyThemesTrue_GroupCountInsideRange(int size)
     {
-      // Arrange: Expected inclusive upper bound from the resolver's rule.
-      int groupCountMax = Math.Max(2, size * 2 / 3 + 1);
+      // Arrange: Expected inclusive upper bound from the resolver's rule: max(2, ceil(sqrt(Size))).
+      int groupCountMax = Math.Max(2, (int)Math.Ceiling(Math.Sqrt(size)));
 
-      // Act: Resolve with ManyThemes enabled.
-      var config = CreateResolver(7, 3, size, manyThemes: true).Execute();
+      // Act & Assert: Across a seed sweep, group count always lands in [2, groupCountMax].
+      for (long seed = 0; seed < 32; seed++)
+      {
+        var config = CreateResolver(seed, 3, size, manyThemes: true).Execute();
+        Assert.InRange(config.ProcOpts.NodeStyle.GroupCount, 2, groupCountMax);
+      }
+    }
 
-      // Assert: Group count lands in [2, groupCountMax]; the empty-range collapse at
-      // Size==2 yields 2, matching the upper bound.
-      Assert.InRange(config.ProcOpts.NodeStyle.GroupCount, 2, groupCountMax);
+    [Fact]
+    public void Execute_ManyThemesTrue_GroupCountMaxReachable()
+    {
+      // Arrange: At Size 16 the inclusive bound is ceil(sqrt(16)) = 4.
+      var seen = new HashSet<int>();
+
+      // Act: Resolve across many supporting seeds.
+      for (long seed = 0; seed < 128; seed++)
+        seen.Add(CreateResolver(seed, 3, 16, manyThemes: true).Execute().ProcOpts.NodeStyle.GroupCount);
+
+      // Assert: Both ends of the inclusive range are reached and nothing exceeds it.
+      Assert.Contains(2, seen);
+      Assert.Contains(4, seen);
+      Assert.All(seen, groupCount => Assert.InRange(groupCount, 2, 4));
+    }
+
+    [Fact]
+    public void Execute_ManyThemesTrue_GroupCountIndependentOfDifficulty()
+    {
+      // Arrange: Size 100 gives inclusive bound ceil(sqrt(100)) = 10 regardless of difficulty.
+      const int size = 100;
+      const int groupCountMax = 10;
+
+      // Act & Assert: Lowest and highest difficulty both stay inside the same range.
+      for (long seed = 0; seed < 32; seed++)
+      {
+        var low = CreateResolver(seed, 0, size, manyThemes: true).Execute();
+        var high = CreateResolver(seed, PropMain.MaxDifficulty, size, manyThemes: true).Execute();
+        Assert.InRange(low.ProcOpts.NodeStyle.GroupCount, 2, groupCountMax);
+        Assert.InRange(high.ProcOpts.NodeStyle.GroupCount, 2, groupCountMax);
+      }
     }
 
     [Fact]
@@ -425,10 +461,10 @@ public sealed class GraphResolverTests
     [Fact]
     public void Execute_ManyThemesTrue_SizeTwo_GroupCountIsTwo()
     {
-      // Act: Resolve at Size==2, where groupCountMax collapses to 2 and NextInt(2, 2) returns 2.
+      // Act: Resolve at Size==2, where ceil(sqrt(2)) = 2 and the minimum of 2 meet.
       var config = CreateResolver(42, 3, 2, manyThemes: true).Execute();
 
-      // Assert: The empty-range collapse yields exactly two groups.
+      // Assert: The single-value range [2, 2] yields exactly two groups.
       Assert.Equal(2, config.ProcOpts.NodeStyle.GroupCount);
     }
   }

@@ -76,11 +76,10 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <summary>Smallest group count when <see cref="PropMain.ManyThemes"/> is on.</summary>
   private const int MinManyThemesGroupCount = 2;
 
-  /// <summary>Numerator of the share of the graph size used as the largest group count.</summary>
-  private const int ManyThemesGroupShareNumerator = 2;
-
-  /// <summary>Denominator of the share of the graph size used as the largest group count.</summary>
-  private const int ManyThemesGroupShareDenominator = 3;
+  /// <summary>Many-themes group count bound per sqrt(Size) at difficulty 0 (see <see cref="SqrtSizeBound"/>).</summary>
+  private const double ManyThemesGroupCountBaseFactor = 1.0;
+  /// <summary>Many-themes group count bound per sqrt(Size) added at the highest difficulty; 0 keeps it difficulty-independent.</summary>
+  private const double ManyThemesGroupCountDifficultyFactor = 0.0;
 
   /// <summary>
   /// Builders the resolver picks from, with equal chance. <see cref="EnGraphBuilder.OneNode"/> is
@@ -260,7 +259,11 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   }
 
   /// <summary>
-  /// Resolve style options.
+  /// Resolve style options. With <see cref="PropMain.ManyThemes"/> off the group count is
+  /// <see cref="SingleThemeGroupCount"/>; with it on, the count is drawn uniformly from
+  /// <see cref="MinManyThemesGroupCount"/> up to the inclusive bound <c>ceil(sqrt(Size))</c>
+  /// (at least the minimum). That bound grows with the square root of the size like the other
+  /// bounds, does not depend on difficulty, and never goes above Size.
   /// </summary>
   /// <returns>Style options.</returns>
   private CnfProcNodeStyleOpt ResolveStyle()
@@ -270,8 +273,8 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     {
       int groupCountMax = Math.Max(
         MinManyThemesGroupCount,
-        _propData.Size * ManyThemesGroupShareNumerator / ManyThemesGroupShareDenominator + 1);
-      groupCount = _random.NextInt(MinManyThemesGroupCount, groupCountMax);
+        SqrtSizeBound(ManyThemesGroupCountBaseFactor, ManyThemesGroupCountDifficultyFactor));
+      groupCount = _random.NextInt(MinManyThemesGroupCount, groupCountMax + 1);
     }
 
     return CnfProcNodeStyleOpt.Default with

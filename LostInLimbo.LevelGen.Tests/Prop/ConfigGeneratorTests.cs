@@ -400,7 +400,7 @@ public sealed class ConfigGeneratorTests
 
       // Assert: Group count is at least two and within the resolver's upper bound.
       var size = config.Graph.Size;
-      int groupCountMax = Math.Max(2, size * 2 / 3 + 1);
+      int groupCountMax = Math.Max(2, (int)Math.Ceiling(Math.Sqrt(size)));
       Assert.InRange(config.Graph.ProcOpts.NodeStyle.GroupCount, 2, groupCountMax);
     }
   }
