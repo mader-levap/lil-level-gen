@@ -151,7 +151,14 @@ public sealed class LevelGenSerializerTests
             ProcOpts = new CnfProcOpt
             {
               RelSecrets = new CnfProcRelSecretsOpt { Amount = 3, ChanceSecretInSecret = 0.75f },
-              NodeObjectives = new CnfProcNodeObjectivesOpt { GoalAmount = 2, OptGoalAmount = 4 },
+              NodeObjectives = new CnfProcNodeObjectivesOpt
+              {
+                GoalAmount = 2,
+                OptGoalAmount = 4,
+                WeightNoPoi = 9,
+                WeightOtherPoi = 6,
+                WeightStartExitPoi = 3,
+              },
               NodeRelSize = new CnfProcNodeRelSizeOpt
               {
                 Steps = 5,

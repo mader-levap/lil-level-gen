@@ -191,6 +191,22 @@ public sealed class ProcNodeObjectivesTests
     }
 
     [Fact]
+    public void Execute_WithAmountEqualToNodeCount_StillFillsStartAndExitNodes()
+    {
+      // Arrange: A chain whose every node must host a goal; Start and Exit carry the
+      // lowest weight, but weights must never exclude a node.
+      var graph = CreateStartExitChainGraph(5);
+      graph.Nodes[2].Pois.Add(Poi(3000, EnPoiType.Solution));
+      var options = CnfProcNodeObjectivesOpt.Default with { GoalAmount = 5, OptGoalAmount = 0 };
+
+      // Act: Demand one goal per node.
+      new ProcNodeObjectives(graph, options, Seed).Execute();
+
+      // Assert: Every node - Start, Exit and Solution hosts included - holds one goal.
+      Assert.All(graph.Nodes, node => Assert.Single(node.Pois.Where(poi => poi.Type == EnPoiType.Goal)));
+    }
+
+    [Fact]
     public void Execute_PlacedPois_HaveUniqueNonEmptyIdentifiers()
     {
       // Arrange: A chain graph with secrets, saturated with objectives.
@@ -207,6 +223,74 @@ public sealed class ProcNodeObjectivesTests
       Assert.NotEmpty(poiIds);
       Assert.All(poiIds, id => Assert.NotEqual(Guid.Empty, id));
       Assert.Equal(poiIds.Count, poiIds.Distinct().Count());
+    }
+  }
+
+  /// <summary>Tests for the host weighting: nodes with POIs are less likely goal hosts.</summary>
+  public sealed class WeightTests
+  {
+    /// <summary>Number of seeds the weighting frequency test averages over.</summary>
+    private const int WeightSeedCount = 2000;
+
+    /// <summary>
+    /// Minimum ratio between hit counts of neighbouring weight classes. Defaults are 4:2:1,
+    /// so the expected ratio is 2; uniform placement would give 1.
+    /// </summary>
+    private const double MinClassRatio = 1.5;
+
+    [Theory]
+    [InlineData(EnPoiType.Goal)]
+    [InlineData(EnPoiType.OptionalGoal)]
+    public void Execute_OverManySeeds_PrefersNodesWithoutPoisOverOtherPoisOverStartAndExit(EnPoiType type)
+    {
+      // Arrange: Hit counters for a five-node chain: 1 = Start, 3 = Solution, 5 = Exit,
+      // 2 and 4 = plain.
+      var hits = new int[5];
+      var options = type == EnPoiType.Goal
+        ? CnfProcNodeObjectivesOpt.Default with { GoalAmount = 1, OptGoalAmount = 0 }
+        : CnfProcNodeObjectivesOpt.Default with { GoalAmount = 0, OptGoalAmount = 1 };
+
+      for (var seed = 0; seed < WeightSeedCount; seed++)
+      {
+        var graph = CreateStartExitChainGraph(5);
+        graph.Nodes[2].Pois.Add(Poi(3000, EnPoiType.Solution));
+
+        // Act: Place a single objective and record its host.
+        new ProcNodeObjectives(graph, options, seed).Execute();
+        var host = graph.Nodes.FindIndex(node => node.Pois.Any(poi => poi.Type == type));
+        hits[host]++;
+      }
+
+      // Assert: Plain nodes beat the Solution node, which beats Start and Exit.
+      var plain = (hits[1] + hits[3]) / 2.0;
+      var other = hits[2];
+      var startExit = (hits[0] + hits[4]) / 2.0;
+      Assert.True(plain > other * MinClassRatio, $"Plain {plain} vs other {other}.");
+      Assert.True(other > startExit * MinClassRatio, $"Other {other} vs start/exit {startExit}.");
+    }
+
+    [Fact]
+    public void ComputeWeight_ForEachPoiClass_ReturnsConfiguredWeight()
+    {
+      // Arrange: Distinct weights so every class is identifiable.
+      var options = CnfProcNodeObjectivesOpt.Default with { WeightNoPoi = 7, WeightOtherPoi = 5, WeightStartExitPoi = 3 };
+
+      // Act & Assert: Each POI class maps to its weight.
+      Assert.Equal(7, ProcNodeObjectives.ComputeWeight(Node(1), options));
+      Assert.Equal(5, ProcNodeObjectives.ComputeWeight(Node(2, Poi(10, EnPoiType.Solution)), options));
+      Assert.Equal(3, ProcNodeObjectives.ComputeWeight(Node(3, Poi(11, EnPoiType.Start)), options));
+      Assert.Equal(3, ProcNodeObjectives.ComputeWeight(Node(4, Poi(12, EnPoiType.Exit)), options));
+    }
+
+    [Fact]
+    public void ComputeWeight_NodeWithStartAndOtherPoi_UsesStartExitWeight()
+    {
+      // Arrange: A node holding both a Start and a Solution POI.
+      var options = CnfProcNodeObjectivesOpt.Default with { WeightNoPoi = 7, WeightOtherPoi = 5, WeightStartExitPoi = 3 };
+      var node = Node(1, Poi(10, EnPoiType.Solution), Poi(11, EnPoiType.Start));
+
+      // Act & Assert: Start/Exit takes priority over the other POI.
+      Assert.Equal(3, ProcNodeObjectives.ComputeWeight(node, options));
     }
   }
 

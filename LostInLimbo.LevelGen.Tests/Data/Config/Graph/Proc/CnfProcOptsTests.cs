@@ -225,6 +225,33 @@ public sealed class CnfProcOptsTests
       // Assert: Defaults match the values builders used before options were configurable.
       Assert.Equal(1, CnfProcNodeObjectivesOpt.Default.GoalAmount);
       Assert.Equal(1, CnfProcNodeObjectivesOpt.Default.OptGoalAmount);
+
+      // Assert: Host weights fall from POI-free nodes to Start/Exit nodes.
+      Assert.Equal(4, CnfProcNodeObjectivesOpt.Default.WeightNoPoi);
+      Assert.Equal(2, CnfProcNodeObjectivesOpt.Default.WeightOtherPoi);
+      Assert.Equal(1, CnfProcNodeObjectivesOpt.Default.WeightStartExitPoi);
+    }
+
+    [Theory]
+    [InlineData(nameof(CnfProcNodeObjectivesOpt.WeightNoPoi), 0)]
+    [InlineData(nameof(CnfProcNodeObjectivesOpt.WeightNoPoi), -1)]
+    [InlineData(nameof(CnfProcNodeObjectivesOpt.WeightOtherPoi), 0)]
+    [InlineData(nameof(CnfProcNodeObjectivesOpt.WeightOtherPoi), -1)]
+    [InlineData(nameof(CnfProcNodeObjectivesOpt.WeightStartExitPoi), 0)]
+    [InlineData(nameof(CnfProcNodeObjectivesOpt.WeightStartExitPoi), -1)]
+    public void NodeObjectives_WithWeightBelowOne_ThrowsArgumentOutOfRangeException(string property, int value)
+    {
+      // Arrange: Config with one forbidden weight.
+      var opts = property switch
+      {
+        nameof(CnfProcNodeObjectivesOpt.WeightNoPoi) => new CnfProcNodeObjectivesOpt { WeightNoPoi = value },
+        nameof(CnfProcNodeObjectivesOpt.WeightOtherPoi) => new CnfProcNodeObjectivesOpt { WeightOtherPoi = value },
+        _ => new CnfProcNodeObjectivesOpt { WeightStartExitPoi = value },
+      };
+
+      // Act/Assert: The out-of-range value is rejected naming the offending property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
+      Assert.Equal(property, exception.ParamName);
     }
 
     [Theory]
