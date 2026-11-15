@@ -19,6 +19,10 @@ internal static class SweepReport
   private const double SlowRunMs = 50;
   /// <summary>How many of the slowest runs the timing section lists.</summary>
   private const int SlowestRunCount = 5;
+  /// <summary>A slow run within this multiple of its peers' median counts as a heavy level, not an outlier.</summary>
+  private const double HeavyLevelFactor = 3.0;
+  /// <summary>Peer groups (same builder and Size) smaller than this are not used for comments.</summary>
+  private const int MinPeerGroup = 5;
   /// <summary>Percentile reported besides the median.</summary>
   private const double HighPercentile = 0.99;
 
@@ -340,9 +344,45 @@ internal static class SweepReport
     TimingRow(text, "Wall", ok.Select(r => r.WallMs));
 
     text.AppendLine().AppendLine("Slowest runs (generation time):").AppendLine();
-    TableHeader(text, "Run", "Seed", "Generation (ms)", "Wall (ms)");
+    var peers = PeerMedians.From(ok);
+    TableHeader(text, "Run", "Seed", "Generation (ms)", "Wall (ms)", "Comment");
     foreach (var record in ok.OrderByDescending(r => r.GenerationMs).ThenBy(r => r.Index).Take(SlowestRunCount))
-      TableRow(text, record.Label, $"`{record.Seed}`", record.GenerationMs.ToString("F2", Invariant), record.WallMs.ToString("F1", Invariant));
+    {
+      TableRow(text, record.Label, $"`{record.Seed}`", record.GenerationMs.ToString("F2", Invariant),
+        record.WallMs.ToString("F1", Invariant), SlowRunComment(record, peers));
+    }
+  }
+
+  /// <summary>
+  /// Likely reasons why <paramref name="run"/> was slow, in a fixed order, or <c>-</c> when none
+  /// is known: first run on its harness thread, JIT or GC during the run, then a comparison with
+  /// peers of the same builder and Size (heavy level vs. unexplained outlier).
+  /// </summary>
+  /// <remarks>JIT and GC counters are process-wide, so those reasons are likely, not proven.</remarks>
+  /// <param name="run">Run to explain.</param>
+  /// <param name="peers">Peer medians of the sweep.</param>
+  /// <returns>Comment text, or <c>-</c>.</returns>
+  internal static string SlowRunComment(RunRecord run, PeerMedians peers)
+  {
+    if (run is null) throw new ArgumentNullException(nameof(run));
+    if (peers is null) throw new ArgumentNullException(nameof(peers));
+
+    var reasons = new List<string>();
+    if (run.ThreadRunOrdinal == 1) reasons.Add("Likely artifact of worker thread's first run.");
+    if (run.JitMethods > 0) reasons.Add($"JIT compiled {run.JitMethods} method(s) during the run.");
+    if (run.GcGeneration >= 0) reasons.Add($"Garbage collection (gen {run.GcGeneration}) during the run.");
+
+    if (peers.TryGet(run, out var median, out var count) && count >= MinPeerGroup && median > 0)
+    {
+      var ratio = run.GenerationMs / median;
+      var group = $"{run.Builder} S{run.Size}";
+      if (ratio <= HeavyLevelFactor)
+        reasons.Add(Format("Consistent with level size ({0:F1}x median of {1}).", ratio, group));
+      else if (reasons.Count == 0)
+        reasons.Add(Format("Outlier: {0:F0}x median of {1}; re-check with `dump {2}`.", ratio, group, run.Index));
+    }
+
+    return reasons.Count == 0 ? "-" : string.Join(" ", reasons);
   }
 
   /// <summary>One row of the timing table.</summary>

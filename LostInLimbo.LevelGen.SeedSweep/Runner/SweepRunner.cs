@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime;
 using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Api.Serializers;
 using LostInLimbo.LevelGen.Data.Config;
@@ -24,6 +25,9 @@ internal static class SweepRunner
   /// <summary>Text seed prefix of warm-up runs; distinct from any sweep prefix default.</summary>
   public const string WarmupSeedPrefix = "warmup";
 
+  /// <summary>Runs started on the current harness thread so far (warm-up included); see <see cref="RunRecord.ThreadRunOrdinal"/>.</summary>
+  [ThreadStatic] private static int _threadRunCount;
+
   /// <summary>
   /// Runs all runs of a sweep in parallel, after <see cref="SweepOptions.WarmupRuns"/> untimed
   /// warm-up runs (see <see cref="WarmUp"/>).
@@ -38,7 +42,7 @@ internal static class SweepRunner
   {
     if (options is null) throw new ArgumentNullException(nameof(options));
 
-    var warmup = WarmUp(options.WarmupRuns, TimeSpan.FromSeconds(options.TimeoutSeconds), cancellationToken);
+    var warmup = WarmUp(options.WarmupRuns, options.EffectiveParallelism, TimeSpan.FromSeconds(options.TimeoutSeconds), cancellationToken);
     var records = new RunRecord[options.Runs];
     var finished = 0;
     var parallel = new ParallelOptions
@@ -58,32 +62,36 @@ internal static class SweepRunner
   }
 
   /// <summary>
-  /// Generates <paramref name="runs"/> untimed levels sequentially on the calling thread, so the
-  /// JIT compiles the generator's code paths before anything is measured.
+  /// Generates <paramref name="runs"/> untimed levels in parallel, so the JIT compiles the
+  /// generator's code paths, and the worker threads start, before anything is measured.
   /// </summary>
   /// <remarks>
   /// Independent of sweep options: run <c>i</c> uses difficulty <c>i % 21</c>, many themes on
   /// for odd difficulty cycles and text seed <c>"warmup-i"</c>, covering both graph builders
-  /// across all difficulties. Never the same levels as sweep runs.
+  /// across all difficulties. Never the same levels as sweep runs. Use the sweep's degree of
+  /// parallelism so the same worker threads get warmed up.
   /// </remarks>
   /// <param name="runs">Number of warm-up runs; 0 does nothing.</param>
+  /// <param name="parallelism">Degree of parallelism; at least 1.</param>
   /// <param name="timeout">Per-run timeout.</param>
-  /// <param name="cancellationToken">Checked before every run.</param>
-  /// <returns>Records of the warm-up runs, for the report summary.</returns>
-  /// <exception cref="ArgumentOutOfRangeException"><paramref name="runs"/> is negative.</exception>
+  /// <param name="cancellationToken">Stops scheduling new runs.</param>
+  /// <returns>Records of the warm-up runs sorted by index, for the report summary.</returns>
+  /// <exception cref="ArgumentOutOfRangeException"><paramref name="runs"/> is negative or <paramref name="parallelism"/> is below 1.</exception>
   /// <exception cref="OperationCanceledException">Cancelled.</exception>
-  public static IReadOnlyList<RunRecord> WarmUp(int runs, TimeSpan timeout, CancellationToken cancellationToken = default)
+  public static IReadOnlyList<RunRecord> WarmUp(
+    int runs, int parallelism, TimeSpan timeout, CancellationToken cancellationToken = default)
   {
     if (runs < 0) throw new ArgumentOutOfRangeException(nameof(runs), runs, "Warm-up run count must not be negative.");
+    if (parallelism < 1) throw new ArgumentOutOfRangeException(nameof(parallelism), parallelism, "Parallelism must be at least 1.");
 
     var span = PropMain.MaxDifficulty + 1;
-    var records = new List<RunRecord>(runs);
-    for (var i = 0; i < runs; i++)
+    var records = new RunRecord[runs];
+    var parallel = new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken };
+    Parallel.For(0, runs, parallel, i =>
     {
-      cancellationToken.ThrowIfCancellationRequested();
       var spec = new RunSpec(i, i % span, i / span % 2 == 1, $"{WarmupSeedPrefix}-{i}");
-      records.Add(Run(spec, checkDeterminism: false, timeout));
-    }
+      records[i] = Run(spec, checkDeterminism: false, timeout);
+    });
 
     return records;
   }
@@ -121,6 +129,7 @@ internal static class SweepRunner
       Difficulty = spec.Difficulty,
       ManyThemes = spec.ManyThemes,
       Seed = spec.TextSeed,
+      ThreadRunOrdinal = ++_threadRunCount,
     };
 
     try
@@ -128,9 +137,14 @@ internal static class SweepRunner
       config = LevelGenConfig.Execute(spec.ToProps());
       RunAnalyzer.FillConfig(record, config);
 
+      // Evidence for slow-run comments: JIT and GC activity within the timed window.
+      var jitBefore = JitInfo.GetCompiledMethodCount();
+      var gcBefore = GcCounts();
       var stopwatch = Stopwatch.StartNew();
       var outcome = Generate(config, timeout);
       record.WallMs = stopwatch.Elapsed.TotalMilliseconds;
+      record.JitMethods = JitInfo.GetCompiledMethodCount() - jitBefore;
+      record.GcGeneration = HighestCollectedGeneration(gcBefore, GcCounts());
       record.GenerationMs = outcome.Status.Elapsed.TotalMilliseconds;
       record.Status = outcome.TimedOut ? "Timeout" : outcome.Status.Result.ToString();
       if (outcome.Status.Result != EnGenResult.Paused || outcome.World is null)
@@ -181,6 +195,28 @@ internal static class SweepRunner
 
       Thread.Sleep(PollIntervalMs);
     }
+  }
+
+  /// <summary>Process-wide collection counts of GC generations 0 to <see cref="GC.MaxGeneration"/>.</summary>
+  private static int[] GcCounts()
+  {
+    var counts = new int[GC.MaxGeneration + 1];
+    for (var generation = 0; generation < counts.Length; generation++) counts[generation] = GC.CollectionCount(generation);
+    return counts;
+  }
+
+  /// <summary>
+  /// Highest GC generation whose collection count grew between the two samples; -1 when none.
+  /// </summary>
+  /// <param name="before">Counts sampled before the window.</param>
+  /// <param name="after">Counts sampled after the window.</param>
+  /// <returns>Generation, or -1.</returns>
+  internal static int HighestCollectedGeneration(IReadOnlyList<int> before, IReadOnlyList<int> after)
+  {
+    for (var generation = Math.Min(before.Count, after.Count) - 1; generation >= 0; generation--)
+      if (after[generation] > before[generation]) return generation;
+
+    return -1;
   }
 
   /// <summary>True when the run with <paramref name="index"/> gets a determinism rerun.</summary>

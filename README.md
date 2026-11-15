@@ -133,7 +133,7 @@ dotnet run --project LostInLimbo.LevelGen.SeedSweep -c Release -- dump --text-se
 | `--determinism-every N` | 25 | Generate every Nth run twice and compare; 0 disables. |
 | `--parallel N` | CPU count | Degree of parallelism. |
 | `--timeout-seconds N` | 20 | Per-run timeout. |
-| `--warmup N` | 42 | Untimed warm-up runs before measuring; 0 disables. |
+| `--warmup N` | 420 | Untimed warm-up runs before measuring (run in parallel); 0 disables. |
 | `--out DIR` | `LostInLimbo.LevelGen.SeedSweep/TestResults` | Output root. |
 | `--help` | | Usage. |
 
@@ -145,4 +145,4 @@ Each invocation writes a new folder `LostInLimbo.LevelGen.SeedSweep/TestResults/
 
 Exit codes: 0 = no errors, 1 = at least one run with errors, 2 = invalid arguments.
 
-Timing in the report is generation time measured by the library (`GenerationStatus.Elapsed`): exact, without polling delay. The CSV also has `WallMs`, the harness' wall time including status polling (rounded up to the ~15 ms OS timer tick on Windows). Before measuring, the harness generates `--warmup` untimed levels (own `warmup-i` seeds, both builders, all difficulties) and runs with tiered JIT disabled, so measured runs see fully compiled code. Parallel runs still share the CPU; use `--parallel 1` for the cleanest numbers.
+Timing in the report is generation time measured by the library (`GenerationStatus.Elapsed`): exact, without polling delay. The CSV also has `WallMs`, the harness' wall time including status polling (rounded up to the ~15 ms OS timer tick on Windows). Before measuring, the harness generates `--warmup` untimed levels in parallel (own `warmup-i` seeds, both builders, all difficulties) and runs with tiered JIT disabled, so measured runs see fully compiled code. Parallel runs still share the CPU; use `--parallel 1` for the cleanest numbers. The report's slowest-runs table has a Comment column with likely reasons: first run on a harness thread, JIT or garbage collection during the run (process-wide counters, so likely rather than proven), or a comparison with runs of the same builder and Size (heavy level vs. outlier worth a `dump`).

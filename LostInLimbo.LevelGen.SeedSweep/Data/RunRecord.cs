@@ -52,6 +52,21 @@ internal sealed class RunRecord
   /// (polling sleeps round up to the OS timer tick); kept for comparison.
   /// </summary>
   public double WallMs { get; set; }
+  /// <summary>
+  /// Position of this run among all runs (warm-up included) executed on its harness thread in
+  /// this process; 1 = the thread's first run.
+  /// </summary>
+  public int ThreadRunOrdinal { get; set; }
+  /// <summary>
+  /// Methods the JIT compiled while this run was generated. Process-wide: in parallel sweeps it
+  /// may include compilation triggered by concurrent runs.
+  /// </summary>
+  public long JitMethods { get; set; }
+  /// <summary>
+  /// Highest garbage-collection generation collected while this run was generated; -1 when none.
+  /// Process-wide, like <see cref="JitMethods"/>.
+  /// </summary>
+  public int GcGeneration { get; set; } = -1;
 
   #endregion
 

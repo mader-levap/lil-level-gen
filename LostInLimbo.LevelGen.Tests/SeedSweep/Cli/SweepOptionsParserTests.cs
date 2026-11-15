@@ -23,7 +23,7 @@ public sealed class SweepOptionsParserTests
       Assert.Equal(SweepOptions.DefaultRuns, result.Options.Runs);
       Assert.Equal(0, result.Options.DifficultyMin);
       Assert.Equal(PropMain.MaxDifficulty, result.Options.DifficultyMax);
-      Assert.Equal(42, result.Options.WarmupRuns);
+      Assert.Equal(420, result.Options.WarmupRuns);
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public sealed class SweepOptionsParserTests
 
       // Assert: Defaults spelled out, no output root when none is set.
       Assert.Equal(
-        "--runs 10000 --difficulty 0-20 --many-themes both --seed-prefix sweep --start-index 0 --determinism-every 25 --parallel 0 --timeout-seconds 20 --warmup 42",
+        "--runs 10000 --difficulty 0-20 --many-themes both --seed-prefix sweep --start-index 0 --determinism-every 25 --parallel 0 --timeout-seconds 20 --warmup 420",
         SweepOptionsParser.JoinArguments(args));
     }
 
@@ -150,7 +150,7 @@ public sealed class SweepOptionsParserTests
       var parsed = SweepOptionsParser.Parse(args);
 
       // Assert: Dump command first, indices and difficulty preserved.
-      Assert.Equal("dump 924 967 --difficulty 5 --many-themes both --seed-prefix sweep --timeout-seconds 20 --warmup 42", SweepOptionsParser.JoinArguments(args));
+      Assert.Equal("dump 924 967 --difficulty 5 --many-themes both --seed-prefix sweep --timeout-seconds 20 --warmup 420", SweepOptionsParser.JoinArguments(args));
       Assert.True(parsed.Success, string.Join("; ", parsed.Errors));
       Assert.Equal([924, 967], parsed.Options.DumpIndices);
     }

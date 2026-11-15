@@ -23,10 +23,13 @@ internal sealed record SweepOptions
   /// <summary>Default per-run timeout in seconds.</summary>
   public const int DefaultTimeoutSeconds = 20;
   /// <summary>
-  /// Default number of untimed warm-up runs: one full difficulty cycle with many themes off
-  /// and one with it on, which covers the code paths of both graph builders.
+  /// Default number of untimed warm-up runs: 20 difficulty cycles (420 runs), alternating many
+  /// themes off and on. Fewer runs (e.g. 42) left rare code paths uncompiled, so the first level
+  /// to hit them measured several ms of JIT; 420 removed that in measurements.
   /// </summary>
-  public const int DefaultWarmupRuns = 2 * (PropMain.MaxDifficulty + 1);
+  public const int DefaultWarmupRuns = WarmupCycles * (PropMain.MaxDifficulty + 1);
+  /// <summary>Difficulty cycles of the default warm-up.</summary>
+  private const int WarmupCycles = 20;
 
   /// <summary>
   /// Untimed runs generated before measuring, so measured runs see JIT-compiled code; 0 disables.

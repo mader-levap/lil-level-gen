@@ -91,7 +91,7 @@ internal static class Program
       : options.DumpIndices.Select(i => RunSpec.ForIndex(i, options)).ToList();
 
     // Warm up so the generation time shown for the dumped runs excludes JIT compilation.
-    var warmup = SweepRunner.WarmUp(options.WarmupRuns, TimeSpan.FromSeconds(options.TimeoutSeconds));
+    var warmup = SweepRunner.WarmUp(options.WarmupRuns, options.EffectiveParallelism, TimeSpan.FromSeconds(options.TimeoutSeconds));
     var text = new StringBuilder();
     var hasErrors = warmup.Any(r => r.Issues.Count > 0);
     foreach (var failed in warmup.Where(r => r.Issues.Count > 0))

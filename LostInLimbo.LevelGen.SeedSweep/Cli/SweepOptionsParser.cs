@@ -32,7 +32,7 @@ internal static class SweepOptionsParser
       --determinism-every N    Generate every Nth run twice and compare; 0 disables (default 25).
       --parallel N             Degree of parallelism; 0 = processor count (default 0).
       --timeout-seconds N      Per-run timeout (default 20).
-      --warmup N               Untimed warm-up runs before measuring; 0 disables (default 42).
+      --warmup N               Untimed warm-up runs before measuring; 0 disables (default 420).
       --out DIR                Output root (default <project>/TestResults).
       --text-seed S            dump only: dump this text seed instead of run indices.
       --help                   Show this text.
