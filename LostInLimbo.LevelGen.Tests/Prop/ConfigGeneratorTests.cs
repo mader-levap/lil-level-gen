@@ -115,7 +115,7 @@ public sealed class ConfigGeneratorTests
       Assert.Equal(16.201443f, config.General.Degeneration);
       Assert.Equal(6, config.Graph.Size);
       Assert.Equal(2, config.Graph.Connectivity);
-      Assert.Equal(1, config.Graph.Complexity);
+      Assert.Equal(2, config.Graph.Complexity);
       Assert.Equal(EnGraphBuilder.Linear, config.Graph.GraphBuilder.Builder);
       Assert.Equal(CnfGraphBuilderLinear.Default with
       {
@@ -192,7 +192,7 @@ public sealed class ConfigGeneratorTests
       var (sizeMin, sizeMax) = ConfigGenerator.ResolveSizeRange(difficulty);
       Assert.InRange(config.Graph.Size, sizeMin, sizeMax);
       Assert.InRange(config.Graph.Connectivity, 0, GraphResolverExpect.MaxConnectivity(config.Graph.Size, difficulty));
-      Assert.InRange(config.Graph.Complexity, 0, GraphResolverExpect.MaxComplexity(config.Graph.Size, difficulty));
+      Assert.InRange(config.Graph.Complexity, GraphResolverExpect.MinComplexity(config.Graph.Size, difficulty), GraphResolverExpect.MaxComplexity(config.Graph.Size, difficulty));
       Assert.InRange(config.Graph.ProcOpts.RelSecrets.Amount, 0, GraphResolverExpect.MaxSecretAmount(config.Graph.Size, difficulty));
       Assert.InRange(config.Graph.ProcOpts.NodeObjectives.GoalAmount, 1, GraphResolverExpect.MaxGoalAmount(config.Graph.Size, difficulty));
       Assert.InRange(config.Graph.ProcOpts.NodeObjectives.OptGoalAmount, 0, GraphResolverExpect.MaxOptGoalAmount(config.Graph.Size, difficulty));
@@ -402,7 +402,7 @@ public sealed class ConfigGeneratorTests
     /// <summary>Pinned graph connectivity for "mordor" at difficulty 3.</summary>
     private const int PinnedConnectivity = 1;
     /// <summary>Pinned graph complexity for "mordor" at difficulty 3.</summary>
-    private const int PinnedComplexity = 0;
+    private const int PinnedComplexity = 2;
     /// <summary>Pinned graph builder for "mordor" at difficulty 3.</summary>
     private const EnGraphBuilder PinnedBuilder = EnGraphBuilder.Linear;
     /// <summary>Pinned Linear builder options for "mordor" at difficulty 3.</summary>

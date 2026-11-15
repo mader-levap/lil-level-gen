@@ -105,9 +105,10 @@ public sealed class ConfigGeneratorHighDifficultyTests
     var maxConnectivity = GraphResolverExpect.MaxConnectivity(graph.Size, difficulty);
     if (graph.Connectivity < 0 || graph.Connectivity > maxConnectivity)
       violations.Add($"Connectivity {graph.Connectivity} outside [0, {maxConnectivity}]");
+    var minComplexity = GraphResolverExpect.MinComplexity(graph.Size, difficulty);
     var maxComplexity = GraphResolverExpect.MaxComplexity(graph.Size, difficulty);
-    if (graph.Complexity < 0 || graph.Complexity > maxComplexity)
-      violations.Add($"Complexity {graph.Complexity} outside [0, {maxComplexity}]");
+    if (graph.Complexity < minComplexity || graph.Complexity > maxComplexity)
+      violations.Add($"Complexity {graph.Complexity} outside [{minComplexity}, {maxComplexity}]");
     var maxSecretAmount = GraphResolverExpect.MaxSecretAmount(graph.Size, difficulty);
     if (graph.ProcOpts.RelSecrets.Amount < 0 || graph.ProcOpts.RelSecrets.Amount > maxSecretAmount)
       violations.Add($"RelSecrets.Amount {graph.ProcOpts.RelSecrets.Amount} outside [0, {maxSecretAmount}]");

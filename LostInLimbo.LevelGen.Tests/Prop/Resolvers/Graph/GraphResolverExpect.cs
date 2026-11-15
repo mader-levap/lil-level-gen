@@ -3,7 +3,7 @@ using LostInLimbo.LevelGen.Data.Prop;
 namespace LostInLimbo.LevelGen.Tests.Prop.Resolvers.Graph;
 
 /// <summary>
-/// Expected inclusive upper bounds of the graph resolver's connectivity and complexity draws.
+/// Expected inclusive bounds of the graph resolver's connectivity and complexity draws.
 /// Deliberately an independent copy of the documented formula, so a silent change of the
 /// resolver's scaling breaks the tests.
 /// </summary>
@@ -25,6 +25,19 @@ internal static class GraphResolverExpect
   public static int MaxComplexity(int size, int difficulty)
   {
     return Math.Min(Math.Max(0, size - 1), SqrtSizeBound(size, difficulty, 0.5, 1.5));
+  }
+
+  /// <summary>
+  /// Smallest complexity for a size and difficulty: 0 at difficulty 0, otherwise
+  /// <c>max(1, floor(sqrt(size) * 1.0 * t))</c>; never above <see cref="MaxComplexity"/>.
+  /// </summary>
+  public static int MinComplexity(int size, int difficulty)
+  {
+    if (difficulty == 0) return 0;
+
+    var t = (double)difficulty / PropMain.MaxDifficulty;
+    var low = Math.Max(1, (int)Math.Floor(Math.Sqrt(size) * 1.0 * t));
+    return Math.Min(low, MaxComplexity(size, difficulty));
   }
 
   /// <summary>

@@ -107,7 +107,7 @@ public sealed class ConfigGeneratorStressTests
       var (sizeMin, sizeMax) = ConfigGenerator.ResolveSizeRange(difficulty);
       Assert.InRange(graph.Size, sizeMin, sizeMax);
       Assert.InRange(graph.Connectivity, 0, GraphResolverExpect.MaxConnectivity(graph.Size, difficulty));
-      Assert.InRange(graph.Complexity, 0, GraphResolverExpect.MaxComplexity(graph.Size, difficulty));
+      Assert.InRange(graph.Complexity, GraphResolverExpect.MinComplexity(graph.Size, difficulty), GraphResolverExpect.MaxComplexity(graph.Size, difficulty));
       Assert.InRange(graph.ProcOpts.RelSecrets.Amount, 0, GraphResolverExpect.MaxSecretAmount(graph.Size, difficulty));
       Assert.InRange(graph.ProcOpts.NodeObjectives.GoalAmount, 1, GraphResolverExpect.MaxGoalAmount(graph.Size, difficulty));
       Assert.InRange(graph.ProcOpts.NodeObjectives.OptGoalAmount, 0, GraphResolverExpect.MaxOptGoalAmount(graph.Size, difficulty));

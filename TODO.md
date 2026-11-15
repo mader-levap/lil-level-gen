@@ -1,1 +1,1 @@
-- Min complexity needs to be adjusted so any difficulty above 0 has 1 as lower bound
+
