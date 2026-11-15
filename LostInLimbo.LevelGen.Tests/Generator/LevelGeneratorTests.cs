@@ -951,4 +951,87 @@ public sealed class LevelGeneratorTests
         Assert.True(observed[index] >= observed[index - 1], $"Completion decreased: {observed[index - 1]} -> {observed[index]}.");
     }
   }
+
+  /// <summary>Tests <see cref="GenerationStatus.Elapsed"/> as measured by the generator.</summary>
+  [Collection("LevelGeneratorTests")]
+  public sealed class ElapsedTests
+  {
+    /// <summary>Total placeholder sleep of <see cref="SleepyConfig"/>, in milliseconds.</summary>
+    private const int TotalSleepMs = 40;
+    /// <summary>Placeholder steps of <see cref="SleepyConfig"/>; divides <see cref="TotalSleepMs"/> evenly.</summary>
+    private const int Steps = 2;
+
+    /// <summary>Config whose map phase sleeps a known total, giving a lower bound for Elapsed.</summary>
+    private static CnfLevelGeneration SleepyConfig() => CnfLevelGeneration.Default with
+    {
+      Debug = new CnfDebug { PlaceholderSleep = TotalSleepMs, PlaceholderSteps = Steps },
+    };
+
+    [Fact]
+    public void Status_BeforeAnyRun_ElapsedIsZero()
+    {
+      // Arrange: Fresh store, nothing ran.
+      var statusStore = new GenerationStatusStore();
+
+      // Assert: No time reported.
+      Assert.Equal(TimeSpan.Zero, statusStore.Current.Elapsed);
+    }
+
+    [Fact]
+    public void Execute_FinishedRun_ReportsElapsedCoveringTheWork()
+    {
+      // Arrange: Run with a known placeholder sleep.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var generator = new LevelGenerator(EnRunKind.All, SleepyConfig(), statusStore);
+
+      // Act: Run to completion.
+      generator.Execute();
+
+      // Assert: Finished, and the elapsed time is at least the sleep the run performed.
+      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.True(statusStore.Current.Elapsed >= TimeSpan.FromMilliseconds(TotalSleepMs),
+        $"Elapsed {statusStore.Current.Elapsed.TotalMilliseconds} ms < {TotalSleepMs} ms.");
+    }
+
+    [Fact]
+    public void Execute_StoppedAtGraphPhase_ReportsPositiveElapsed()
+    {
+      // Arrange: Real prepass and graph only, as the seed sweep runs it.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var config = CnfLevelGeneration.Default with { Debug = new CnfDebug { EndAtPhase = EnPhase.Map } };
+      var generator = new LevelGenerator(EnRunKind.All, config, statusStore);
+
+      // Act: Run until the debug stop.
+      generator.Execute();
+
+      // Assert: Paused with measured time.
+      Assert.Equal(EnGenResult.Paused, statusStore.Current.Result);
+      Assert.True(statusStore.Current.Elapsed > TimeSpan.Zero);
+    }
+
+    [Fact]
+    public void Execute_AcrossPauseAndResume_ElapsedAccumulates()
+    {
+      // Arrange: First segment runs one step and pauses.
+      var statusStore = new GenerationStatusStore();
+      Assert.True(statusStore.TryBeginRun());
+      var generator = new LevelGenerator(EnRunKind.Step, SleepyConfig(), statusStore);
+      generator.Execute();
+      var afterFirst = statusStore.Current.Elapsed;
+
+      // Act: Resume the rest the way Resume does.
+      Assert.True(statusStore.TryBeginRun());
+      generator.SetRunKind(EnRunKind.All);
+      generator.Execute();
+
+      // Assert: Time grew over both segments and covers the whole sleep.
+      Assert.Equal(EnGenResult.Finished, statusStore.Current.Result);
+      Assert.True(afterFirst > TimeSpan.Zero);
+      Assert.True(statusStore.Current.Elapsed > afterFirst);
+      Assert.True(statusStore.Current.Elapsed >= TimeSpan.FromMilliseconds(TotalSleepMs),
+        $"Elapsed {statusStore.Current.Elapsed.TotalMilliseconds} ms < {TotalSleepMs} ms.");
+    }
+  }
 }

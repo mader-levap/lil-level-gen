@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="LostInLimbo.LevelGen/LostInLimbo.LevelGen.csproj" />
+  <Project Path="LostInLimbo.LevelGen.SeedSweep/LostInLimbo.LevelGen.SeedSweep.csproj" />
   <Project Path="LostInLimbo.LevelGen.Tests/LostInLimbo.LevelGen.Tests.csproj" />
 </Solution>

@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LostInLimbo.LevelGen\LostInLimbo.LevelGen.csproj" />
+    <!-- Unit tests of the seed sweep harness (parser, analyzer, runner). -->
+    <ProjectReference Include="..\LostInLimbo.LevelGen.SeedSweep\LostInLimbo.LevelGen.SeedSweep.csproj" />
   </ItemGroup>
 
 </Project>

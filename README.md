@@ -84,6 +84,13 @@ Notes:
 
 ## Testing
 
+### Standard
+
+Run in terminal:
+```bash
+dotnet test LostInLimbo.slnx
+```
+
 ### With coverage
 
 #### In Visual Studio Code
@@ -102,3 +109,39 @@ dotnet test LostInLimbo.slnx --collect:"XPlat Code Coverage" --settings coverlet
 ```
 
 It will generate report `coverage.cobertura.xml` in directory `LostInLimbo.LevelGen.Tests\TestResults\<guid>\`.
+
+### Seed sweep (mass generation)
+
+`LostInLimbo.LevelGen.SeedSweep` is a console harness, not part of `dotnet test`. It generates many levels up to the graph phase through the public API and checks each graph against its props and config. It reports hard errors, such as broken structure, impossible POIs, unreachable nodes, validator failures and non-deterministic reruns. It also reports suspicious results, such as obstacles that only lock secret passages, keys lying next to their door in the start node, and connectivity shortfalls.
+
+Run in terminal (Release is much faster):
+
+```bash
+dotnet run --project LostInLimbo.LevelGen.SeedSweep -c Release
+dotnet run --project LostInLimbo.LevelGen.SeedSweep -c Release -- --runs 2000 --difficulty 5-10
+dotnet run --project LostInLimbo.LevelGen.SeedSweep -c Release -- dump 924 967
+dotnet run --project LostInLimbo.LevelGen.SeedSweep -c Release -- dump --text-seed 148 --difficulty 5 --many-themes on
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--runs N` | 10000 | Number of runs. |
+| `--difficulty A[-B]` | 0-20 | Difficulty or range; runs cycle through it. |
+| `--many-themes on\|off\|both` | both | `both` alternates per difficulty cycle. |
+| `--seed-prefix P` | `sweep` | Text seed of run `i` is `P-i`. |
+| `--start-index N` | 0 | Index of the first run. |
+| `--determinism-every N` | 25 | Generate every Nth run twice and compare; 0 disables. |
+| `--parallel N` | CPU count | Degree of parallelism. |
+| `--timeout-seconds N` | 20 | Per-run timeout. |
+| `--out DIR` | `LostInLimbo.LevelGen.SeedSweep/TestResults` | Output root. |
+| `--help` | | Usage. |
+
+Run indices are reproducible: `dump <index>` with the same `--difficulty`, `--many-themes` and `--seed-prefix` options regenerates the exact run from a sweep report.
+
+Each invocation writes a new folder `LostInLimbo.LevelGen.SeedSweep/TestResults/<yyyyMMdd-HHmmss>/` (gitignored):
+- A sweep writes `report.md` (same Markdown as the console), `runs.csv` (one row per run with all metrics) and `options.md`.
+- A dump writes `dump-*.md` (and `options.md`).
+
+Exit codes: 0 = no errors, 1 = at least one run with errors, 2 = invalid arguments.
+
+Timing in the report is generation time measured by the library (`GenerationStatus.Elapsed`): exact, without polling delay. The CSV also has `WallMs`, the harness' wall time including status polling (rounded up to the ~15 ms OS timer tick on Windows). Parallel runs share the CPU, and the first run on each worker thread includes JIT warm-up; use `--parallel 1` for cleaner numbers.

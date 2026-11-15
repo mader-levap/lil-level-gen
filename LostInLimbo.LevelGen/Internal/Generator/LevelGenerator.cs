@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using LostInLimbo.LevelGen.Data.Config;
 using LostInLimbo.LevelGen.Data.Result;
@@ -69,6 +70,14 @@ internal sealed class LevelGenerator
   /// from the progress its predecessor reached.
   /// </summary>
   private float _completion;
+
+  /// <summary>
+  /// Processing time of this generator (see <see cref="GenerationStatus.Elapsed"/>). Started at
+  /// the beginning of <see cref="Execute"/> and stopped in <see cref="PublishTerminal"/>, so it
+  /// accumulates over resumed runs and skips paused time. Diagnostic only: it never influences
+  /// generated data. Worker-thread only; consecutive runs are ordered by the session's claim.
+  /// </summary>
+  private readonly Stopwatch _stopwatch = new();
 
   /// <summary>Total number of placeholder steps of this generator's configuration.</summary>
   private int TotalSteps => _config.Debug?.PlaceholderSteps ?? CnfDebug.DefaultPlaceholderSteps;
@@ -160,7 +169,7 @@ internal sealed class LevelGenerator
   private void PublishProgress(EnPhase phase, float phaseFraction)
   {
     _completion = GenerationProgress.Compute(phase, phaseFraction);
-    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running, Seed = Seed, Completion = _completion });
+    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running, Seed = Seed, Completion = _completion, Elapsed = _stopwatch.Elapsed });
   }
 
   /// <summary>
@@ -186,6 +195,8 @@ internal sealed class LevelGenerator
   /// </param>
   private void PublishTerminal(EnGenResult result, Exception? error = null, string? failureReason = null)
   {
+    // Stop first: the elapsed time covers generation, not the world copy below.
+    _stopwatch.Stop();
     lock (_pauseGate)
     {
       // Pause has precedence over cancellation only; Finished, ValidationError and Error
@@ -198,7 +209,7 @@ internal sealed class LevelGenerator
       var world = result is EnGenResult.Paused or EnGenResult.Finished or EnGenResult.ValidationError
         ? LilWorldCopy.Copy(_world)
         : null;
-      var status = new GenerationStatus { Result = result, Seed = Seed, Completion = _completion, Error = error, FailureReason = failureReason };
+      var status = new GenerationStatus { Result = result, Seed = Seed, Completion = _completion, Error = error, FailureReason = failureReason, Elapsed = _stopwatch.Elapsed };
       _statusStore.Publish(status, world);
     }
   }
@@ -242,8 +253,9 @@ internal sealed class LevelGenerator
   public void Execute(CancellationToken cancellationToken = default)
   {
     _validationFailureReason = null;
-    // A resumed run continues from the progress the previous run of this generator reached.
-    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running, Seed = Seed, Completion = _completion });
+    _stopwatch.Start();
+    // A resumed run continues from the progress (and elapsed time) the previous run of this generator reached.
+    _statusStore.Publish(new GenerationStatus { Result = EnGenResult.Running, Seed = Seed, Completion = _completion, Elapsed = _stopwatch.Elapsed });
     try
     {
       // First checkpoint: a token cancelled before the run got going ends it right away.

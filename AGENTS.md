@@ -45,20 +45,28 @@ You may use modern C# language syntax where the compiler supports it, but do not
 
 ```text
 lil-level-gen/
- ├─ LostInLimbo.slnx              - Solution for level generator and its tests.
- ├─ AGENTS.md                     - This file.
- ├─ README.md                     - Project notes.
- ├─ TODO.md                       - Current tasks.
+ ├─ LostInLimbo.slnx                - Solution for level generator and its tests.
+ ├─ AGENTS.md                       - This file.
+ ├─ README.md                       - Project notes.
+ ├─ TODO.md                         - Current tasks.
  ├─ LostInLimbo.LevelGen/
- │   ├─ Api/                      - Contains public API.
- │   ├─ Data/                     - Contains public data contracts.
- │   ├─ Docs/                     - Additional documentation as .md files.
- │   └─ Internal/                 - Contains internal code.
+ │   ├─ Api/                        - Contains public API.
+ │   ├─ Data/                       - Contains public data contracts.
+ │   ├─ Docs/                       - Additional documentation as .md files.
+ │   └─ Internal/                   - Contains internal code.
+ ├─ LostInLimbo.LevelGen.SeedSweep/ - Mass-generation harness (console app, net8.0).
+ │   ├─ Program.cs                  - Entry point only.
+ │   ├─ Cli/                        - Command-line parsing.
+ │   ├─ Data/                       - Options, run specs, run records.
+ │   ├─ Export/                     - Markdown/CSV output and result folders.
+ │   ├─ Runner/                     - Generation and graph analysis.
+ │   └─ TestResults/                - Sweep output, gitignored.
  └─ LostInLimbo.LevelGen.Tests/
 ```
 
 - `LostInLimbo.LevelGen` contains all generator code.
-- `LostInLimbo.LevelGen.Tests` contains unit and integration tests.
+- `LostInLimbo.LevelGen.Tests` contains unit and integration tests, including tests of the seed sweep harness (`SeedSweep/`).
+- `LostInLimbo.LevelGen.SeedSweep` generates many levels through the public API and reports errors and suspicious results. It may do file and console I/O (it is not generator code) and must use only the public library API.
 - Editor, Godot, Unity, and other engine-specific code must not be added to this library project.
 
 ## Basic commands
@@ -80,6 +88,13 @@ Run only tests:
 
 ```bash
 dotnet test LostInLimbo.LevelGen.Tests/LostInLimbo.LevelGen.Tests.csproj
+```
+
+Seed sweep: mass generation with error and suspicious-result report. It is not part of `dotnet test`; run it after generator changes that may shift graph statistics. See README.md for the options.
+
+```bash
+dotnet run --project LostInLimbo.LevelGen.SeedSweep -c Release
+dotnet run --project LostInLimbo.LevelGen.SeedSweep -c Release -- dump <index>
 ```
 
 Pack library (only when explicitly asked):

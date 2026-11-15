@@ -66,6 +66,26 @@ public sealed record GenerationStatus
   public float Completion { get; init; } = 0.0f;
 
   /// <summary>
+  /// Processing time the generator has spent on this run so far.
+  /// </summary>
+  /// <remarks>
+  /// <para>
+  /// Measured by the worker itself from the start of execution to its terminal state, so it is
+  /// exact (no polling delay of the consumer) and excludes the time needed to hand the world
+  /// over. Cumulative across <see cref="EnGenResult.Paused"/> and resume: time spent paused
+  /// between segments is not counted. While <see cref="EnGenResult.Running"/>, it is the time
+  /// up to the latest progress update.
+  /// </para>
+  /// <para>
+  /// Diagnostic only: it depends on the machine and its load, never influences generation and
+  /// is not part of the world, so determinism of generated data is unaffected.
+  /// <see cref="TimeSpan.Zero"/> for <see cref="EnGenResult.None"/> and for a run that failed
+  /// to launch.
+  /// </para>
+  /// </remarks>
+  public TimeSpan Elapsed { get; init; } = TimeSpan.Zero;
+
+  /// <summary>
   /// Exception that terminated generation.
   /// Invariant: non-<see langword="null"/> if and only if <see cref="Result"/> is <see cref="EnGenResult.Error"/>.
   /// Stays <see langword="null"/> for <see cref="EnGenResult.Cancelled"/>, which is a requested
