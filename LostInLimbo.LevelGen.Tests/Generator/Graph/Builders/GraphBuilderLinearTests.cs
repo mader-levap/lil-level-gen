@@ -437,6 +437,46 @@ public sealed class GraphBuilderLinearTests
     }
 
     [Fact]
+    public void Build_WithOtherTargetsLeft_NeverGuardsTheNodeAfterStart()
+    {
+      for (var seed = 0; seed < 100; seed++)
+      {
+        // Arrange/Act: Plain chain, a few obstacles; every other node still has room.
+        var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+        {
+          Size = 6,
+          Connectivity = 0,
+          Complexity = 3,
+          ProcOpts = GraphTestSupport.NoSecrets,
+        }, seed);
+        var positions = GraphAssertions.GetPositions(graph);
+
+        // Assert: The cut right after the start would force the key into the start node next
+        // to its door, so it is never guarded while another cut has room.
+        foreach (var (solution, cut) in GraphAssertions.GetGuardedNodes(graph, positions))
+          Assert.True(cut > 1, $"Solution {solution} guards the node after the start (seed {seed}).");
+      }
+    }
+
+    [Fact]
+    public void Build_WithOnlyTheNodeAfterStartLeft_StillGuardsIt()
+    {
+      // Arrange/Act: Two nodes: the cut after the start is the only one there is.
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      {
+        Size = 2,
+        Connectivity = 0,
+        Complexity = 1,
+        ProcOpts = GraphTestSupport.NoSecrets,
+      });
+
+      // Assert: Complexity is not wasted; the last resort is used.
+      Assert.True(result.Success);
+      Assert.Single(GraphTestSupport.GetPois(graph, EnPoiType.Solution));
+      GraphTestAssert.AssertBeatable(graph);
+    }
+
+    [Fact]
     public void Build_WithObstacles_FavorsSolutionPlacementNearGuardedPassage()
     {
       // Act: Collect every solution's distance to its guarded passage over many seeds.

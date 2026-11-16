@@ -40,7 +40,8 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 /// and the node <see cref="LilNode.MaxEdges"/> hard cap.</item>
 /// <item>Create obstacles for relationships up to complexity and
 /// <see cref="CnfGraphBuilderLinear.MaxConditionPerRel"/>: one shared solution condition on every
-/// relationship crossing the cut in front of a chosen node (skips over it included, except for
+/// relationship crossing the cut in front of a chosen node (the node after the start only as a
+/// last resort; skips over it included, except for
 /// rare bypasses by <see cref="CnfGraphBuilderLinear.ChanceObstacleBypass"/>), solution most likely
 /// near its guarded passage within <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/>.</item>
 /// <item>Processors: secret nodes, objective POIs, node relative size and grouping.</item>
@@ -336,7 +337,8 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// <para>One obstacle per iteration, up to <paramref name="complexity"/> iterations:</para>
   /// <list type="number">
   /// <item>Among all nodes but the first whose cut still has capacity (see
-  /// <see cref="FindObstacleTargets"/>), one target is picked uniformly.</item>
+  /// <see cref="FindObstacleTargets"/>), one target is picked uniformly. The node right after
+  /// the start is a last resort (<see cref="DropNodeAfterStartUnlessLast"/>).</item>
   /// <item>A new solution POI is created and placed by <see cref="PickSolutionNode"/>, so it
   /// is most likely right before the guarded passage and falls off with distance up to
   /// <see cref="CnfGraphBuilderLinear.MaxConditionDistance"/>.</item>
@@ -365,6 +367,7 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
     {
       var targets = FindObstacleTargets(size, chainIndices);
       if (targets.Count == 0) break;
+      DropNodeAfterStartUnlessLast(targets);
 
       var target = targets[Random.NextInt(targets.Count)];
 
@@ -395,6 +398,23 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
 
       added++;
     }
+  }
+
+  /// <summary>Chain index of the node right after the start node.</summary>
+  private const int NodeAfterStart = 1;
+
+  /// <summary>
+  /// Removes the node right after the start from the targets while any other target is left.
+  /// </summary>
+  /// <remarks>
+  /// Its cut leaves only the start node in front of the guarded passage, so the solution would
+  /// always lie in the start node next to its own door - a lock without a search. It stays
+  /// available as the last resort, so Complexity is not wasted on tiny chains.
+  /// </remarks>
+  /// <param name="targets">Target chain indices in ascending order; not empty. Changed in place.</param>
+  private static void DropNodeAfterStartUnlessLast(List<int> targets)
+  {
+    if (targets.Count > 1 && targets[0] == NodeAfterStart) targets.RemoveAt(0);
   }
 
   /// <summary>
