@@ -1143,7 +1143,7 @@ public sealed class GraphBuilderLinearTests
       var builderConfig = CnfGraphBuilder.Default with
       {
         Builder = EnGraphBuilder.Linear,
-        CnfLinear = CnfGraphBuilderLinear.Default with { MaxEdges = 3, MaxExtraDegree = 4 },
+        CnfLinear = CnfGraphBuilderLinear.Default with { MaxEdges = 3, MaxExtraDegree = 4, ChanceReserveSecretSlots = 1f },
       };
       var procOpts = CnfProcOpt.Default with { RelSecrets = new CnfProcRelSecretsOpt { Amount = secretAmount } };
 
@@ -1161,6 +1161,96 @@ public sealed class GraphBuilderLinearTests
         Assert.True(result.Success);
         Assert.Equal(secretAmount, graph.Nodes.Count(node => node.Secret));
       }
+    }
+
+    [Fact]
+    public void Build_WithReserveChanceZero_BuildsSameExtrasAsWithoutSecrets()
+    {
+      for (var seed = 0; seed < 20; seed++)
+      {
+        // Act: Saturating extras with and without requested secrets, reservation switched off.
+        var withSecrets = BuildSaturated(seed, 0f, secretAmount: 2);
+        var withoutSecrets = BuildSaturated(seed, 0f, secretAmount: 0);
+
+        // Assert: Secrets do not hold back any ordinary relationship (behaviour before reservation).
+        Assert.Equal(OrdinaryEdgeSignature(withoutSecrets), OrdinaryEdgeSignature(withSecrets));
+      }
+    }
+
+    [Fact]
+    public void Build_WithoutSaturation_DrawsNoReserveRoll()
+    {
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with { MaxEdges = 6 },
+      };
+
+      for (var seed = 0; seed < 20; seed++)
+      {
+        // Act: Few extras and roomy caps, so slots never run short; vary only the chance.
+        var signatures = new[] { 0f, 0.5f, 1f }.Select(chance =>
+        {
+          var config = builderConfig with { CnfLinear = builderConfig.CnfLinear with { ChanceReserveSecretSlots = chance } };
+          var (_, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+          {
+            Size = 10,
+            Connectivity = 3,
+            ProcOpts = CnfProcOpt.Default with { RelSecrets = new CnfProcRelSecretsOpt { Amount = 2 } },
+          }, seed, config);
+          return string.Join(";", graph.Edges.Select(edge => $"{edge.From}-{edge.To}-{edge.Secret}"));
+        }).ToList();
+
+        // Assert: No roll happened, so all three graphs are identical.
+        Assert.Equal(signatures[0], signatures[1]);
+        Assert.Equal(signatures[0], signatures[2]);
+      }
+    }
+
+    [Fact]
+    public void Build_WithReserveChanceHalf_SometimesReserves()
+    {
+      // Act: Saturating extras with secrets over many seeds.
+      var secretCounts = Enumerable.Range(0, 60)
+        .Select(seed => BuildSaturated(seed, 0.5f, secretAmount: 2).Nodes.Count(node => node.Secret))
+        .ToList();
+
+      // Assert: Some runs reserved (all secrets placed), others did not (secrets short).
+      Assert.Contains(2, secretCounts);
+      Assert.Contains(secretCounts, count => count < 2);
+    }
+
+    /// <summary>Builds a Linear graph whose extras fill the low hard cap of 3.</summary>
+    private static LilGraph BuildSaturated(int seed, float reserveChance, int secretAmount)
+    {
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with
+        {
+          MaxEdges = 3,
+          MaxExtraDegree = 4,
+          ChanceReserveSecretSlots = reserveChance,
+        },
+      };
+      var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+      {
+        Size = 12,
+        Connectivity = 100,
+        ProcOpts = CnfProcOpt.Default with { RelSecrets = new CnfProcRelSecretsOpt { Amount = secretAmount } },
+      }, seed, builderConfig);
+      Assert.True(result.Success);
+      return graph;
+    }
+
+    /// <summary>Ordinary relationships as sorted node-index pairs, independent of identifiers.</summary>
+    private static string OrdinaryEdgeSignature(LilGraph graph)
+    {
+      var index = graph.Nodes.Where(node => !node.Secret).Select((node, i) => (node.Id, i)).ToDictionary(p => p.Id, p => p.i);
+      return string.Join(";", graph.Edges
+        .Where(edge => !edge.Secret)
+        .Select(edge => (Math.Min(index[edge.From], index[edge.To]), Math.Max(index[edge.From], index[edge.To])))
+        .OrderBy(pair => pair.Item1).ThenBy(pair => pair.Item2));
     }
 
     [Fact]
@@ -1461,6 +1551,27 @@ public sealed class GraphBuilderLinearTests
       Assert.Equal(nameof(CnfGraphBuilderLinear.ChanceObstacleBypass), ex.ParamName);
     }
 
+    [Theory]
+    [InlineData(-0.1f)]
+    [InlineData(1.1f)]
+    [InlineData(float.NaN)]
+    public void Validate_ChanceReserveSecretSlotsOutOfRange_ThrowsArgumentOutOfRange(float chance)
+    {
+      // Arrange: The reservation chance must be a probability.
+      var config = CnfGraphBuilderLinear.Default with { ChanceReserveSecretSlots = chance };
+
+      // Assert: Validation rejects the value.
+      var ex = Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+      Assert.Equal(nameof(CnfGraphBuilderLinear.ChanceReserveSecretSlots), ex.ParamName);
+    }
+
+    [Fact]
+    public void Default_ChanceReserveSecretSlots_IsHalf()
+    {
+      // Assert: Reservation is a coin flip by default.
+      Assert.Equal(0.5f, CnfGraphBuilderLinear.Default.ChanceReserveSecretSlots);
+    }
+
     [Fact]
     public void Validate_MinimalBoundaryValues_DoesNotThrow()
     {
@@ -1472,6 +1583,7 @@ public sealed class GraphBuilderLinearTests
         MaxConditionPerRel = 1,
         MaxConditionDistance = 0,
         MaxSkipDistance = 0,
+        ChanceReserveSecretSlots = 0f,
       };
 
       // Assert: The boundary values are inside the allowed ranges.

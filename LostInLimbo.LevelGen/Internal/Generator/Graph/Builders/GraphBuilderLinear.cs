@@ -158,8 +158,10 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// silently - connectivity is a soft constraint. At most one extra relationship per node
   /// pair, so an adjacent pair holds at most two passages (skeleton plus extra) and a
   /// skipping pair at most one. No self-loops by construction.</para>
-  /// <para>A relationship is only added while a free slot stays for every requested secret
-  /// node (<see cref="KeepsSecretHosts"/>), so the secrets processor finds hosts.</para>
+  /// <para>When the next relationship would use a slot that a requested secret node needs
+  /// (<see cref="KeepsSecretHosts"/>), one roll with <see cref="CnfGraphBuilderLinear.ChanceReserveSecretSlots"/>
+  /// decides: the pass ends here and the secrets processor finds hosts, or reservation is dropped
+  /// for this graph and extras fill the slots. Graphs that never run short draw no roll.</para>
   /// </remarks>
   /// <param name="connectivity">Requested number of extra relationships, from <c>CnfGraph.Connectivity</c>.</param>
   /// <param name="nodeIds">Node identifiers in chain order.</param>
@@ -179,24 +181,31 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
 
     var size = extraOutDegrees.Length;
     var secretHosts = Config.Graph.ProcOpts.RelSecrets.Amount;
+    var reservationDecided = false;
     var added = 0;
     while (added < connectivity)
     {
       // Find all sources that are not full and have somewhere to link to.
-      var freeSlots = CountFreeSlots(degrees);
       var sources = new List<int>();
       for (var from = 0; from < size - 1; from++)
       {
         if (extraOutDegrees[from] >= _config.MaxExtraDegree) continue;
         if (degrees[from] >= _config.MaxEdges) continue;
-        if (HasEligibleTarget(from, degrees, extraInDegrees, extraPairs, size, freeSlots, secretHosts)) sources.Add(from);
+        if (HasEligibleTarget(from, degrees, extraInDegrees, extraPairs, size)) sources.Add(from);
       }
 
       // No source with an eligible target remains; excess connectivity is ignored.
       if (sources.Count == 0) break;
 
+      // Slots run short: roll once whether the rest is kept for secrets (pass ends) or not.
+      if (!reservationDecided && !KeepsSecretHosts(CountFreeSlots(degrees), secretHosts))
+      {
+        reservationDecided = true;
+        if (Random.NextBool(_config.ChanceReserveSecretSlots)) break;
+      }
+
       var source = sources[Random.NextInt(sources.Count)];
-      var target = PickTarget(source, degrees, extraInDegrees, extraPairs, size, freeSlots, secretHosts);
+      var target = PickTarget(source, degrees, extraInDegrees, extraPairs, size);
 
       AddEdge(source, target, nodeIds, degrees, ExtraPassage);
       extraOutDegrees[source]++;
@@ -215,10 +224,8 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// <param name="extraInDegrees">Extra relationships per target node.</param>
   /// <param name="extraPairs">Pairs that already carry an extra relationship.</param>
   /// <param name="size">Total number of nodes.</param>
-  /// <param name="freeSlots">Free relationship slots of all nodes, see <see cref="CountFreeSlots"/>.</param>
-  /// <param name="secretHosts">Nodes that must keep a free slot for secrets, see <see cref="KeepsSecretHosts"/>.</param>
   /// <returns>True when at least one target within the skip window is eligible.</returns>
-  private bool HasEligibleTarget(int from, int[] degrees, int[] extraInDegrees, bool[,] extraPairs, int size, int freeSlots, int secretHosts)
+  private bool HasEligibleTarget(int from, int[] degrees, int[] extraInDegrees, bool[,] extraPairs, int size)
   {
     var lastTarget = Math.Min(from + _config.MaxSkipDistance + 1, size - 1);
     for (var to = from + 1; to <= lastTarget; to++)
@@ -226,7 +233,6 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
       if (extraPairs[from, to]) continue;
       if (extraInDegrees[to] >= _config.MaxExtraDegree) continue;
       if (degrees[to] >= _config.MaxEdges) continue;
-      if (!KeepsSecretHosts(freeSlots, secretHosts)) continue;
       return true;
     }
 
@@ -254,10 +260,10 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// from <c>ProcRelSecrets</c>; each secret needs one slot on its host.
   /// </summary>
   /// <remarks>
-  /// An extra relationship uses one slot on each endpoint. Without this check, excessive
+  /// An extra relationship uses one slot on each endpoint. Without reservation, excessive
   /// Connectivity fills every node to its cap and the secrets pass finds no host. Slots, not
-  /// nodes, are counted: a node with two free slots can host two secrets. Bites only when the
-  /// slots are nearly used up anyway.
+  /// nodes, are counted: a node with two free slots can host two secrets. With 0 secrets it
+  /// always holds.
   /// </remarks>
   /// <param name="freeSlots">Free slots of all nodes now.</param>
   /// <param name="secretHosts">Requested number of secret nodes; 0 reserves nothing.</param>
@@ -280,12 +286,10 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
   /// <param name="extraInDegrees">Extra relationships per target node.</param>
   /// <param name="extraPairs">Pairs that already carry an extra relationship.</param>
   /// <param name="size">Total number of nodes.</param>
-  /// <param name="freeSlots">Free relationship slots of all nodes, see <see cref="CountFreeSlots"/>.</param>
-  /// <param name="secretHosts">Nodes that must keep a free slot for secrets, see <see cref="KeepsSecretHosts"/>.</param>
   /// <returns>Index of the chosen target node.</returns>
   /// <exception cref="InvalidOperationException">No eligible target remains; unreachable while
   /// <see cref="HasEligibleTarget"/> agreed that one exists.</exception>
-  private int PickTarget(int from, int[] degrees, int[] extraInDegrees, bool[,] extraPairs, int size, int freeSlots, int secretHosts)
+  private int PickTarget(int from, int[] degrees, int[] extraInDegrees, bool[,] extraPairs, int size)
   {
     var lastTarget = Math.Min(from + _config.MaxSkipDistance + 1, size - 1);
     var totalWeight = 0;
@@ -294,7 +298,6 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
       if (extraPairs[from, to]) continue;
       if (extraInDegrees[to] >= _config.MaxExtraDegree) continue;
       if (degrees[to] >= _config.MaxEdges) continue;
-      if (!KeepsSecretHosts(freeSlots, secretHosts)) continue;
       totalWeight += _config.MaxSkipDistance + 1 - (to - from - 1);
     }
 
@@ -308,7 +311,6 @@ internal sealed class GraphBuilderLinear(CnfGraphBuilder cnfGraphBuilder) : AGra
       if (extraPairs[from, to]) continue;
       if (extraInDegrees[to] >= _config.MaxExtraDegree) continue;
       if (degrees[to] >= _config.MaxEdges) continue;
-      if (!KeepsSecretHosts(freeSlots, secretHosts)) continue;
       roll -= _config.MaxSkipDistance + 1 - (to - from - 1);
       if (roll < 0) return to;
     }

@@ -48,6 +48,14 @@ public sealed record CnfGraphBuilderLinear
   /// </summary>
   public float ChanceObstacleBypass { get; init; } = 0.05f;
 
+  /// <summary>
+  /// Chance (0 to 1) that the extra-relationship pass keeps a free slot under
+  /// <see cref="MaxEdges"/> for every requested secret node. Rolled once per graph, and only
+  /// when the free slots run short (another extra relationship would use a slot a secret
+  /// needs); otherwise extra relationships take priority and secrets may find no host.
+  /// </summary>
+  public float ChanceReserveSecretSlots { get; init; } = 0.5f;
+
   // Helpers.
 
   /// <summary>
@@ -68,5 +76,7 @@ public sealed record CnfGraphBuilderLinear
       throw new ArgumentOutOfRangeException(nameof(MaxSkipDistance), MaxSkipDistance, "MaxSkipDistance must be at least 0.");
     if (float.IsNaN(ChanceObstacleBypass) || ChanceObstacleBypass < 0f || ChanceObstacleBypass > 1f)
       throw new ArgumentOutOfRangeException(nameof(ChanceObstacleBypass), ChanceObstacleBypass, "ChanceObstacleBypass must be a number between 0 and 1.");
+    if (float.IsNaN(ChanceReserveSecretSlots) || ChanceReserveSecretSlots < 0f || ChanceReserveSecretSlots > 1f)
+      throw new ArgumentOutOfRangeException(nameof(ChanceReserveSecretSlots), ChanceReserveSecretSlots, "ChanceReserveSecretSlots must be a number between 0 and 1.");
   }
 }
