@@ -23,12 +23,14 @@ public sealed record PropMain
   /// <summary>Maximum allowed difficulty.</summary>
   public const int MaxDifficulty = 20;
 
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static PropMain Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// Schema version of this configuration. Increment when the JSON format changes in a way that
@@ -55,7 +57,9 @@ public sealed record PropMain
   /// <summary>If true and possible, map will use different themes.</summary>
   public bool ManyThemes { get; init; } = false;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Validates the invariants of these properties.
@@ -75,4 +79,6 @@ public sealed record PropMain
     // Validate all sections.
     // PLACEHOLDER
   }
+
+  #endregion
 }

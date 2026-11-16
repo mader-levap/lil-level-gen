@@ -17,7 +17,7 @@ public sealed record CnfProcRelSecretsOpt
   /// <summary>Maximum allowed amount - keeps generation cost bounded.</summary>
   public const int MaxAmount = 110;
 
-  //
+  #region Defaults
 
   /// <summary>
   /// Default instance: one secret node and a ten percent chance of secret-in-secret
@@ -28,6 +28,10 @@ public sealed record CnfProcRelSecretsOpt
     Amount = 1,
     ChanceSecretInSecret = 0.1f,
   };
+
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// Number of secret nodes to append; 0 disables the processor. Must not be negative. The hard cap is <see cref="MaxAmount"/>.
@@ -85,7 +89,9 @@ public sealed record CnfProcRelSecretsOpt
   /// </summary>
   public int MaxExitDistance { get; init; } = 3;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used for generation.
@@ -111,4 +117,6 @@ public sealed record CnfProcRelSecretsOpt
     if (MaxExitDistance < 1)
       throw new ArgumentOutOfRangeException(nameof(MaxExitDistance), MaxExitDistance, "MaxExitDistance must be at least 1.");
   }
+
+  #endregion
 }

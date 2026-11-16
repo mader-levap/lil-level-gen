@@ -17,12 +17,14 @@ public sealed record CnfDebug
   /// <summary>Default number of steps the placeholder generation loop executes.</summary>
   public const int DefaultPlaceholderSteps = 10;
 
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfDebug Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// If true, throw an exception already at the start.
@@ -74,7 +76,9 @@ public sealed record CnfDebug
   /// </summary>
   public int PlaceholderSteps { get; init; } = DefaultPlaceholderSteps;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used.
@@ -91,4 +95,6 @@ public sealed record CnfDebug
     if (EndAtPhase is { } endAtPhase && !Enum.IsDefined(typeof(EnPhase), endAtPhase))
       throw new ArgumentOutOfRangeException(nameof(EndAtPhase), endAtPhase, "End-at phase must be a defined phase or null.");
   }
+
+  #endregion
 }

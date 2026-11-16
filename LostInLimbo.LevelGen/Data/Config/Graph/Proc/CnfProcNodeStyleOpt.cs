@@ -21,7 +21,7 @@ public sealed record CnfProcNodeStyleOpt
   /// </summary>
   public int GroupCount { get; init; } = 3;
 
-  // Helpers.
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used for generation.
@@ -32,4 +32,6 @@ public sealed record CnfProcNodeStyleOpt
     if (GroupCount < 1)
       throw new ArgumentOutOfRangeException(nameof(GroupCount), GroupCount, "GroupCount must be at least 1.");
   }
+
+  #endregion
 }

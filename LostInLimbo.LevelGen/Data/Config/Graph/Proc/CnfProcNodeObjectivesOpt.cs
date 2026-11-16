@@ -40,6 +40,8 @@ public sealed record CnfProcNodeObjectivesOpt
     WeightStartExitPoi = 1,
   };
 
+  #region Basic options
+
   /// <summary>
   /// Number of mandatory goal POIs to place; 0 disables mandatory goals. Must not be
   /// negative.
@@ -51,6 +53,10 @@ public sealed record CnfProcNodeObjectivesOpt
   /// negative.
   /// </summary>
   public int OptGoalAmount { get; init; } = 1;
+
+  #endregion
+
+  #region Knobs
 
   /// <summary>
   /// Relative pick weight of an eligible node holding no POI. Must be at least 1.
@@ -69,7 +75,9 @@ public sealed record CnfProcNodeObjectivesOpt
   /// </summary>
   public int WeightStartExitPoi { get; init; } = 1;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used for generation.
@@ -88,4 +96,6 @@ public sealed record CnfProcNodeObjectivesOpt
     if (WeightStartExitPoi < 1)
       throw new ArgumentOutOfRangeException(nameof(WeightStartExitPoi), WeightStartExitPoi, "WeightStartExitPoi must be at least 1.");
   }
+
+  #endregion
 }

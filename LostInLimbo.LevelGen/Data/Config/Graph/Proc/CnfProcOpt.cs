@@ -11,12 +11,14 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 /// </remarks>
 public sealed record CnfProcOpt
 {
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfProcOpt Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>Options of the secret-nodes processor.</summary>
   public CnfProcRelSecretsOpt RelSecrets { get; init; } = CnfProcRelSecretsOpt.Default;
@@ -33,7 +35,9 @@ public sealed record CnfProcOpt
   /// <summary>Options of the node-grouping processor.</summary>
   public CnfProcNodeStyleOpt NodeStyle { get; init; } = CnfProcNodeStyleOpt.Default;
 
-  //  Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used for generation.
@@ -60,4 +64,6 @@ public sealed record CnfProcOpt
     NodeRelSize.Validate();
     NodeStyle.Validate();
   }
+
+  #endregion
 }

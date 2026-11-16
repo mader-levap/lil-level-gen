@@ -7,12 +7,14 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 /// </summary>
 public sealed record CnfGraphBuilder
 {
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfGraphBuilder Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// Graph builder to use.
@@ -56,4 +58,6 @@ public sealed record CnfGraphBuilder
         break;
     }
   }
+
+  #endregion
 }

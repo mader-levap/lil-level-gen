@@ -6,7 +6,7 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 /// </summary>
 public sealed record CnfValidGraphOpt
 {
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfValidGraphOpt Default { get; } = new();
@@ -14,7 +14,9 @@ public sealed record CnfValidGraphOpt
   /// <summary>Default with validation enabled.</summary>
   public static CnfValidGraphOpt DefEnabled { get; } = Default with { Enabled = true };
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// If true, perform graph validation when graph generation is finished.
@@ -29,7 +31,9 @@ public sealed record CnfValidGraphOpt
   /// </summary>
   public bool AllowOneWayDeadEnds { get; init; } = true;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that these options can be used for validation. Every combination of the current
@@ -38,4 +42,6 @@ public sealed record CnfValidGraphOpt
   public void Validate()
   {
   }
+
+  #endregion
 }

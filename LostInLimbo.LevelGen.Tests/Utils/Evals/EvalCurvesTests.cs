@@ -107,7 +107,7 @@ public sealed class EvalCurvesTests
       Assert.True(edgeCount > 0, "No values clamped to the range edges.");
     }
 
-    // Exceptions.
+    #region Exceptions
 
     [Fact]
     public void Gaussian_WithFromGreaterThanTo_ThrowsArgumentException()
@@ -117,5 +117,7 @@ public sealed class EvalCurvesTests
         () => EvalCurves.Gaussian(new SeededRandom(7), 10, 0));
       Assert.Equal("from", exception.ParamName);
     }
+
+    #endregion
   }
 }

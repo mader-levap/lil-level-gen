@@ -24,12 +24,14 @@ public sealed record CnfLevelGeneration
   /// <summary>Version of the configuration format currently written by the serializer.</summary>
   public const int CurrentConfigVersion = 1;
 
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfLevelGeneration Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// Schema version of this configuration. Increment when the JSON format changes in a way that
@@ -52,7 +54,9 @@ public sealed record CnfLevelGeneration
   /// <summary>Debug configuration. Ignored if null.</summary>
   public CnfDebug? Debug { get; init; } = null;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Validates the invariants of this configuration and its general, graph and debug sections.
@@ -80,4 +84,6 @@ public sealed record CnfLevelGeneration
     Map.Validate();
     Debug?.Validate();
   }
+
+  #endregion
 }

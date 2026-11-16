@@ -9,12 +9,14 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 /// </summary>
 public sealed record CnfGraphBuilderLinear
 {
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfGraphBuilderLinear Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// Maximum number of relationships a node may have, counting skeleton and extra
@@ -56,7 +58,9 @@ public sealed record CnfGraphBuilderLinear
   /// </summary>
   public float ChanceReserveSecretSlots { get; init; } = 0.5f;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used for generation.
@@ -79,4 +83,6 @@ public sealed record CnfGraphBuilderLinear
     if (float.IsNaN(ChanceReserveSecretSlots) || ChanceReserveSecretSlots < 0f || ChanceReserveSecretSlots > 1f)
       throw new ArgumentOutOfRangeException(nameof(ChanceReserveSecretSlots), ChanceReserveSecretSlots, "ChanceReserveSecretSlots must be a number between 0 and 1.");
   }
+
+  #endregion
 }

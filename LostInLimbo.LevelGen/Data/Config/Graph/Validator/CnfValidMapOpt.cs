@@ -5,7 +5,7 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph.Validator;
 /// </summary>
 public sealed record CnfValidMapOpt
 {
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfValidMapOpt Default { get; } = new();
@@ -13,14 +13,18 @@ public sealed record CnfValidMapOpt
   /// <summary>Default with validation enabled.</summary>
   public static CnfValidMapOpt DefEnabled { get; } = Default with { Enabled = true };
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// If true, perform map validation when map generation is finished.
   /// </summary>
   public bool Enabled { get; init; } = false;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that these options can be used for validation. Every value of the current flag is
@@ -29,4 +33,6 @@ public sealed record CnfValidMapOpt
   public void Validate()
   {
   }
+
+  #endregion
 }

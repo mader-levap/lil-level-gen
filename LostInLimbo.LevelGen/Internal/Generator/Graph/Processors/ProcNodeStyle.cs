@@ -136,9 +136,7 @@ internal sealed class ProcNodeStyle
     }
   }
 
-  //
-  // Internals
-  //
+  #region Internals
 
   /// <summary>
   /// Runs growth cycles until a full cycle over all groups produces no assignment.
@@ -397,4 +395,6 @@ internal sealed class ProcNodeStyle
     counts[groupCount - 1] = nodeCount - previous;
     return counts;
   }
+
+  #endregion
 }

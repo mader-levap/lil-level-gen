@@ -95,7 +95,7 @@ public sealed record CnfProcNodeRelSizeOpt
     return ComputeStepValues();
   }
 
-  // Helpers.
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used for generation.
@@ -143,9 +143,9 @@ public sealed record CnfProcNodeRelSizeOpt
     }
   }
 
-  //
-  // Internals
-  //
+  #endregion
+
+  #region Internals
 
   /// <summary>
   /// Largest float strictly below 2^31: rounding it (and anything below) can never leave
@@ -189,4 +189,6 @@ public sealed record CnfProcNodeRelSizeOpt
 
     return values;
   }
+
+  #endregion
 }

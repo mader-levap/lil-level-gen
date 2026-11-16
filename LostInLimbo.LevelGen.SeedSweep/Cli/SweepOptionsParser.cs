@@ -154,9 +154,7 @@ internal static class SweepOptionsParser
       a.Length == 0 || a.Any(ch => char.IsWhiteSpace(ch) || ch == '"') ? $"\"{a.Replace("\"", "\\\"")}\"" : a));
   }
 
-  //
-  // Internals
-  //
+  #region Internals
 
   /// <summary>Formats an integer with the invariant culture.</summary>
   private static string Invariant(int value) => value.ToString(CultureInfo.InvariantCulture);
@@ -273,4 +271,6 @@ internal static class SweepOptionsParser
   {
     return int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value);
   }
+
+  #endregion
 }

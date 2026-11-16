@@ -127,7 +127,7 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     };
   }
 
-  // Field resolvers.
+  #region Field resolvers
 
   /// <summary>
   /// Resolve connectivity of the graph (amount of extra relationships), drawn uniformly from
@@ -229,7 +229,9 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     return (int)Math.Floor(Math.Sqrt(_propData.Size) * difficultyFactor * difficultyShare);
   }
 
-  // Graph builder.
+  #endregion
+
+  #region Graph builder
 
   /// <summary>
   /// Resolve graph builder and its options.
@@ -257,7 +259,9 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     return EligibleBuilders[_random.NextInt(EligibleBuilders.Length)];
   }
 
-  // Processor options.
+  #endregion
+
+  #region Processor options
 
   /// <summary>
   /// Resolve processor options.
@@ -275,7 +279,9 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     };
   }
 
-  // Processors.
+  #endregion
+
+  #region Processors
 
   /// <summary>
   /// Resolve secrets options. The amount is drawn uniformly from <see cref="MinSecretAmount"/>
@@ -349,7 +355,9 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
     };
   }
 
-  // Validator options.
+  #endregion
+
+  #region Validator options
 
   /// <summary>
   /// Resolve validator options.
@@ -363,4 +371,6 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
       AllowOneWayDeadEnds = false,
     };
   }
+
+  #endregion
 }

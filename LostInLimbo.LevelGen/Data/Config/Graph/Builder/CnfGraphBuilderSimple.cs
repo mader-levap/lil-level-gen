@@ -7,12 +7,14 @@ namespace LostInLimbo.LevelGen.Data.Config.Graph.Builder;
 /// </summary>
 public sealed record CnfGraphBuilderSimple
 {
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfGraphBuilderSimple Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// Chance that a given relationship is a chokepoint (only one physical passage allowed for map generation).
@@ -31,7 +33,9 @@ public sealed record CnfGraphBuilderSimple
   /// </summary>
   public int MaxExtraDegreeStar { get; init; } = 7;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used for generation.
@@ -46,4 +50,6 @@ public sealed record CnfGraphBuilderSimple
     if (MaxExtraDegreeStar < 2)
       throw new ArgumentOutOfRangeException(nameof(MaxExtraDegreeStar), MaxExtraDegreeStar, "MaxExtraDegreeStar must be at least 2.");
   }
+
+  #endregion
 }

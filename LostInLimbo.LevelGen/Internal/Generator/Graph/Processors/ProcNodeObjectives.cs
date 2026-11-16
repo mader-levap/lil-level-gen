@@ -100,9 +100,7 @@ internal sealed class ProcNodeObjectives
     PlacePois(EnPoiType.OptionalGoal, _options.OptGoalAmount, allowSecret: true, SaltOptGoalPoi);
   }
 
-  //
-  // Internals
-  //
+  #region Internals
 
   /// <summary>
   /// Places up to <paramref name="amount"/> POIs of one type onto distinct eligible nodes.
@@ -226,4 +224,6 @@ internal sealed class ProcNodeObjectives
     var subSeed = SeedDerivation.Derive(_seedGraph, salt, ordinal);
     return IdDerivation.Derive(subSeed, salt);
   }
+
+  #endregion
 }

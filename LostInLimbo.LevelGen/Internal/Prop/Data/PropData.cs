@@ -11,12 +11,14 @@ internal sealed record PropData
   /// <summary>Default size.</summary>
   public const int DefaultSize = 2;
 
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static PropData Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// Internal seed driving config-generation draws. Derived from <see cref="WorldSeed"/> with its
@@ -32,4 +34,6 @@ internal sealed record PropData
 
   /// <summary>Size of the graph. Should be pre-calculated early as it is needed for a lot of other calculations.</summary>
   public int Size { get; init; } = DefaultSize;
+
+  #endregion
 }

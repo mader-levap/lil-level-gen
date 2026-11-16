@@ -46,7 +46,7 @@ internal sealed class GeneralResolver(PropMain propMain, PropData propData)
     };
   }
 
-  // Field resolvers.
+  #region Field resolvers
 
   /// <summary>
   /// Resolve the world seed. It is resolved once by <see cref="ConfigGenerator"/> (text-seed hash
@@ -74,4 +74,6 @@ internal sealed class GeneralResolver(PropMain propMain, PropData propData)
     float to = baseValue + DegenerationSpread;
     return _random.NextFloat(from, to);
   }
+
+  #endregion
 }

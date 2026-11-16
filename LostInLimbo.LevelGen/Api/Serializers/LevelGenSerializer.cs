@@ -35,8 +35,7 @@ public static class LevelGenSerializer
     Converters = { new JsonStringEnumConverter(allowIntegerValues: false) },
   };
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // CnfLevelGeneration
+  #region CnfLevelGeneration
 
   /// <summary>
   /// Serializes a configuration into canonical JSON.
@@ -99,8 +98,9 @@ public static class LevelGenSerializer
     return config;
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // PropMain
+  #endregion
+
+  #region PropMain
 
   /// <summary>
   /// Serializes a properties dataset into canonical JSON.
@@ -162,4 +162,6 @@ public static class LevelGenSerializer
     props.Validate();
     return props;
   }
+
+  #endregion
 }

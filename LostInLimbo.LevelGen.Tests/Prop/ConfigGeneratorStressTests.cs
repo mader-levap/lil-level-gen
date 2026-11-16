@@ -193,7 +193,7 @@ public sealed class ConfigGeneratorStressTests
     PrintDiversityLine(GenerationsPerDifficulty, graphCounts);
   }
 
-  // Diversity line.
+  #region Diversity line
 
   /// <summary>
   /// Structural signature of a generated graph: the integer and enum variables shown in
@@ -340,7 +340,9 @@ public sealed class ConfigGeneratorStressTests
     return entropy;
   }
 
-  // Statistics table.
+  #endregion
+
+  #region Statistics table
 
   /// <summary>
   /// Reports the collected samples as a fixed-width min/max/average/median table, one
@@ -451,4 +453,6 @@ public sealed class ConfigGeneratorStressTests
       ? (sorted[middle - 1] + sorted[middle]) / 2.0f
       : sorted[middle];
   }
+
+  #endregion
 }

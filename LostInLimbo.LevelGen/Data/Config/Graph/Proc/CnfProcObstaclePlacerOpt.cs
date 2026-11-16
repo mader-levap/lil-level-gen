@@ -27,7 +27,7 @@ public sealed record CnfProcObstaclePlacerOpt
   /// <summary>Default instance.</summary>
   public static CnfProcObstaclePlacerOpt Default { get; } = new();
 
-  // Limits.
+  #region Limits
 
   /// <summary>
   /// Maximum number of conditions a single passage may carry (inclusive). A passage at this
@@ -82,7 +82,9 @@ public sealed record CnfProcObstaclePlacerOpt
   /// </summary>
   public float ChanceReserveSideOnly { get; init; } = 0.05f;
 
-  // Main pass.
+  #endregion
+
+  #region Main pass
 
   /// <summary>
   /// Main pass, per obstacle after the first: chance that the node holding the most recent
@@ -135,7 +137,9 @@ public sealed record CnfProcObstaclePlacerOpt
   /// </summary>
   public float CutCostHalving { get; init; } = 2f;
 
-  // Bypasses.
+  #endregion
+
+  #region Bypasses
 
   /// <summary>
   /// Main pass, per obstacle and secret passage it would lock: chance that the secret passage
@@ -153,7 +157,9 @@ public sealed record CnfProcObstaclePlacerOpt
   /// </summary>
   public float ChanceBypass { get; init; } = 0.01f;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used for generation.
@@ -197,4 +203,6 @@ public sealed record CnfProcObstaclePlacerOpt
     if (!float.IsFinite(value) || value < 0f || value > 1f)
       throw new ArgumentOutOfRangeException(name, value, $"{name} must be a finite value within [0, 1].");
   }
+
+  #endregion
 }

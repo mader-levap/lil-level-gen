@@ -30,9 +30,7 @@ internal static class GraphTestSupport
     RelSecrets = new CnfProcRelSecretsOpt { Amount = 0 },
   };
 
-  //
-  // Build runner
-  //
+  #region Build runner
 
   /// <summary>
   /// Runs a graph builder through the factory exactly like production dispatch does and
@@ -89,9 +87,9 @@ internal static class GraphTestSupport
     };
   }
 
-  //
-  // Queries
-  //
+  #endregion
+
+  #region Queries
 
   /// <summary>
   /// Collects all POIs of the given type from every node of the graph.
@@ -188,4 +186,6 @@ internal static class GraphTestSupport
       .Select(node => (node.Id, node.Style.Group))
       .ToList();
   }
+
+  #endregion
 }

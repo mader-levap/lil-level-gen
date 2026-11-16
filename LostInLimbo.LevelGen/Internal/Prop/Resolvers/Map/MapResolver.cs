@@ -38,7 +38,7 @@ internal sealed class MapResolver(PropMain propMain, PropData propData)
     };
   }
 
-  // Validator options.
+  #region Validator options
   
   /// <summary>
   /// Resolve validator options.
@@ -51,4 +51,6 @@ internal sealed class MapResolver(PropMain propMain, PropData propData)
       Enabled = true,
     };
   }
+
+  #endregion
 }

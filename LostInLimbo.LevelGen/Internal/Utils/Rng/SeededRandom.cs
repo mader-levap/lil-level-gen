@@ -37,7 +37,7 @@ internal sealed class SeededRandom
     _state = unchecked((ulong)seed);
   }
 
-  // Simple random numbers.
+  #region Simple random numbers
 
   /// <summary>
   /// Produces the next raw 64-bit value of the sequence.
@@ -130,7 +130,9 @@ internal sealed class SeededRandom
     return (uint)NextULong() < threshold;
   }
 
-  // Ranges.
+  #endregion
+
+  #region Ranges
 
   /// <summary>
   /// Produces a random integer from an inclusive-exclusive range.
@@ -185,7 +187,9 @@ internal sealed class SeededRandom
     return value;
   }
 
-  // Advanced operations.
+  #endregion
+
+  #region Advanced operations
 
   /// <summary>
   /// Rearranges the list into a uniformly random order using the Fisher-Yates algorithm.
@@ -202,4 +206,6 @@ internal sealed class SeededRandom
       (list[i], list[j]) = (list[j], list[i]);
     }
   }
+
+  #endregion
 }

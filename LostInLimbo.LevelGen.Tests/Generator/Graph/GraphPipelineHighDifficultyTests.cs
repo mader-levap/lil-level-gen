@@ -115,7 +115,7 @@ public sealed class GraphPipelineHighDifficultyTests
     }
   }
 
-  // Pipeline.
+  #region Pipeline
 
   /// <summary>Output of one pipeline run.</summary>
   /// <param name="Config">Generated configuration.</param>
@@ -167,7 +167,9 @@ public sealed class GraphPipelineHighDifficultyTests
     return new PipelineRun(config, result, world.Graph);
   }
 
-  // Checks.
+  #endregion
+
+  #region Checks
 
   /// <summary>
   /// Checks one pipeline run: success outcome, node count, start/exit POIs, edge integrity and
@@ -230,4 +232,6 @@ public sealed class GraphPipelineHighDifficultyTests
       && first.Edges.Select(edge => (edge.Id, edge.From, edge.To, edge.Secret))
         .SequenceEqual(second.Edges.Select(edge => (edge.Id, edge.From, edge.To, edge.Secret)));
   }
+
+  #endregion
 }

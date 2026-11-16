@@ -119,9 +119,7 @@ internal sealed class ProcNodeRelSize
     }
   }
 
-  //
-  // Internals
-  //
+  #region Internals
 
   /// <summary>
   /// Counts how many relationships touch each node, in node-index order. Both endpoints
@@ -234,4 +232,6 @@ internal sealed class ProcNodeRelSize
     // Floating-point fallback: only reachable through rounding drift; heaviest top step.
     return stepCount - 1;
   }
+
+  #endregion
 }

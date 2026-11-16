@@ -10,16 +10,20 @@ public sealed record CnfStyle
 {
   // Constants here
 
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfStyle Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   // actual fields here
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used for generation.
@@ -27,4 +31,6 @@ public sealed record CnfStyle
   public void Validate()
   {
   }
+
+  #endregion
 }

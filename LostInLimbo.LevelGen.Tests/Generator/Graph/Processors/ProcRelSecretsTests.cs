@@ -969,9 +969,7 @@ public sealed class ProcRelSecretsTests
     }
   }
 
-  //
-  // Graph fixtures
-  //
+  #region Graph fixtures
 
   /// <summary>
   /// Builds a two-node graph whose only passage is conditional: node 1 holds the Start
@@ -1052,4 +1050,6 @@ public sealed class ProcRelSecretsTests
 
     return graph;
   }
+
+  #endregion
 }

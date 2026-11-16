@@ -29,12 +29,14 @@ public sealed record CnfGraph
   /// <summary>Maximum allowed size - keeps generation cost bounded.</summary>
   public const int MaxSize = 110;
 
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfGraph Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// Size of the graph. Usually just the number of nodes. The hard cap is <see cref="MaxSize"/>.
@@ -67,7 +69,9 @@ public sealed record CnfGraph
   /// </summary>
   public CnfValidGraphOpt ValidatorOpts { get; init; } = CnfValidGraphOpt.Default;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this graph generation config can be used for graph generation.
@@ -96,4 +100,6 @@ public sealed record CnfGraph
     ProcOpts.Validate();
     ValidatorOpts.Validate();
   }
+
+  #endregion
 }

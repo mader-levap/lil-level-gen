@@ -205,9 +205,7 @@ internal sealed class ProcRelSecrets
     }
   }
 
-  //
-  // Internals
-  //
+  #region Internals
 
   /// <summary>
   /// Picks the host of one secret node: a secret created earlier when the
@@ -440,4 +438,6 @@ internal sealed class ProcRelSecrets
     var subSeed = SeedDerivation.Derive(_seedGraph, SaltSecretExitEdge, ordinal);
     return IdDerivation.Derive(subSeed, SaltSecretExitEdge);
   }
+
+  #endregion
 }

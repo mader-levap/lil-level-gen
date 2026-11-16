@@ -88,7 +88,7 @@ public sealed class EvalWeightsTests
       Assert.InRange(counts[2], 175, 225); // 44 has weight 2 out of 10
     }
 
-    // Exceptions.
+    #region Exceptions
 
     [Fact]
     public void Pick_Int_EmptyArray_ThrowsArgumentException()
@@ -107,6 +107,8 @@ public sealed class EvalWeightsTests
         () => EvalWeights.Pick(new SeededRandom(7), [1, 2, 3], [1, 2]));
       Assert.Equal("weights", exception.ParamName);
     }
+
+    #endregion
   }
   /// <summary>Tests of weighted picks over float values.</summary>
   public sealed class FloatTests
@@ -189,7 +191,7 @@ public sealed class EvalWeightsTests
       Assert.InRange(counts[2], 175, 225); // 2.0 has weight 2 out of 10
     }
 
-    // Exceptions.
+    #region Exceptions
 
     [Fact]
     public void Pick_Float_EmptyArray_ThrowsArgumentException()
@@ -208,6 +210,8 @@ public sealed class EvalWeightsTests
         () => EvalWeights.Pick(new SeededRandom(7), [1.0f, 1.5f, 2.0f], [1, 2]));
       Assert.Equal("weights", exception.ParamName);
     }
+
+    #endregion
   }
 
   /// <summary>Tests of the constant-time input checks and the documented weight contract.</summary>

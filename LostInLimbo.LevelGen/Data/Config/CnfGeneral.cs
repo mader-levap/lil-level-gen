@@ -16,12 +16,14 @@ public sealed record CnfGeneral
   /// <summary>Default degeneration degree - no degeneration at all.</summary>
   public const float DefaultDegeneration = 0.0f;
 
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfGeneral Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   /// <summary>
   /// World seed from which all other seeds are derived deterministically.
@@ -35,7 +37,9 @@ public sealed record CnfGeneral
   /// </summary>
   public float Degeneration { get; init; } = DefaultDegeneration;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this config can be used for generation.
@@ -46,4 +50,6 @@ public sealed record CnfGeneral
     if (!float.IsFinite(Degeneration) || Degeneration < 0.0f)
       throw new ArgumentOutOfRangeException(nameof(Degeneration), Degeneration, "Degeneration must be a finite number >= 0.");
   }
+
+  #endregion
 }

@@ -22,9 +22,7 @@ internal static class GraphTestCreate
   /// </summary>
   public const int DefaultNodeMaxEdges = -1;
 
-  //
-  // Identifier and element primitives
-  //
+  #region Identifier and element primitives
 
   /// <summary>
   /// Derives a stable, readable test identifier from a small integer.
@@ -121,9 +119,9 @@ internal static class GraphTestCreate
     RequiresPoi = Id(poiId),
   };
 
-  //
-  // Graph shapes
-  //
+  #endregion
+
+  #region Graph shapes
 
   /// <summary>
   /// Creates a chain graph: node 0 - node 1 - ... with deterministic identifiers.
@@ -281,9 +279,9 @@ internal static class GraphTestCreate
     };
   }
 
-  //
-  // Internals
-  //
+  #endregion
+
+  #region Internals
 
   /// <summary>
   /// Creates the node list with deterministic identifiers and initial sizes of 1.
@@ -311,4 +309,6 @@ internal static class GraphTestCreate
 
     return graph;
   }
+
+  #endregion
 }

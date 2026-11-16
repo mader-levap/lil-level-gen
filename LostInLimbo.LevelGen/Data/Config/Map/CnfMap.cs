@@ -15,12 +15,14 @@ public sealed record CnfMap
 {
   // Constants here
 
-  // Defaults.
+  #region Defaults
 
   /// <summary>Default instance.</summary>
   public static CnfMap Default { get; } = new();
 
-  // Fields.
+  #endregion
+
+  #region Fields
 
   // actual fields here
 
@@ -29,7 +31,9 @@ public sealed record CnfMap
   /// </summary>
   public CnfValidMapOpt ValidatorOpts { get; init; } = CnfValidMapOpt.Default;
 
-  // Helpers.
+  #endregion
+
+  #region Helpers
 
   /// <summary>
   /// Checks that this map generation config can be used for map generation.
@@ -42,4 +46,6 @@ public sealed record CnfMap
 
     ValidatorOpts.Validate();
   }
+
+  #endregion
 }

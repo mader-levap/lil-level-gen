@@ -920,9 +920,7 @@ public sealed class GraphBuilderLinearTests
     }
   }
 
-  //
-  // Shared assertions specific to GraphBuilderLinear.
-  //
+  #region Shared assertions specific to GraphBuilderLinear
 
   /// <summary>
   /// Builder-specific structural assertions of <see cref="GraphBuilderLinear"/>: kept out of
@@ -1590,4 +1588,6 @@ public sealed class GraphBuilderLinearTests
       config.Validate();
     }
   }
+
+  #endregion
 }
