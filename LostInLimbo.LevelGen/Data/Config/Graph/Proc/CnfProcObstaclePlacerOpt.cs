@@ -43,6 +43,15 @@ public sealed record CnfProcObstaclePlacerOpt
   /// </summary>
   public int MaxEdgesPerObstacle { get; init; } = 4;
 
+  /// <summary>
+  /// Width cap of the one-time fallback of the main pass (inclusive): when the main pass has
+  /// placed nothing yet and no cut fits <see cref="MaxEdgesPerObstacle"/> (for example start and
+  /// exit as adjacent hubs whose leaves are linked), one obstacle may lock up to this many
+  /// ordinary passages, so the exit is never left open for want of a narrow cut.
+  /// <para>Must be at least 1; a value at or below <see cref="MaxEdgesPerObstacle"/> disables the fallback.</para>
+  /// </summary>
+  public int MaxEdgesPerObstacleFallback { get; init; } = 8;
+
   // Budget split between the passes.
 
   /// <summary>
@@ -156,6 +165,8 @@ public sealed record CnfProcObstaclePlacerOpt
       throw new ArgumentOutOfRangeException(nameof(MaxConditionsPerEdge), MaxConditionsPerEdge, "MaxConditionsPerEdge must be at least 1.");
     if (MaxEdgesPerObstacle < 1)
       throw new ArgumentOutOfRangeException(nameof(MaxEdgesPerObstacle), MaxEdgesPerObstacle, "MaxEdgesPerObstacle must be at least 1.");
+    if (MaxEdgesPerObstacleFallback < 1)
+      throw new ArgumentOutOfRangeException(nameof(MaxEdgesPerObstacleFallback), MaxEdgesPerObstacleFallback, "MaxEdgesPerObstacleFallback must be at least 1.");
     if (SmallComplexityMax < 0)
       throw new ArgumentOutOfRangeException(nameof(SmallComplexityMax), SmallComplexityMax, "SmallComplexityMax must not be negative.");
 

@@ -38,6 +38,11 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// <see cref="CnfProcObstaclePlacerOpt.MaxStackLoad"/> with it (see <see cref="IsStackAllowed"/>);
 /// otherwise it is refused without a roll and cannot be forced either. When nothing fresh is
 /// left and the limit forbids stacking, the pass ends early.</item>
+/// <item><b>Wide fallback.</b> When the pass has placed nothing yet and no target has a cut
+/// within <see cref="CnfProcObstaclePlacerOpt.MaxEdgesPerObstacle"/> (for example start and exit
+/// as adjacent hubs with linked leaves), the choice is repeated once with the cap
+/// <see cref="CnfProcObstaclePlacerOpt.MaxEdgesPerObstacleFallback"/>, so the exit is not left
+/// open. Later obstacles use the normal cap again.</item>
 /// <item><b>Cramped cuts last.</b> A cut that leaves no node but the start for the solution
 /// (a door at the start with its key lying next to it) is only used when nothing else is left,
 /// even after forced stacking. Such a solution cannot be guarded by a later obstacle either.</item>
@@ -106,7 +111,13 @@ internal sealed class ObstaclePassMain
       cancellationToken.ThrowIfCancellationRequested();
 
       var targets = OrderTargets(required, PickPrimary(primaries), lastSolutionNode, isFirst: placed == 0);
-      var cut = ChooseCut(start, targets);
+      var cut = ChooseCut(start, targets, _state.Search);
+      if (cut is null && placed == 0 && _state.HasWideFallback)
+      {
+        // No cut fits the width cap and nothing guards the exit yet: allow one wide obstacle.
+        cut = ChooseCut(start, targets, _state.WideSearch);
+      }
+
       if (cut is null) break; // Nothing left to lock.
 
       if (!_state.TryPlaceObstacle(cut.LockEdges, _protectedNodes, out var solutionNode)) break;
@@ -182,8 +193,9 @@ internal sealed class ObstaclePassMain
   /// </summary>
   /// <param name="start">Work index of the start node.</param>
   /// <param name="targets">Required nodes, most wanted first.</param>
+  /// <param name="search">Cut search to use: the normal one, or the wide one of the fallback.</param>
   /// <returns>The chosen cut, or <see langword="null"/> when no target can be cut off.</returns>
-  private CutCandidate? ChooseCut(int start, List<int> targets)
+  private CutCandidate? ChooseCut(int start, List<int> targets, CutSearch search)
   {
     // Costs follow the conditions, so they are rebuilt for every obstacle.
     var costs = _state.Work.BuildMainCutCosts();
@@ -193,7 +205,7 @@ internal sealed class ObstaclePassMain
 
     foreach (var target in targets)
     {
-      var all = _state.Search.FindCandidates(start, target, costs);
+      var all = search.FindCandidates(start, target, costs);
       var candidates = all.FindAll(HasRoomForSolution);
       if (candidates.Count == 0)
       {

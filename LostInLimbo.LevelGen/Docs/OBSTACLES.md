@@ -154,6 +154,10 @@ Keep a list of **required nodes** `Q`, initially `{exit node}`. Per obstacle:
    **Cramped cuts** come last of all, after forced stacking: a cut that leaves no node but the
    start for the solution (no other non-secret, unprotected node on the start side). It would put
    the key next to its door at the start, and such a solution cannot be guarded later. (Added in phase 7.)
+   **Wide fallback** (section 5.4): when the pass has placed nothing yet and no target has any
+   cut within `MaxEdgesPerObstacle`, steps 2-3 are repeated once with the cap
+   `MaxEdgesPerObstacleFallback` (default 8). One wide obstacle then locks the exit instead of
+   leaving it open; later obstacles use the normal cap again.
 4. Lock the cut, place the solution, add its node to `Q` (unless it is the start node).
 
 Every main obstacle guards a node the player must visit, so **all of them are mandatory for the
@@ -173,7 +177,10 @@ Edge cases this covers without special code:
   rarer (a two-chokepoint cut is a quarter as likely as a one-chokepoint cut at the default
   `CutCostHalving`), and never above `MaxEdgesPerObstacle`.
 - **Fragmentation**: a cut may split off a group of nodes; fine by the softlock rule.
-- **Dense graph / exit with high degree**: no cut under the width cap -> fewer obstacles, Complexity unused.
+- **Dense graph / exit with high degree**: no cut under the width cap -> fewer obstacles, Complexity
+  unused. When this hits the very first main obstacle (no cut at all, e.g. start and exit as
+  adjacent hubs with linked leaves), the wide fallback locks the exit with one obstacle of up to
+  `MaxEdgesPerObstacleFallback` passages.
 
 ### 4.3 Side pass (secrets, goals, optional goals)
 
@@ -207,7 +214,8 @@ locking, and an invalid one is skipped for the next in the list.
 
 No-op when: `Complexity == 0`; fewer than two nodes; not exactly one start node and one exit node
 (missing, or several - unsupported in v1); no edges. Unused Complexity is dropped silently.
-`MaxConditionsPerEdge` (3) is enforced through infinite capacity. No nodes or edges are added, so
+`MaxConditionsPerEdge` (3) is enforced through infinite capacity. `MaxEdgesPerObstacle` (4) holds for
+every obstacle except at most one main obstacle of the wide fallback (`MaxEdgesPerObstacleFallback`, 8). No nodes or edges are added, so
 `MaxEdges` caps are untouched. Pre-existing conditions are tolerated (count toward the cap, honoured by floods).
 
 ## 5. Potential issues
@@ -318,6 +326,17 @@ SeedSweep, 10000 runs with default options, before -> after (Simple builder, 504
 
 No errors before or after; the other suspicious counts moved by a few runs only.
 
+### 5.4 Wide fallback
+
+Added after 5.3. The sweep showed Simple levels with Complexity 2-8 whose main pass placed nothing
+(runs `sweep-5077`, `sweep-7641`, `sweep-3457`): start and exit were adjacent hubs (5-7 passages)
+whose leaves were linked by Connectivity, so every start|exit cut held at least 5 passages, above
+`MaxEdgesPerObstacle`. The exit was open and only side dead ends were locked. Now the first main
+obstacle may use `MaxEdgesPerObstacleFallback` (8, at least the Simple hub degree
+`MaxExtraDegreeStar` 7). Default sweep: these three runs get main obstacles (`sweep-7641` now
+places all 8); every other count moved by at most 3 runs. The map must guard every opening of such
+a wide obstacle.
+
 ## 6. Implementation plan
 
 New code, namespace `LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler`
@@ -344,7 +363,7 @@ Changes to existing code:
 - `Data/Config/Graph/Proc/CnfProcObstaclePlacerOpt.cs` (new public record + `Validate()`), added to
   `CnfProcOpt` as `ObstaclePlacer`: `MaxConditionsPerEdge = 3`, `MaxEdgesPerObstacle = 4`,
   `MainShare = 0.7`, `SmallComplexityMax = 3`, `ChanceReserveSide = 0.75`, `ChanceReserveSideOnly = 0.2`,
-  `ChanceNestSolution = 0.4`, `ChanceStack = 0.2`, `MaxStackLoad = 0.25`, `FreeStackedConditions = 2`, `ChanceSecretBypass = 0.25`, `ChanceBypass = 0.01`, `CutCostHalving = 2` (added with 5.3). Cost weights
+  `ChanceNestSolution = 0.4`, `ChanceStack = 0.2`, `MaxStackLoad = 0.25`, `FreeStackedConditions = 2`, `ChanceSecretBypass = 0.25`, `ChanceBypass = 0.01`, `CutCostHalving = 2` (added with 5.3), `MaxEdgesPerObstacleFallback = 8` (added with 5.4). Cost weights
   (`CostChokepoint = 4`, `CostOpen = 6`, `CostStack = 2`, `CostSecret = 0`) stay
   named constants inside `ObstacleWorkGraph` until tuning shows they need exposing.
 - `Internal/Prop/Resolvers/Graph/GraphResolver.cs` (`ResolveProcOpts`): pass the default section.

@@ -300,6 +300,7 @@ public sealed class CnfProcOptsTests
       Assert.Equal(0.25f, opts.ChanceSecretBypass);
       Assert.Equal(0.01f, opts.ChanceBypass);
       Assert.Equal(2f, opts.CutCostHalving);
+      Assert.Equal(8, opts.MaxEdgesPerObstacleFallback);
     }
 
     [Fact]
@@ -310,6 +311,7 @@ public sealed class CnfProcOptsTests
       {
         MaxConditionsPerEdge = 1,
         MaxEdgesPerObstacle = 1,
+        MaxEdgesPerObstacleFallback = 1,
         SmallComplexityMax = 0,
         MainShare = 0f,
         ChanceReserveSide = 1f,
@@ -333,6 +335,8 @@ public sealed class CnfProcOptsTests
     [InlineData(nameof(CnfProcObstaclePlacerOpt.MaxEdgesPerObstacle), 0)]
     [InlineData(nameof(CnfProcObstaclePlacerOpt.MaxEdgesPerObstacle), -2)]
     [InlineData(nameof(CnfProcObstaclePlacerOpt.SmallComplexityMax), -1)]
+    [InlineData(nameof(CnfProcObstaclePlacerOpt.MaxEdgesPerObstacleFallback), 0)]
+    [InlineData(nameof(CnfProcObstaclePlacerOpt.MaxEdgesPerObstacleFallback), -2)]
     public void ObstaclePlacer_WithLimitBelowMinimum_ThrowsArgumentOutOfRangeException(string property, int value)
     {
       // Arrange: Config with one forbidden limit.
@@ -340,6 +344,7 @@ public sealed class CnfProcOptsTests
       {
         nameof(CnfProcObstaclePlacerOpt.MaxConditionsPerEdge) => new CnfProcObstaclePlacerOpt { MaxConditionsPerEdge = value },
         nameof(CnfProcObstaclePlacerOpt.MaxEdgesPerObstacle) => new CnfProcObstaclePlacerOpt { MaxEdgesPerObstacle = value },
+        nameof(CnfProcObstaclePlacerOpt.MaxEdgesPerObstacleFallback) => new CnfProcObstaclePlacerOpt { MaxEdgesPerObstacleFallback = value },
         _ => new CnfProcObstaclePlacerOpt { SmallComplexityMax = value },
       };
 

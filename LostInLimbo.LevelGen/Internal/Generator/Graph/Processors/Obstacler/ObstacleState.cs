@@ -63,6 +63,7 @@ internal sealed class ObstacleState
     Work = new ObstacleWorkGraph(graph, options);
     Random = new SeededRandom(SeedDerivation.Derive(seedGraph, SaltObstaclePlacer));
     Search = new CutSearch(Work, options.MaxEdgesPerObstacle);
+    WideSearch = new CutSearch(Work, Math.Max(options.MaxEdgesPerObstacle, options.MaxEdgesPerObstacleFallback));
     Picker = new SolutionPicker(Work, Random);
     _flood = new GraphFlood(graph, edge => !edge.Secret && edge.Direction == EnPassageDirection.Bidirectional);
 
@@ -87,6 +88,15 @@ internal sealed class ObstacleState
 
   /// <summary>Candidate cut search over <see cref="Work"/>.</summary>
   public CutSearch Search { get; }
+
+  /// <summary>
+  /// Candidate cut search with the width cap of the main pass fallback
+  /// (<see cref="CnfProcObstaclePlacerOpt.MaxEdgesPerObstacleFallback"/>, never below the normal cap).
+  /// </summary>
+  public CutSearch WideSearch { get; }
+
+  /// <summary>Tells whether <see cref="WideSearch"/> allows wider cuts than <see cref="Search"/>.</summary>
+  public bool HasWideFallback => Options.MaxEdgesPerObstacleFallback > Options.MaxEdgesPerObstacle;
 
   /// <summary>Solution node picker over <see cref="Work"/>.</summary>
   public SolutionPicker Picker { get; }

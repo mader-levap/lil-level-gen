@@ -1,3 +1,4 @@
+using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Meta;
@@ -117,13 +118,19 @@ public sealed class ProcObstaclePlacerTests
     }
 
     // Assert: Per solution - it locks something, not too many ordinary passages, and it does
-    // not lie in a secret node.
+    // not lie in a secret node. Only the one-time wide fallback may exceed the normal cap.
+    var fallbackCap = Math.Max(options.MaxEdgesPerObstacle, options.MaxEdgesPerObstacleFallback);
+    var wide = 0;
     foreach (var solutionId in solutions)
     {
       var locked = EdgesRequiring(graph, solutionId);
       Assert.NotEmpty(locked);
-      Assert.True(locked.FindAll(edge => !edge.Secret).Count <= options.MaxEdgesPerObstacle, context);
+      var ordinary = locked.FindAll(edge => !edge.Secret).Count;
+      Assert.True(ordinary <= fallbackCap, context);
+      if (ordinary > options.MaxEdgesPerObstacle) wide++;
     }
+
+    Assert.True(wide <= 1, context);
 
     foreach (var node in graph.Nodes)
     {
@@ -220,6 +227,31 @@ public sealed class ProcObstaclePlacerTests
       new Passage(6, 7),
       new Passage(7, 8),
       new Passage(8, 1));
+  }
+
+  /// <summary>
+  /// Two adjacent hubs: start (node 1) with leaves 3 - 6, exit (node 2) with leaves 7 - 10, and
+  /// every start leaf linked to one exit leaf. Every cut between start and exit holds at least
+  /// five passages (the direct one plus the four links), above the default width cap.
+  /// </summary>
+  /// <returns>The graph.</returns>
+  private static LilGraph CreateAdjacentHubsLevel()
+  {
+    return CreateLevel(
+      10, 1, 2,
+      new Passage(1, 2),
+      new Passage(1, 3), new Passage(1, 4), new Passage(1, 5), new Passage(1, 6),
+      new Passage(2, 7), new Passage(2, 8), new Passage(2, 9), new Passage(2, 10),
+      new Passage(3, 7), new Passage(4, 8), new Passage(5, 9), new Passage(6, 10));
+  }
+
+  /// <summary>Tells whether the exit can be reached from the start without any solution.</summary>
+  /// <param name="graph">Graph to check.</param>
+  /// <returns>True when the exit is open.</returns>
+  private static bool IsExitOpen(LilGraph graph)
+  {
+    var exitNode = graph.Nodes.Find(node => node.HasPoi(EnPoiType.Exit))!;
+    return LevelGraphReach.GetReachableNodes(graph, GraphTestCreate.Id(StartPoiId), []).Contains(exitNode.Id);
   }
 
   /// <summary>
@@ -584,8 +616,13 @@ public sealed class ProcObstaclePlacerTests
     [Fact]
     public void Execute_WithTightLimits_RespectsThem()
     {
-      // Arrange: One condition per passage, one passage per obstacle.
-      var options = CnfProcObstaclePlacerOpt.Default with { MaxConditionsPerEdge = 1, MaxEdgesPerObstacle = 1 };
+      // Arrange: One condition per passage, one passage per obstacle, no wide fallback.
+      var options = CnfProcObstaclePlacerOpt.Default with
+      {
+        MaxConditionsPerEdge = 1,
+        MaxEdgesPerObstacle = 1,
+        MaxEdgesPerObstacleFallback = 1,
+      };
       for (var seed = 0; seed < SweepSeeds; seed++)
       {
         var graph = CreateMixedLevel();
@@ -660,6 +697,46 @@ public sealed class ProcObstaclePlacerTests
         // Assert: Always the passage in front of the exit.
         Assert.Empty(graph.Edges[0].Conditions);
         Assert.Single(graph.Edges[1].Conditions);
+      }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public void Execute_WhenEveryExitCutIsTooWide_UsesWideFallbackOnce(int complexity)
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: Adjacent hubs; no exit cut fits the normal width cap.
+        var graph = CreateAdjacentHubsLevel();
+        var options = NoBypass with { ChanceReserveSideOnly = 0f };
+
+        // Act: Place obstacles.
+        var placer = Run(graph, complexity, seed, options);
+
+        // Assert: A main obstacle exists and the exit is locked; only one obstacle is wide.
+        var context = $"seed {seed}";
+        Assert.True(placer.PlacedMainObstacles >= 1, context);
+        Assert.False(IsExitOpen(graph), context);
+        AssertInvariants(graph, placer, complexity, options, context);
+      }
+    }
+
+    [Fact]
+    public void Execute_WithFallbackAtCap_PlacesNoMainObstacleOnHubs()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: Same hubs, the fallback switched off.
+        var graph = CreateAdjacentHubsLevel();
+        var options = NoBypass with { MaxEdgesPerObstacleFallback = NoBypass.MaxEdgesPerObstacle };
+
+        // Act: One obstacle.
+        var placer = Run(graph, 1, seed, options);
+
+        // Assert: Nothing fits the cap, so the exit stays open (old behaviour).
+        Assert.Equal(0, placer.PlacedMainObstacles);
+        Assert.True(IsExitOpen(graph));
       }
     }
 
