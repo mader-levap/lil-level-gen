@@ -118,7 +118,8 @@ Budget split, decided once before the pass:
 - **Small** (`Complexity <= SmallComplexityMax`, default 3): main gets everything, except that one
   Complexity is left for the side pass with `ChanceReserveSide` (default 0.75).
 - **Complexity 1**: reserving would leave the main pass nothing, so the chance drops to
-  `ChanceReserveSideOnly` (default 0.2); on a hit only the side pass runs.
+  `ChanceReserveSideOnly` (default 0.05, lowered from 0.2 after the sweep in 5.4: a lone obstacle
+  guarding only a dead end left the main route without any lock); on a hit only the side pass runs.
 
 **Pocket pre-scan.** Before the split, the side pass lists the valid pockets (section 4.3) in its
 seeded-shuffled order, with the pocket size roll already made. Then:
@@ -362,7 +363,7 @@ Changes to existing code:
 - `GraphBuilderSimple.cs`: override to `true`; fix docs ("Complexity is ignored", "without obstacles").
 - `Data/Config/Graph/Proc/CnfProcObstaclePlacerOpt.cs` (new public record + `Validate()`), added to
   `CnfProcOpt` as `ObstaclePlacer`: `MaxConditionsPerEdge = 3`, `MaxEdgesPerObstacle = 4`,
-  `MainShare = 0.7`, `SmallComplexityMax = 3`, `ChanceReserveSide = 0.75`, `ChanceReserveSideOnly = 0.2`,
+  `MainShare = 0.7`, `SmallComplexityMax = 3`, `ChanceReserveSide = 0.75`, `ChanceReserveSideOnly = 0.05` (0.2 before 5.4),
   `ChanceNestSolution = 0.4`, `ChanceStack = 0.2`, `MaxStackLoad = 0.25`, `FreeStackedConditions = 2`, `ChanceSecretBypass = 0.25`, `ChanceBypass = 0.01`, `CutCostHalving = 2` (added with 5.3), `MaxEdgesPerObstacleFallback = 8` (added with 5.4). Cost weights
   (`CostChokepoint = 4`, `CostOpen = 6`, `CostStack = 2`, `CostSecret = 0`) stay
   named constants inside `ObstacleWorkGraph` until tuning shows they need exposing.

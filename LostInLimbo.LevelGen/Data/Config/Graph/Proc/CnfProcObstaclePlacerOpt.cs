@@ -80,7 +80,7 @@ public sealed record CnfProcObstaclePlacerOpt
   /// pass, so the main pass gets nothing.
   /// <para>Must be a finite value within [0, 1].</para>
   /// </summary>
-  public float ChanceReserveSideOnly { get; init; } = 0.2f;
+  public float ChanceReserveSideOnly { get; init; } = 0.05f;
 
   // Main pass.
 

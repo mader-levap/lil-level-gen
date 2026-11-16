@@ -292,7 +292,7 @@ public sealed class CnfProcOptsTests
       Assert.Equal(0.7f, opts.MainShare);
       Assert.Equal(3, opts.SmallComplexityMax);
       Assert.Equal(0.75f, opts.ChanceReserveSide);
-      Assert.Equal(0.2f, opts.ChanceReserveSideOnly);
+      Assert.Equal(0.05f, opts.ChanceReserveSideOnly);
       Assert.Equal(0.4f, opts.ChanceNestSolution);
       Assert.Equal(0.2f, opts.ChanceStack);
       Assert.Equal(0.25f, opts.MaxStackLoad);
