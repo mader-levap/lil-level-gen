@@ -110,7 +110,7 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <returns>Resolved graph configuration.</returns>
   public CnfGraph Execute()
   {
-    return CnfGraph.Default with
+    var config = CnfGraph.Default with
     {
       Size = _propData.Size,
       Connectivity = ResolveConnectivity(),
@@ -118,6 +118,12 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
       GraphBuilder = ResolveGraphBuilder(),
       ProcOpts = ResolveProcOpts(),
       ValidatorOpts = ResolveValidatorOpts(),
+    };
+
+    // Capped after all draws, so the random stream does not depend on the builder.
+    return config with
+    {
+      Connectivity = CapConnectivity(config.Connectivity, config.GraphBuilder.Builder, config.Size),
     };
   }
 
@@ -131,12 +137,35 @@ internal sealed class GraphResolver(PropMain propMain, PropData propData)
   /// <remarks>
   /// The bound grows with the square root of the size, so small graphs keep a usable range
   /// while large graphs do not get flooded with extras (a linear bound cannot do both).
+  /// The drawn value is later capped at what the builder can build, see <see cref="CapConnectivity"/>.
   /// </remarks>
   /// <returns>Connectivity of the graph.</returns>
   private int ResolveConnectivity()
   {
     int max = SqrtSizeBound(ConnectivityBaseFactor, ConnectivityDifficultyFactor);
     return _random.NextInt(MinConnectivity, max + 1);
+  }
+
+  /// <summary>
+  /// Caps Connectivity at the number of extra relationships the builder can ever create.
+  /// </summary>
+  /// <remarks>
+  /// Simple joins every node pair at most once, so beyond the <c>size - 1</c> relationships of
+  /// the spanning skeleton only <c>(size - 1) * (size - 2) / 2</c> pairs remain (0 for two
+  /// nodes, 1 for three). Other builders are not capped: Linear may add parallel passages, and
+  /// its degree caps are drawn separately. Degree caps can still leave Connectivity unspent;
+  /// it stays a soft constraint.
+  /// </remarks>
+  /// <param name="connectivity">Drawn Connectivity.</param>
+  /// <param name="builder">Resolved graph builder.</param>
+  /// <param name="size">Node count of the graph.</param>
+  /// <returns>Connectivity, never above the builder's maximum; never negative.</returns>
+  private static int CapConnectivity(int connectivity, EnGraphBuilder builder, int size)
+  {
+    if (builder != EnGraphBuilder.Simple) return connectivity;
+
+    var pairsBeyondSkeleton = size < 2 ? 0 : (long)(size - 1) * (size - 2) / 2;
+    return (int)Math.Min(connectivity, pairsBeyondSkeleton);
   }
 
   /// <summary>

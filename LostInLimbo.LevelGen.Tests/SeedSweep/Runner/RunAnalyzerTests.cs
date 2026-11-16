@@ -250,6 +250,7 @@ public sealed class RunAnalyzerTests
       Assert.Equal(config.Graph.Size, record.Size);
       Assert.Equal(config.Graph.Complexity, record.Complexity);
       Assert.Equal(config.Graph.GraphBuilder.Builder.ToString(), record.Builder);
+      Assert.Equal(config.Graph.ProcOpts.NodeRelSize.Steps, record.RelSizeSteps);
     }
   }
 

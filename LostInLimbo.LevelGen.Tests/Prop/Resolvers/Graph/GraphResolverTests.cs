@@ -263,6 +263,33 @@ public sealed class GraphResolverTests
       Assert.Contains(configs, config => config.Complexity == expectedMin);
     }
 
+    [Theory]
+    [InlineData(2, 0)]
+    [InlineData(3, 1)]
+    [InlineData(4, 3)]
+    public void Execute_WithSimpleBuilder_CapsConnectivityAtBuildableMaximum(int size, int buildableMaximum)
+    {
+      // Act: Resolve many tiny graphs at the highest difficulty (largest Connectivity bound).
+      var configs = ResolveMany(size, PropMain.MaxDifficulty);
+      var simple = configs.Where(config => config.GraphBuilder.Builder == EnGraphBuilder.Simple).ToList();
+
+      // Assert: Simple has no parallel passages, so Connectivity never asks for more extra
+      // passages than node pairs left over by the spanning tree; the cap is reached.
+      Assert.NotEmpty(simple);
+      Assert.All(simple, config => Assert.InRange(config.Connectivity, 0, buildableMaximum));
+      Assert.Contains(simple, config => config.Connectivity == buildableMaximum);
+    }
+
+    [Fact]
+    public void Execute_WithLinearBuilder_KeepsConnectivityAboveSimpleMaximum()
+    {
+      // Act: Resolve many two-node graphs at the highest difficulty.
+      var configs = ResolveMany(2, PropMain.MaxDifficulty);
+
+      // Assert: Linear may add parallel passages, so its Connectivity is not capped.
+      Assert.Contains(configs, config => config.GraphBuilder.Builder == EnGraphBuilder.Linear && config.Connectivity > 0);
+    }
+
     [Fact]
     public void Execute_AtDifficultyZero_StillAllowsZeroComplexity()
     {

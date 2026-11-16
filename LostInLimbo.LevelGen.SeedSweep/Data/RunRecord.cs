@@ -35,6 +35,8 @@ internal sealed class RunRecord
   public int OptGoalAmount { get; set; }
   /// <summary>Requested style group count.</summary>
   public int GroupCount { get; set; }
+  /// <summary>Number of distinct RelSize steps the config allows; 1 means a single size by design.</summary>
+  public int RelSizeSteps { get; set; }
 
   #endregion
 

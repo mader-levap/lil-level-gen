@@ -32,6 +32,7 @@ internal static class RunAnalyzer
     record.GoalAmount = graph.ProcOpts.NodeObjectives.GoalAmount;
     record.OptGoalAmount = graph.ProcOpts.NodeObjectives.OptGoalAmount;
     record.GroupCount = graph.ProcOpts.NodeStyle.GroupCount;
+    record.RelSizeSteps = graph.ProcOpts.NodeRelSize.Steps;
   }
 
   /// <summary>

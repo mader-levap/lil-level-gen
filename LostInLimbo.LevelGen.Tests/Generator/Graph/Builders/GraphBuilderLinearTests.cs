@@ -2,6 +2,7 @@ using LostInLimbo.LevelGen.Api;
 using LostInLimbo.LevelGen.Data.Status;
 using LostInLimbo.LevelGen.Data.Config.Graph;
 using LostInLimbo.LevelGen.Data.Config.Graph.Builder;
+using LostInLimbo.LevelGen.Data.Config.Graph.Proc;
 using LostInLimbo.LevelGen.Data.Result.Graph;
 using LostInLimbo.LevelGen.Internal.Generator.Graph.Builders;
 
@@ -1130,6 +1131,36 @@ public sealed class GraphBuilderLinearTests
 
       // Assert: The skeleton is exactly the chain over all nodes and stays connected.
       GraphAssertions.AssertExactChainBuild(result, graph, size);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(4)]
+    public void Build_WithFullCapsAndSecrets_KeepsHostsForSecrets(int secretAmount)
+    {
+      // Arrange: A low hard cap that excessive Connectivity would fill on every node.
+      var builderConfig = CnfGraphBuilder.Default with
+      {
+        Builder = EnGraphBuilder.Linear,
+        CnfLinear = CnfGraphBuilderLinear.Default with { MaxEdges = 3, MaxExtraDegree = 4 },
+      };
+      var procOpts = CnfProcOpt.Default with { RelSecrets = new CnfProcRelSecretsOpt { Amount = secretAmount } };
+
+      for (var seed = 0; seed < 20; seed++)
+      {
+        // Act: Request far more extras than the cap allows, plus secrets.
+        var (result, graph) = GraphTestSupport.Build(EnGraphBuilder.Linear, new CnfGraph
+        {
+          Size = 12,
+          Connectivity = 100,
+          ProcOpts = procOpts,
+        }, seed, builderConfig);
+
+        // Assert: The extras left a free slot for every requested secret.
+        Assert.True(result.Success);
+        Assert.Equal(secretAmount, graph.Nodes.Count(node => node.Secret));
+      }
     }
 
     [Fact]

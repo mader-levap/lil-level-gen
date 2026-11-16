@@ -244,7 +244,8 @@ internal static class SweepReport
     Line("conditioned secret passage", r => r.ConditionedSecret > 0);
     Line("stacked conditions (>1 on a passage)", r => r.StackedEdges > 0);
     Line("3+ conditions on a passage", r => r.MaxConditionsPerEdge >= 3);
-    Line("one RelSize only (Size>=4)", r => r.Size >= 4 && r.RelSizeMin == r.RelSizeMax);
+    // Configs with a single RelSize step are a deliberate profile; only count the rest.
+    Line("one RelSize only (Size>=4, Steps>1)", r => r.Size >= 4 && r.RelSizeSteps > 1 && r.RelSizeMin == r.RelSizeMax);
     Line($"slow run > {SlowRunMs.ToString(Invariant)} ms", r => r.GenerationMs > SlowRunMs);
 
     AppendKeyAtStartDoorByDifficulty(text, ok);
