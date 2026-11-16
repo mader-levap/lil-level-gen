@@ -196,6 +196,32 @@ public sealed class ProcObstaclePlacerTests
       new Passage(1, 3), new Passage(1, 4), new Passage(1, 5), new Passage(1, 6), new Passage(1, 7));
   }
 
+  /// <summary>Work index of the direct start-exit passage of <see cref="CreateAdjacentCycleLevel"/>.</summary>
+  private const int AdjacentCycleDirectEdge = 7;
+
+  /// <summary>Work index of the only chokepoint of <see cref="CreateAdjacentCycleLevel"/>.</summary>
+  private const int AdjacentCycleChokepointEdge = 1;
+
+  /// <summary>
+  /// Cycle 1 - 2 - ... - 8 - 1 with the start in node 1 and the exit in node 8, so they are
+  /// adjacent (edge 7). The only chokepoint is edge 1 (2 - 3), one node away from the start.
+  /// The shape of text seed "46" at difficulty 5.
+  /// </summary>
+  /// <returns>The graph.</returns>
+  private static LilGraph CreateAdjacentCycleLevel()
+  {
+    return CreateLevel(
+      8, 1, 8,
+      new Passage(1, 2),
+      new Passage(2, 3, Chokepoint: true),
+      new Passage(3, 4),
+      new Passage(4, 5),
+      new Passage(5, 6),
+      new Passage(6, 7),
+      new Passage(7, 8),
+      new Passage(8, 1));
+  }
+
   /// <summary>
   /// Chain 1 - 5 with a shortcut, a leaf, parallel passages, a secret bridge from start to
   /// exit (node 7), a secret leaf (node 8) and a one-way secret loop (node 9).
@@ -634,6 +660,60 @@ public sealed class ProcObstaclePlacerTests
         // Assert: Always the passage in front of the exit.
         Assert.Empty(graph.Edges[0].Conditions);
         Assert.Single(graph.Edges[1].Conditions);
+      }
+    }
+
+    [Fact]
+    public void Execute_WithWeightedPick_SometimesTakesCostlierCut()
+    {
+      // Arrange: Eight-node cycle, start next to the exit, one chokepoint near the start.
+      const int seeds = 200;
+      var lockedDetour = new int[8];
+      for (var seed = 0; seed < seeds; seed++)
+      {
+        var graph = CreateAdjacentCycleLevel();
+
+        // Act: One obstacle.
+        Run(graph, 1, seed, NoBypass);
+
+        // Assert: The direct passage is always part of the cut.
+        Assert.Single(graph.Edges[AdjacentCycleDirectEdge].Conditions);
+        for (var edge = 0; edge < AdjacentCycleDirectEdge; edge++)
+        {
+          if (graph.Edges[edge].Conditions.Count > 0) lockedDetour[edge]++;
+        }
+      }
+
+      // Assert: The cheapest cut (through the chokepoint, edge 1) is the most likely one, but
+      // dearer cuts further along the detour are taken too.
+      var counts = string.Join(",", lockedDetour);
+      var chokepoint = lockedDetour[AdjacentCycleChokepointEdge];
+      for (var edge = 0; edge < AdjacentCycleDirectEdge; edge++)
+      {
+        if (edge != AdjacentCycleChokepointEdge) Assert.True(chokepoint > lockedDetour[edge], counts);
+      }
+
+      Assert.True(lockedDetour[2] > 0 && lockedDetour[3] > 0, counts);
+    }
+
+    [Fact]
+    public void Execute_WithCutCostHalvingZero_AlwaysTakesCheapest()
+    {
+      for (var seed = 0; seed < SweepSeeds; seed++)
+      {
+        // Arrange: Same cycle; the weighted pick switched off.
+        var graph = CreateAdjacentCycleLevel();
+        var options = NoBypass with { CutCostHalving = 0f };
+
+        // Act: One obstacle.
+        Run(graph, 1, seed, options);
+
+        // Assert: Always the unique minimum cut: the direct passage and the chokepoint.
+        for (var edge = 0; edge < graph.Edges.Count; edge++)
+        {
+          var expected = edge == AdjacentCycleDirectEdge || edge == AdjacentCycleChokepointEdge ? 1 : 0;
+          Assert.Equal(expected, graph.Edges[edge].Conditions.Count);
+        }
       }
     }
 

@@ -63,8 +63,13 @@ Extra conservatism for the solution flood (stronger than the validator):
   condition already on the edge (prefers fresh cuts over stacking, stacking still possible).
 - **Candidates**: several cuts per target, by contracting the BFS ball of radius `r = 0, 1, 2...`
   around `T` (and around `s`) into the terminal before the flow. Gives cuts at different positions
-  along the corridor. Deduplicate by edge set; reject cuts with more than `MaxEdgesPerObstacle`
-  ordinary edges or infinite cost. Pick the cheapest, ties and near-ties broken by seeded roll.
+  along the corridor. A ball never enters the opposite terminal (it grows around it), and a series
+  ends when its ball stops growing; so adjacent start and exit still get cuts further along the
+  detour. Deduplicate by edge set; reject cuts with more than `MaxEdgesPerObstacle` ordinary edges
+  or infinite cost. **Weighted pick**: a candidate's weight halves for every `CutCostHalving`
+  (default 2) of cost above the cheapest, so the cheapest is the most likely pick, not a certain
+  one. `CutCostHalving = 0` takes only the cheapest (equal costs rolled). Weights are integers
+  (cheapest = 65536, at least 1), rolled once.
 - **Sides**: `A` = nodes reached from `s` over ordinary edges without the cut; the rest of the ordinary
   nodes are `B`. Secret nodes join `A` first (flood over secret edges), then `B`. Every edge between
   `A` and `B` gets the condition - except a *secret* edge may stay open with `ChanceSecretBypass`.
@@ -134,7 +139,8 @@ Keep a list of **required nodes** `Q`, initially `{exit node}`. Per obstacle:
    - a **stacking** cut (`c` = highest condition count on its edges, 1 or 2) is accepted only with
      chance `ChanceStack ^ c` (default 0.2: 20 %, then 4 %). When refused, the cheapest fresh cut
      of the same target is taken if one exists (wider, but fresh); otherwise the next target is tried.
-   "Best" means lowest cost; exactly equal costs are decided by seeded roll.
+   "Best" means the weighted pick of section 4.1 (cheapest most likely); the fresh fallback is
+   the cheapest fresh cut.
 3. If no target was accepted but some stacking cut was refused, take the least stacked of them
    (ties: first in target order). Stacking is rare while alternatives exist, yet Complexity is not
    wasted on tiny graphs where stacking is the only option. No cut at all -> pass ends early.
@@ -155,13 +161,17 @@ exit** (testable through `GraphMetadata`: exit `Reach` lists every main solution
 
 Edge cases this covers without special code:
 - **Start and exit adjacent**: every start-exit cut contains the direct edge. The first obstacle
-  locks it. Later obstacles mostly lock away earlier solutions instead (chain: solution 1 behind
+  locks it, together with one passage of each detour; that second passage is picked among several
+  positions along the detour (weighted pick), not always the cheapest one. Without that, a single
+  chokepoint near the start took every such obstacle and left one or two nodes for the solution
+  (text seed "46", difficulty 5). Later obstacles mostly lock away earlier solutions instead (chain: solution 1 behind
   obstacle 2, solution 2 behind obstacle 3...), because re-targeting the exit means stacking and
   must pass the `ChanceStack` roll. After 3 conditions the edge is uncuttable anyway. Three
   stacked obstacles with unrelated solutions ("collect three keys") are the rare outcome, or the
   forced one when the graph offers nothing else to lock.
-- **Bottlenecks**: a bridge is the cheapest cut, so it wins; wide cuts only when nothing narrower
-  exists, and never above `MaxEdgesPerObstacle`.
+- **Bottlenecks**: a bridge is the cheapest cut, so it is the most likely pick; wider cuts are
+  rarer (a two-chokepoint cut is a quarter as likely as a one-chokepoint cut at the default
+  `CutCostHalving`), and never above `MaxEdgesPerObstacle`.
 - **Fragmentation**: a cut may split off a group of nodes; fine by the softlock rule.
 - **Dense graph / exit with high degree**: no cut under the width cap -> fewer obstacles, Complexity unused.
 
@@ -209,7 +219,8 @@ No-op when: `Complexity == 0`; fewer than two nodes; not exactly one start node 
   all others, the whole target series lands on it and other positions only come from the source
   series (at most `MaxBallRadius` = 3 hops from start). `CostStack` evens this out once the
   bottleneck carries a condition. Measured in phase 7 (section 5.1): long corridors are covered
-  well enough, the radius stays.
+  well enough, the radius stays. Since the weighted pick (section 5.3) the cheapest bottleneck no
+  longer takes every obstacle.
 - **Stacking frequency (measured in phase 3)**: start next to exit with five leaves on the start,
   Complexity 3, 2000 seeds; share of seeds by number of conditions on the direct passage:
 
@@ -288,6 +299,25 @@ So the limit bites where it should - dense graphs asked for many obstacles - and
 drop to 15-23 % doubled passages but only 72-77 % placed) and `FreeStackedConditions = 1` (removes
 triple stacks on 5-node graphs, costs 2-3 points on small graphs). Defaults stay 0.25 and 2.
 
+### 5.3 Weighted cut pick
+
+Added after the stack limit. Before, the cut was always the cheapest candidate (exact ties rolled),
+and with start next to exit only radius-0 cuts were searched (both balls swallowed the other
+terminal at once). One chokepoint near the start then took every such obstacle. Now balls grow
+around the opposite terminal and the pick is weighted (`CutCostHalving`, section 4.1).
+
+SeedSweep, 10000 runs with default options, before -> after (Simple builder, 5043 runs):
+
+| Metric | Before | After |
+|---|---|---|
+| Solution in start / obstacle | 14.8 % | 13.3 % |
+| Key in start node next to its door | 11.2 % | 9.8 % |
+| Runs where every obstacle is key-at-start-door | 409 | 331 |
+| Stacked / conditioned passage | 10.9 % | 10.6 % |
+| Obstacles / Complexity | 98.9 % | 98.9 % |
+
+No errors before or after; the other suspicious counts moved by a few runs only.
+
 ## 6. Implementation plan
 
 New code, namespace `LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler`
@@ -314,7 +344,7 @@ Changes to existing code:
 - `Data/Config/Graph/Proc/CnfProcObstaclePlacerOpt.cs` (new public record + `Validate()`), added to
   `CnfProcOpt` as `ObstaclePlacer`: `MaxConditionsPerEdge = 3`, `MaxEdgesPerObstacle = 4`,
   `MainShare = 0.7`, `SmallComplexityMax = 3`, `ChanceReserveSide = 0.75`, `ChanceReserveSideOnly = 0.2`,
-  `ChanceNestSolution = 0.4`, `ChanceStack = 0.2`, `MaxStackLoad = 0.25`, `FreeStackedConditions = 2`, `ChanceSecretBypass = 0.25`, `ChanceBypass = 0.01`. Cost weights
+  `ChanceNestSolution = 0.4`, `ChanceStack = 0.2`, `MaxStackLoad = 0.25`, `FreeStackedConditions = 2`, `ChanceSecretBypass = 0.25`, `ChanceBypass = 0.01`, `CutCostHalving = 2` (added with 5.3). Cost weights
   (`CostChokepoint = 4`, `CostOpen = 6`, `CostStack = 2`, `CostSecret = 0`) stay
   named constants inside `ObstacleWorkGraph` until tuning shows they need exposing.
 - `Internal/Prop/Resolvers/Graph/GraphResolver.cs` (`ResolveProcOpts`): pass the default section.

@@ -299,6 +299,7 @@ public sealed class CnfProcOptsTests
       Assert.Equal(2, opts.FreeStackedConditions);
       Assert.Equal(0.25f, opts.ChanceSecretBypass);
       Assert.Equal(0.01f, opts.ChanceBypass);
+      Assert.Equal(2f, opts.CutCostHalving);
     }
 
     [Fact]
@@ -319,6 +320,7 @@ public sealed class CnfProcOptsTests
         FreeStackedConditions = 0,
         ChanceSecretBypass = 1f,
         ChanceBypass = 0f,
+        CutCostHalving = 0f,
       };
 
       // Act/Assert: Smallest limits and both ends of the unit interval are allowed.
@@ -403,6 +405,20 @@ public sealed class CnfProcOptsTests
       // Act/Assert: Validation rejects it naming the property.
       var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
       Assert.Equal(nameof(CnfProcObstaclePlacerOpt.MaxStackLoad), exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-0.01f)]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    public void ObstaclePlacer_WithInvalidCutCostHalving_ThrowsArgumentOutOfRangeException(float halving)
+    {
+      // Arrange: A cost halving that is negative or not finite.
+      var opts = new CnfProcObstaclePlacerOpt { CutCostHalving = halving };
+
+      // Act/Assert: Validation rejects it naming the property.
+      var exception = Assert.Throws<ArgumentOutOfRangeException>(() => opts.Validate());
+      Assert.Equal(nameof(CnfProcObstaclePlacerOpt.CutCostHalving), exception.ParamName);
     }
 
     [Fact]

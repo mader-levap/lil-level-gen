@@ -317,6 +317,30 @@ public sealed class ObstacleWorkGraphTests
     }
 
     [Fact]
+    public void Ball_WithBlockedNode_NeverEntersIt()
+    {
+      // Arrange: Chain of five nodes.
+      var work = CreateWorkGraph(5, Chain(5));
+
+      // Act: Large ball around the middle node, its left neighbour blocked.
+      var ball = work.Ball(2, 9, blocked: 1);
+
+      // Assert: The blocked node and everything behind it stay outside.
+      Assert.Equal([false, false, true, true, true], ball);
+    }
+
+    [Fact]
+    public void Ball_WithBlockedCenter_ThrowsArgumentException()
+    {
+      // Arrange: Any graph.
+      var work = CreateWorkGraph(2, Chain(2));
+
+      // Act/Assert: The center cannot be blocked.
+      var exception = Assert.Throws<ArgumentException>(() => work.Ball(0, 1, blocked: 0));
+      Assert.Equal("blocked", exception.ParamName);
+    }
+
+    [Fact]
     public void Ball_WithNegativeRadius_ThrowsArgumentOutOfRangeException()
     {
       // Arrange: Any graph.

@@ -13,8 +13,6 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsPackable>false</IsPackable>
-    <!-- Timing: compile every method fully optimised at first use, so measured runs do not
-         drift while tiered JIT recompiles hot code mid-sweep. Harness process only. -->
     <TieredCompilation>false</TieredCompilation>
   </PropertyGroup>
 

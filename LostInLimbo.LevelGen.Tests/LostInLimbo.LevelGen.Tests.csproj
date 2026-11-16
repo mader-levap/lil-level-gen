@@ -21,8 +21,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Allows unit tests of the level generator itself. -->
     <ProjectReference Include="..\LostInLimbo.LevelGen\LostInLimbo.LevelGen.csproj" />
-    <!-- Unit tests of the seed sweep harness (parser, analyzer, runner). -->
+    <!-- Allows unit tests of the seed sweep harness (parser, analyzer, runner). -->
     <ProjectReference Include="..\LostInLimbo.LevelGen.SeedSweep\LostInLimbo.LevelGen.SeedSweep.csproj" />
   </ItemGroup>
 

@@ -112,6 +112,20 @@ public sealed record CnfProcObstaclePlacerOpt
   /// </summary>
   public int FreeStackedConditions { get; init; } = 2;
 
+  /// <summary>
+  /// Main pass: how strongly the cheapest cut is preferred. Among the candidate cuts of a
+  /// target, a cut's pick weight halves for every <c>CutCostHalving</c> of cut cost above the
+  /// cheapest one, so the cheapest is the most likely pick but not a certain one.
+  /// <para>
+  /// Cut costs: 4 per chokepoint passage, 6 per other passage, +2 per condition already on the
+  /// passage, 0 per secret passage. With the default 2, a cut swapping one chokepoint for an
+  /// ordinary passage is half as likely; a cut of two chokepoints a quarter as likely as one
+  /// chokepoint.
+  /// </para>
+  /// <para>Must be a finite value of at least 0; 0 always takes the cheapest cut (equal costs are rolled).</para>
+  /// </summary>
+  public float CutCostHalving { get; init; } = 2f;
+
   // Bypasses.
 
   /// <summary>
@@ -149,6 +163,8 @@ public sealed record CnfProcObstaclePlacerOpt
       throw new ArgumentOutOfRangeException(nameof(FreeStackedConditions), FreeStackedConditions, "FreeStackedConditions must not be negative.");
     if (!float.IsFinite(MaxStackLoad) || MaxStackLoad < 0f)
       throw new ArgumentOutOfRangeException(nameof(MaxStackLoad), MaxStackLoad, "MaxStackLoad must be a finite value of at least 0.");
+    if (!float.IsFinite(CutCostHalving) || CutCostHalving < 0f)
+      throw new ArgumentOutOfRangeException(nameof(CutCostHalving), CutCostHalving, "CutCostHalving must be a finite value of at least 0.");
 
     ValidateChance(MainShare, nameof(MainShare));
     ValidateChance(ChanceReserveSide, nameof(ChanceReserveSide));

@@ -18,7 +18,9 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// <item>source grown: the cut nearest the source is taken, pushed outwards as the ball grows.</item>
 /// </list>
 /// <para>
-/// A ball that swallows the opposite terminal ends its series. Cuts that lock the same
+/// A ball never enters the opposite terminal; it grows around it instead. So a source next to
+/// the target still gets cuts further along the detour (the direct passage is part of each).
+/// A ball that stops growing ends its series. Cuts that lock the same
 /// passages are reported once; cuts through passages that cannot be locked, and cuts wider
 /// than the allowed number of ordinary passages, are dropped.
 /// </para>
@@ -92,26 +94,12 @@ internal sealed class CutSearch
 
     // Target series: grow the target, take the cut nearest to it.
     single[source] = true;
-    for (var radius = 0; radius <= MaxBallRadius; radius++)
-    {
-      var ball = _graph.Ball(target, radius);
-      if (ball[source]) break;
-
-      var result = _finder.Find(costs, single, ball, ObstacleWorkGraph.CostUncuttable);
-      if (!result.Limited) AddCandidate(source, target, costs, result.SinkSide, candidates, seen);
-    }
+    AddSeries(source, target, grown: target, opposite: source, single, costs, candidates, seen);
 
     // Source series: grow the source, take the cut nearest to it.
     single[source] = false;
     single[target] = true;
-    for (var radius = 0; radius <= MaxBallRadius; radius++)
-    {
-      var ball = _graph.Ball(source, radius);
-      if (ball[target]) break;
-
-      var result = _finder.Find(costs, ball, single, ObstacleWorkGraph.CostUncuttable);
-      if (!result.Limited) AddCandidate(source, target, costs, result.SourceSide, candidates, seen);
-    }
+    AddSeries(source, target, grown: source, opposite: target, single, costs, candidates, seen);
 
     // Stable ordering: List.Sort is unstable, so discovery order is an explicit last key.
     var order = new List<int>(candidates.Count);
@@ -127,6 +115,61 @@ internal sealed class CutSearch
     var sorted = new List<CutCandidate>(candidates.Count);
     foreach (var index in order) sorted.Add(candidates[index]);
     return sorted;
+  }
+
+  /// <summary>
+  /// Runs one series: grows a ball around one terminal (radius <c>0 .. </c><see cref="MaxBallRadius"/>)
+  /// and adds the minimum cut between that ball and the other terminal per radius.
+  /// </summary>
+  /// <param name="source">Work index of the source node.</param>
+  /// <param name="target">Work index of the target node.</param>
+  /// <param name="grown">Terminal the ball grows around: <paramref name="source"/> or <paramref name="target"/>.</param>
+  /// <param name="opposite">The other terminal; the ball never enters it.</param>
+  /// <param name="single">Flags of the opposite terminal alone, the fixed side of the flow.</param>
+  /// <param name="costs">Cut cost per edge.</param>
+  /// <param name="candidates">Receives the candidates.</param>
+  /// <param name="seen">Keys of the lock sets already reported.</param>
+  private void AddSeries(
+    int source,
+    int target,
+    int grown,
+    int opposite,
+    bool[] single,
+    long[] costs,
+    List<CutCandidate> candidates,
+    HashSet<string> seen)
+  {
+    var previousSize = 0;
+    for (var radius = 0; radius <= MaxBallRadius; radius++)
+    {
+      var ball = _graph.Ball(grown, radius, blocked: opposite);
+      var size = CountSet(ball);
+      if (size == previousSize) break; // The ball stopped growing: no new cut position.
+      previousSize = size;
+
+      var growsTarget = grown == target;
+      var result = growsTarget
+        ? _finder.Find(costs, single, ball, ObstacleWorkGraph.CostUncuttable)
+        : _finder.Find(costs, ball, single, ObstacleWorkGraph.CostUncuttable);
+      if (result.Limited) continue;
+
+      // The side next to the grown ball holds the cut nearest to it.
+      AddCandidate(source, target, costs, growsTarget ? result.SinkSide : result.SourceSide, candidates, seen);
+    }
+  }
+
+  /// <summary>Counts the set flags.</summary>
+  /// <param name="flags">Flags to count.</param>
+  /// <returns>Number of true entries.</returns>
+  private static int CountSet(bool[] flags)
+  {
+    var count = 0;
+    foreach (var flag in flags)
+    {
+      if (flag) count++;
+    }
+
+    return count;
   }
 
   /// <summary>

@@ -97,6 +97,33 @@ public sealed class CutSearchTests
     }
 
     [Fact]
+    public void FindCandidates_WithAdjacentSourceAndTargetOnCycle_OffersSeveralPositions()
+    {
+      // Arrange: Cycle of eight nodes, source 1 next to target 8 (edge 7 is the direct passage).
+      // The only chokepoint lies one node away from the source (edge 1), so with the direct
+      // passage it forms the unique minimum cut (the shape of text seed "46", difficulty 5).
+      var work = CreateWorkGraph(
+        8,
+        new Passage(1, 2),
+        new Passage(2, 3, Chokepoint: true),
+        new Passage(3, 4),
+        new Passage(4, 5),
+        new Passage(5, 6),
+        new Passage(6, 7),
+        new Passage(7, 8),
+        new Passage(8, 1));
+
+      // Act: Keep node 8 away from its neighbour node 1.
+      var candidates = Search(work, 0, 7);
+
+      // Assert: The balls grow past the adjacent terminal, so dearer positions further along
+      // the detour are offered too; every cut still holds the direct passage.
+      Assert.Equal([[1, 7], [2, 7], [3, 7]], LockSets(candidates));
+      Assert.Equal(ObstacleWorkGraph.CostChokepoint + ObstacleWorkGraph.CostOpen, candidates[0].Cost);
+      Assert.Equal(2 * ObstacleWorkGraph.CostOpen, candidates[1].Cost);
+    }
+
+    [Fact]
     public void FindCandidates_WithDirectPassageOnly_OffersThatPassage()
     {
       // Arrange: Two nodes, one passage.

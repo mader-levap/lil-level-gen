@@ -232,12 +232,19 @@ internal sealed class ObstacleWorkGraph
   /// </summary>
   /// <param name="center">Work index of the center node.</param>
   /// <param name="radius">Largest hop distance included; 0 yields the center alone. Must not be negative.</param>
-  /// <returns>Flags per node; the center is always set.</returns>
+  /// <param name="blocked">
+  /// Node the ball never enters (nor reaches through), or <see cref="NoNode"/> for none. Must
+  /// differ from <paramref name="center"/>.
+  /// </param>
+  /// <returns>Flags per node; the center is always set, the blocked node never.</returns>
   /// <exception cref="ArgumentOutOfRangeException"><paramref name="radius"/> is negative.</exception>
-  public bool[] Ball(int center, int radius)
+  /// <exception cref="ArgumentException"><paramref name="blocked"/> is the center.</exception>
+  public bool[] Ball(int center, int radius, int blocked = NoNode)
   {
     if (radius < 0)
       throw new ArgumentOutOfRangeException(nameof(radius), radius, "Radius must not be negative.");
+    if (blocked == center)
+      throw new ArgumentException("The center cannot be blocked.", nameof(blocked));
 
     var inside = new bool[_nodes.Length];
     var distance = new int[_nodes.Length];
@@ -253,7 +260,7 @@ internal sealed class ObstacleWorkGraph
       foreach (var edge in _incident[node])
       {
         var next = OtherEnd(edge, node);
-        if (inside[next]) continue;
+        if (inside[next] || next == blocked) continue;
 
         inside[next] = true;
         distance[next] = distance[node] + 1;

@@ -25,8 +25,9 @@ namespace LostInLimbo.LevelGen.Internal.Generator.Graph.Processors.Obstacler;
 /// comes first with <see cref="CnfProcObstaclePlacerOpt.ChanceNestSolution"/> (a solution behind
 /// another obstacle), otherwise a primary target. The other required nodes follow in shuffled
 /// order.</item>
-/// <item><b>Cut per target.</b> The cheapest candidate cut is taken, ties broken by roll. A
-/// fresh cut (no passage of it carries a condition) is accepted at once. A stacking cut is
+/// <item><b>Cut per target.</b> One candidate cut is picked by weighted roll: the cheapest is
+/// the most likely, dearer ones less so (<see cref="CnfProcObstaclePlacerOpt.CutCostHalving"/>),
+/// so obstacles do not always land on the same bottleneck. A fresh cut (no passage of it carries a condition) is accepted at once. A stacking cut is
 /// accepted with chance <c>ChanceStack ^ c</c>, where <c>c</c> is the highest condition count
 /// on its passages; when refused, the cheapest fresh cut of the same target is taken instead,
 /// and without one the next target is tried.</item>
@@ -201,7 +202,7 @@ internal sealed class ObstaclePassMain
         continue;
       }
 
-      var best = PickCheapest(candidates);
+      var best = PickWeighted(candidates);
       if (best.MaxConditions == 0) return best;
 
       // Over the stack limit: refused without a roll, and not available for forced stacking.
@@ -343,16 +344,55 @@ internal sealed class ObstaclePassMain
 
   #endregion
 
+  /// <summary>Fixed-point scale of the cut pick weights: the cheapest cut weighs this much.</summary>
+  private const double CutWeightScale = 1 << 16;
+
   /// <summary>
-  /// Picks among the cheapest candidates; several equally cheap ones are decided by roll.
+  /// Picks one candidate by weighted roll: the weight halves for every
+  /// <see cref="CnfProcObstaclePlacerOpt.CutCostHalving"/> of cost above the cheapest, so the
+  /// cheapest is the most likely pick. With a halving of 0 only the cheapest candidates are
+  /// eligible, equally likely.
   /// </summary>
+  /// <remarks>
+  /// Weights are rounded to integers (the cheapest weighs <see cref="CutWeightScale"/>, none
+  /// less than 1) and rolled once, like <see cref="SolutionPicker"/>; the rounding keeps the
+  /// result independent of the last bits of <see cref="Math.Pow(double, double)"/>. A single
+  /// eligible candidate draws no random number.
+  /// </remarks>
   /// <param name="candidates">Candidates ordered cheapest first; not empty.</param>
-  /// <returns>One of the candidates sharing the lowest cost.</returns>
-  private CutCandidate PickCheapest(List<CutCandidate> candidates)
+  /// <returns>The picked candidate.</returns>
+  private CutCandidate PickWeighted(List<CutCandidate> candidates)
   {
-    var ties = 1;
-    while (ties < candidates.Count && candidates[ties].Cost == candidates[0].Cost) ties++;
-    return ties == 1 ? candidates[0] : candidates[_state.Random.NextInt(ties)];
+    var cheapest = candidates[0].Cost;
+    var halving = _state.Options.CutCostHalving;
+    var weights = new int[candidates.Count];
+    var total = 0;
+    for (var index = 0; index < candidates.Count; index++)
+    {
+      var excess = candidates[index].Cost - cheapest;
+      if (halving <= 0f)
+      {
+        weights[index] = excess == 0 ? 1 : 0;
+      }
+      else
+      {
+        var weight = Math.Round(CutWeightScale * Math.Pow(0.5, excess / (double)halving));
+        weights[index] = (int)Math.Max(1.0, weight);
+      }
+
+      total += weights[index];
+    }
+
+    if (total == weights[0]) return candidates[0]; // Only the first is eligible: no roll.
+
+    var roll = _state.Random.NextInt(total);
+    for (var index = 0; index < candidates.Count; index++)
+    {
+      roll -= weights[index];
+      if (roll < 0) return candidates[index];
+    }
+
+    throw new InvalidOperationException("Cut weight roll landed outside the candidate list.");
   }
 
   /// <summary>
